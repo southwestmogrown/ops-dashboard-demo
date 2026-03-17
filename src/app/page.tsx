@@ -1,10 +1,26 @@
+"use client";
+
 import "./globals.css";
 
+import { ShiftName } from "@/lib/types";
+import Header from "@/components/Header";
+import { useState } from "react";
+
+
+
 export default function Home() {
+  const [shift, setShift] = useState<ShiftName>("day");
+
   return (
     <main className="p-8">
-      <h1 className="text-accent text-2xl font-semibold">Ops Dashboard</h1>
-      <p className="text-slate-400 mt-2">Dashboard coming soon.</p>
+      <Header
+        shift={shift}
+        onShiftChange={setShift}
+        lastUpdated={new Date()}
+      />
+      <div className="p-8">
+        <p className="text-slate-400">Components go here.</p>
+      </div>
     </main>
   );
 }
