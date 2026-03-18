@@ -10,14 +10,14 @@ import {
   Legend,
   ResponsiveContainer,
 } from "recharts";
-import { Line } from "@/lib/types";
+import { Line as LineData } from "@/lib/types";
 
 interface OutputChartProps {
-  lines: Line[];
+  lines: LineData[];
 }
 
 export default function OutputChart({ lines }: OutputChartProps) {
-  const data = lines.map((line) => ({
+  const data = lines.map((line: LineData) => ({
     line: `${line.valueStream} L${line.name.slice(-1)}`,
     output: line.output,
     target: line.target,
