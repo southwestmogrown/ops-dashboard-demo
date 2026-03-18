@@ -1,8 +1,8 @@
 "use client";
 
 import {
-  LineChart,
-  Line,
+  BarChart,
+  Bar,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -10,26 +10,34 @@ import {
   Legend,
   ResponsiveContainer,
 } from "recharts";
-import { TimePoint } from "@/lib/types";
+import { Line } from "@/lib/types";
 
-interface TrendChartProps {
-  data: TimePoint[];
+interface OutputChartProps {
+  lines: Line[];
 }
 
-export default function TrendChart({ data }: TrendChartProps) {
+export default function OutputChart({ lines }: OutputChartProps) {
+  const data = lines.map((line) => ({
+    line: `${line.valueStream} L${line.name.slice(-1)}`,
+    output: line.output,
+    target: line.target,
+  }));
+
   return (
     <div className="bg-surface border border-border rounded-lg p-5">
       <div className="text-slate-500 text-xs font-medium uppercase tracking-wider mb-4">
-        Output Trend
+        Output vs Target
       </div>
       <ResponsiveContainer width="100%" height={300}>
-        <LineChart
+        <BarChart
           data={data}
           margin={{ top: 5, right: 20, left: 0, bottom: 5 }}
+          barCategoryGap="25%"
+          barGap={3}
         >
-          <CartesianGrid strokeDasharray="3 3" stroke="#1e2433" />
+          <CartesianGrid strokeDasharray="3 3" stroke="#1e2433" vertical={false} />
           <XAxis
-            dataKey="time"
+            dataKey="line"
             tick={{ fill: "#64748b", fontSize: 11 }}
             axisLine={{ stroke: "#1e2433" }}
             tickLine={false}
@@ -41,6 +49,7 @@ export default function TrendChart({ data }: TrendChartProps) {
             width={40}
           />
           <Tooltip
+            cursor={{ fill: "rgba(255,255,255,0.03)" }}
             contentStyle={{
               backgroundColor: "#131720",
               border: "1px solid #1e2433",
@@ -53,25 +62,21 @@ export default function TrendChart({ data }: TrendChartProps) {
           <Legend
             wrapperStyle={{ fontSize: "12px", color: "#64748b" }}
           />
-          <Line
-            type="monotone"
-            dataKey="vs1Output"
-            name="VS1"
-            stroke="#f97316"
-            strokeWidth={2}
-            dot={false}
-            activeDot={{ r: 4, fill: "#f97316" }}
+          <Bar
+            dataKey="output"
+            name="Output"
+            fill="#f97316"
+            radius={[3, 3, 0, 0]}
           />
-          <Line
-            type="monotone"
-            dataKey="vs2Output"
-            name="VS2"
-            stroke="#1D9E75"
-            strokeWidth={2}
-            dot={false}
-            activeDot={{ r: 4, fill: "#1D9E75" }}
+          <Bar
+            dataKey="target"
+            name="Target"
+            fill="#1e2433"
+            radius={[3, 3, 0, 0]}
+            stroke="#334155"
+            strokeWidth={1}
           />
-        </LineChart>
+        </BarChart>
       </ResponsiveContainer>
     </div>
   );
