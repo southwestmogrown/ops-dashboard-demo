@@ -50,9 +50,9 @@ Open [http://localhost:3000](http://localhost:3000). The dashboard polls `/api/m
 |---|---|---|
 | `DEMO_SEED` | No | Integer seed that overrides the per-shift RNG seed. Locks in a specific data run across refreshes. Omit to use shift-default seeds (`day=1001`, `night=3003`). |
 
-**Recommended production value:** `DEMO_SEED=7957`
+**Recommended production value:** `DEMO_SEED=18606`
 
-Seed `7957` produces a visually varied dataset: VS1 Line 1 runs clean (≈ 98 % FPY), while the remaining four lines fall into at-risk territory with high changeover counts — a realistic scenario that exercises every status colour and alert in the UI.
+Seed `18606` produces a dataset that exercises every visual state in the UI: VS1 Line 2 is the lone green performer (95.3 % FPY), VS1 Line 1 sits in the amber warning band, and three lines (VS1 L3, VS2 L1, VS2 L2) are flagged at-risk with red borders. All five lines carry 2–3 changeovers and output ranges from 56 % to 95 % of target.
 
 To set this in Vercel: **Project → Settings → Environment Variables → Add** `DEMO_SEED` = `7957`, environment: Production.
 
