@@ -1,81 +1,86 @@
-# Ops Dashboard — RealTruck BAK Demo
+# Ops Dashboard — RealTruck BAK
 
-A real-time manufacturing floor KPI dashboard built with Next.js, React, and Recharts. Designed as a portfolio case study demonstrating production-monitoring patterns for a high-throughput assembly environment.
+> Real-time production monitoring for manufacturing floor operations. Built for shift supervisors who need to catch at-risk lines before they miss targets — not after.
 
-**Live demo →** https://ops-dashboard-demo.vercel.app
+BAK Industries runs multiple production lines across two value streams. Historically, shift performance was tracked in spreadsheets and reviewed after the fact. This dashboard replaces that workflow with live KPI visibility, automatic at-risk flagging, and one-click shift reporting — built to the same standards you'd ship to production.
 
----
-
-## Case study context
-
-BAK Industries (a RealTruck brand) manufactures retractable truck bed covers across multiple production lines grouped into two value streams — VS1 and VS2. Supervisors historically tracked shift performance in spreadsheets, making it difficult to spot at-risk lines in real time.
-
-This dashboard simulates the monitoring layer that would replace that workflow:
-
-- **At-risk detection** — lines where FPY drops below 90 % *and* output lags target are flagged with a red border before they miss shift goals.
-- **Shift-level KPIs** — total output vs target, average first-pass yield, average hours-per-unit, and headcount are surfaced at a glance.
-- **Per-line drill-down** — clicking any row opens a slide-out drawer with hourly output, FPY trend, and HPU trend charts, plus changeover markers.
-- **CSV export** — supervisors can download a timestamped snapshot for shift handover reports.
-
-Data is generated with a seedable pseudo-random function (Mulberry32) so the demo is deterministic and repeatable without a live data source.
+**[Live demo →](https://ops-dashboard-demo.vercel.app)**
 
 ---
 
-## Local setup
+## Features
+
+- **Automatic at-risk detection** — Lines where first-pass yield falls below 90% *and* output lags behind target are flagged with a red border in real time. Supervisors see the problem; they don't have to calculate it.
+- **Per-line drill-down** — Clicking any row opens a slide-out panel with hourly output, FPY trend, and HPU trend charts for that specific line, including markers for every changeover. Full shift context without leaving the page.
+- **Day / Night shift toggle** — Each shift carries independent targets and trend data. Switching between them reloads all KPIs and charts instantly.
+- **One-click CSV export** — Downloads a timestamped, properly quoted snapshot of the current shift's line-by-line performance — ready to open in Excel or Google Sheets, no formatting required.
+- **Production-grade UX** — Layout-matched loading skeletons on first fetch, graceful error states with retry, smooth opacity transitions on background poll, keyboard-accessible drawer with Escape and outside-click dismissal.
+
+---
+
+## Screenshots
+
+> Add a screenshot of the main dashboard and the LineDrawer open on an at-risk line. This is the highest-ROI addition you can make to this README.
+
+---
+
+## Tech Stack
+
+| Layer      | Technology              |
+|------------|-------------------------|
+| Framework  | Next.js 16 (App Router) |
+| UI         | React 19                |
+| Styling    | Tailwind CSS 4          |
+| Charts     | Recharts 3              |
+| Language   | TypeScript 5            |
+| Deploy     | Vercel                  |
+
+---
+
+## Getting Started
 
 **Prerequisites:** Node.js 18+ and npm.
 
 ```bash
-# 1. Clone
+# Clone
 git clone https://github.com/southwestmogrown/ops-dashboard-demo.git
 cd ops-dashboard-demo
 
-# 2. Install dependencies
+# Install
 npm install
 
-# 3. (Optional) Set a fixed demo seed — see env vars below
+# Configure (see Environment Variables below)
 cp .env.example .env.local
 
-# 4. Start the dev server
+# Run
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000). The dashboard polls `/api/metrics` every 30 seconds and accepts a Day / Night shift toggle.
+Open [http://localhost:3000](http://localhost:3000). The dashboard polls `/api/metrics` every 30 seconds and responds immediately to shift changes.
 
 ---
 
-## Environment variables
+## Environment Variables
 
-| Variable | Required | Description |
-|---|---|---|
-| `DEMO_SEED` | No | Integer seed that overrides the per-shift RNG seed. Locks in a specific data run across refreshes. Omit to use shift-default seeds (`day=1001`, `night=3003`). |
+| Variable    | Required | Description                                                                                                         |
+|-------------|----------|---------------------------------------------------------------------------------------------------------------------|
+| `DEMO_SEED` | No       | Integer seed that locks the RNG to a specific dataset across refreshes. Omit to use shift defaults (`day=1001`, `night=3003`). Set `18606` in Vercel for a dataset that exercises every status colour and alert state in the UI. |
 
-**Recommended production value:** `DEMO_SEED=18606`
-
-Seed `18606` produces a dataset that exercises every visual state in the UI: VS1 Line 2 is the lone green performer (95.3 % FPY), VS1 Line 1 sits in the amber warning band, and three lines (VS1 L3, VS2 L1, VS2 L2) are flagged at-risk with red borders. All five lines carry 2–3 changeovers and output ranges from 56 % to 95 % of target.
-
-To set this in Vercel: **Project → Settings → Environment Variables → Add** `DEMO_SEED` = `7957`, environment: Production.
+To set in Vercel: **Project → Settings → Environment Variables → Add** `DEMO_SEED` = `18606`, environment: Production.
 
 ---
 
-## Tech stack
+## Architecture
 
-| Layer | Technology |
-|---|---|
-| Framework | Next.js 16 (App Router) |
-| UI | React 19, Tailwind CSS 4 |
-| Charts | Recharts 3 |
-| Language | TypeScript 5 |
-| Deploy | Vercel |
+The dashboard is a single Next.js page that owns all state. Data flows from a `/api/metrics` route — backed by a seedable Mulberry32 RNG — through React state, down to four components: `LineTable`, `OutputChart`, `LineDrawer`, and `KpiCard`. The mock data layer is a clean, swappable interface: replacing it with a live MES WebSocket adapter requires no changes to the component layer.
+
+`LineDrawer` is deliberately isolated from the main layout and earmarked for promotion to a `/line/[id]` route in a future release, enabling shareable deep-links and per-line access control without a component rewrite.
 
 ---
 
-## Future features
+## Roadmap
 
-- **Per-line routes (`/line/[id]`)** — the LineDrawer slide-out is earmarked for promotion to a dedicated route, enabling shareable deep-links to individual lines and per-line access control for value-stream leads.
-
-- **Changeover tracking** — changeover counts are already surfaced in the table and drawer charts. A future release will capture start/end timestamps to enable MTCO (mean time for changeover) reporting and integration with the plant scheduling system.
-
-- **Live data adapter** — the mock `generateMetrics` function will be replaced by a thin adapter connecting to the plant's MES (Manufacturing Execution System) via WebSocket for true real-time updates.
-
-- **Role-based views** — supervisor, operator, and plant-manager permission tiers gating export, drill-down, and cross-value-stream visibility.
+- [ ] **Per-line routes** (`/line/[id]`) — shareable deep-links to individual line views with per-line access control for value-stream leads
+- [ ] **Changeover timestamp tracking** — captures start/end times per changeover to enable MTCO reporting and scheduling system integration
+- [ ] **Live data adapter** — WebSocket connection to plant MES replaces the mock layer; component API unchanged
+- [ ] **Role-based views** — supervisor, operator, and plant-manager permission tiers gating export, drill-down, and cross-value-stream visibility
