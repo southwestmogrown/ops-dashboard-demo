@@ -14,65 +14,73 @@ export default function LineTable({
     lines,
     onSelectLine,
     selectedLineId
-}: LineTableProps) {
-    return (
-        <div className="bg-surface border border-border rounded-lg p-5">
-            <div className="text-slate-500 text-xs font-medium uppercase tracking-wider mb-2">
-                VS1
-            </div>
-            <table className="w-full text-sm">
-                <thead>
-                    <tr className="text-slate-500 text-xs uppercase tracking-wider">
-                    <th className="text-left pb-2 w-[15%]">Line</th>
-                    <th className="text-right pb-2 w-[12%]">Output</th>
-                    <th className="text-right pb-2 w-[12%]">Target</th>
-                    <th className="text-right pb-2 w-[12%]">FPY</th>
-                    <th className="text-right pb-2 w-[12%]">HPU</th>
-                    <th className="text-right pb-2 w-[10%]">HC</th>
-                </tr>
-                </thead>
-                <tbody>
-                    {lines.filter(line => line.valueStream === "VS1").map(line => (
-                        <tr
-                            key={line.id}
-                            className={`cursor-pointer ${
+    }: LineTableProps) {
+
+        const tableHead = (
+            <tr className="text-slate-500 text-xs uppercase tracking-wider">
+            <th className="text-left pb-2 w-[15%]">Line</th>
+            <th className="text-right pb-2 w-[12%]">Output</th>
+            <th className="text-right pb-2 w-[12%]">Target</th>
+            <th className="text-right pb-2 w-[12%]">FPY</th>
+            <th className="text-right pb-2 w-[12%]">HPU</th>
+            <th className="text-right pb-2 w-[10%]">HC</th>
+            </tr>
+        );
+
+        return (
+            <div className="bg-surface border border-border rounded-lg p-5">
+                <div className="text-slate-500 text-xs font-medium uppercase tracking-wider mb-2">
+                    VS1
+                </div>
+                <table className="w-full text-sm">
+                    <thead>
+                        {tableHead}
+                    </thead>
+                    <tbody>
+                        {lines.filter(line => line.valueStream === "VS1").map(line => (
+                            <tr
+                                key={line.id}
+                                className={`cursor-pointer ${
                                 line.id === selectedLineId ? "bg-accent/20 border-l-2 border-accent" : "border-l-2 border-transparent hover:bg-white/5"
-                            }`}
-                            onClick={() => onSelectLine(line.id)}
-                        >
-                            <td className="py-2">{line.name}</td>
-                            <td className="text-right py-2">{line.output}</td>
-                            <td className="text-right py-2 text-slate-500">{line.target}</td>
-                            <td className="text-right py-2">{line.fpy.toFixed(1)}%</td>
-                            <td className="text-right py-2">{line.hpu.toFixed(2)} hrs</td>
-                            <td className="text-right py-2">{line.headcount}</td>
-                        </tr>
-                    ))}
-                </tbody>
-             </table>
-            <div className="text-slate-500 text-xs font-medium uppercase tracking-wider mt-4 mb-2">
-                VS2
+                                }`}
+                                onClick={() => onSelectLine(line.id)}
+                            >
+                                <td className="py-2">{line.name}</td>
+                                <td className="text-right py-2">{line.output}</td>
+                                <td className="text-right py-2 text-slate-500">{line.target}</td>
+                                <td className="text-right py-2">{line.fpy.toFixed(1)}%</td>
+                                <td className="text-right py-2">{line.hpu.toFixed(2)} hrs</td>
+                                <td className="text-right py-2">{line.headcount}</td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+                <div className="text-slate-500 text-xs font-medium uppercase tracking-wider mt-4 mb-2">
+                    VS2
+                </div>
+                <table className="w-full text-sm">
+                    <thead>
+                        {tableHead}
+                    </thead>
+                    <tbody>
+                        {lines.filter(line => line.valueStream === "VS2").map(line => (
+                            <tr
+                                key={line.id}
+                                className={`cursor-pointer ${
+                                    line.id === selectedLineId ? "bg-accent/20 border-l-2 border-accent" : "border-l-2 border-transparent hover:bg-white/5"
+                                }`}
+                                onClick={() => onSelectLine(line.id)}
+                            >
+                                <td className="py-2">{line.name}</td>
+                                <td className="text-right py-2">{line.output}</td>
+                                <td className="text-right py-2 text-slate-500">{line.target}</td>
+                                <td className="text-right py-2">{line.fpy.toFixed(1)}%</td>
+                                <td className="text-right py-2">{line.hpu.toFixed(2)} hrs</td>
+                                <td className="text-right py-2">{line.headcount}</td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
             </div>
-             <table className="w-full text-sm">
-                <tbody>
-                    {lines.filter(line => line.valueStream === "VS2").map(line => (
-                        <tr
-                            key={line.id}
-                            className={`cursor-pointer ${
-                                line.id === selectedLineId ? "bg-accent/20 border-l-2 border-accent" : "border-l-2 border-transparent hover:bg-white/5"
-                            }`}
-                            onClick={() => onSelectLine(line.id)}
-                        >
-                            <td className="py-2">{line.name}</td>
-                            <td className="text-right py-2">{line.output}</td>
-                            <td className="text-right py-2 text-slate-500">{line.target}</td>
-                            <td className="text-right py-2">{line.fpy.toFixed(1)}%</td>
-                            <td className="text-right py-2">{line.hpu.toFixed(2)} hrs</td>
-                            <td className="text-right py-2">{line.headcount}</td>
-                        </tr>
-                    ))}
-                </tbody>
-            </table>
-        </div>
-    )
-}
+        )
+    }
