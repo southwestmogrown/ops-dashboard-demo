@@ -1,18 +1,21 @@
 "use client";
 
-import { ShiftName } from "@/lib/types";
+import { Line, ShiftName } from "@/lib/types";
 import ShiftSelector from "./ShiftSelector";
+import ExportButton from "./ExportButton";
 
 interface HeaderProps {
   shift: ShiftName;
   onShiftChange: (shift: ShiftName) => void;
   lastUpdated: Date | null;
+  lines: Line[];
 }
 
 export default function Header({
   shift,
   onShiftChange,
   lastUpdated,
+  lines,
 }: HeaderProps) {
   return (
     <header className="bg-surface border-b border-border px-8 py-4">
@@ -39,13 +42,7 @@ export default function Header({
               ? `Updated ${lastUpdated.toLocaleTimeString()}`
               : "Fetching..."}
           </span>
-          <button
-            disabled
-            className="px-3 py-1.5 rounded text-sm border border-border
-                       text-slate-600 opacity-50 cursor-not-allowed"
-          >
-            Export CSV
-          </button>
+          <ExportButton lines={lines} shift={shift} />
         </div>
       </div>
     </header>

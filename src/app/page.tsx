@@ -107,6 +107,7 @@ export default function Home() {
         shift={shift}
         onShiftChange={setShift}
         lastUpdated={lastUpdated}
+        lines={lines}
       />
 
       {/* KPI cards */}
