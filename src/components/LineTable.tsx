@@ -28,7 +28,7 @@ export default function LineTable({
     }: LineTableProps) {
 
         const tableHead = (
-            <tr className="text-slate-500 text-xs uppercase tracking-wider">
+            <tr className="text-slate-400 text-xs uppercase tracking-wider">
             <th className="text-left pb-2 w-[15%]">Line</th>
             <th className="text-right pb-2 w-[12%]">Output</th>
             <th className="text-right pb-2 w-[12%]">Target</th>
@@ -40,7 +40,7 @@ export default function LineTable({
 
         return (
             <div className="bg-surface border border-border rounded-lg p-5">
-                <div className="text-slate-500 text-xs font-medium uppercase tracking-wider mb-2">
+                <div className="text-slate-400 text-xs font-medium uppercase tracking-wider mb-2">
                     VS1
                 </div>
                 <table className="w-full text-sm">
@@ -70,7 +70,7 @@ export default function LineTable({
                         ))}
                     </tbody>
                 </table>
-                <div className="text-slate-500 text-xs font-medium uppercase tracking-wider mt-4 mb-2">
+                <div className="text-slate-400 text-xs font-medium uppercase tracking-wider mt-4 mb-2">
                     VS2
                 </div>
                 <table className="w-full text-sm">

@@ -107,13 +107,13 @@ function buildChartData(line: LineData, trend: TimePoint[]): ChartPoint[] {
 
 const tooltipStyle = {
   contentStyle: {
-    backgroundColor: "#131720",
-    border: "1px solid #1e2433",
+    backgroundColor: "#161c2a",
+    border: "1px solid #253044",
     borderRadius: "6px",
     fontSize: "12px",
   },
   labelStyle: { color: "#94a3b8" },
-  itemStyle: { color: "#e2e8f0" },
+  itemStyle: { color: "#edf2f8" },
 };
 
 export default function LineDrawer({ line, trend, onClose }: LineDrawerProps) {
@@ -156,14 +156,14 @@ export default function LineDrawer({ line, trend, onClose }: LineDrawerProps) {
             {/* Header */}
             <div className="flex items-center justify-between p-5 border-b border-border shrink-0">
               <div>
-                <p className="text-xs text-slate-500 uppercase tracking-wider">
+                <p className="text-xs text-slate-400 uppercase tracking-wider">
                   {line.valueStream}
                 </p>
                 <h2 className="text-lg font-semibold text-white">{line.name}</h2>
               </div>
               <button
                 onClick={onClose}
-                className="text-slate-500 hover:text-white transition-colors p-1 rounded"
+                className="text-slate-400 hover:text-white transition-colors p-1 rounded"
                 aria-label="Close drawer"
               >
                 <svg
@@ -186,14 +186,14 @@ export default function LineDrawer({ line, trend, onClose }: LineDrawerProps) {
             {/* Metric summary row */}
             <div className="grid grid-cols-4 gap-3 p-5 border-b border-border shrink-0">
               <div>
-                <p className="text-xs text-slate-500 uppercase tracking-wider mb-1">
+                <p className="text-xs text-slate-400 uppercase tracking-wider mb-1">
                   Output
                 </p>
                 <p className="text-xl font-semibold">{line.output}</p>
-                <p className="text-xs text-slate-500">/ {line.target}</p>
+                <p className="text-xs text-slate-400">/ {line.target}</p>
               </div>
               <div>
-                <p className="text-xs text-slate-500 uppercase tracking-wider mb-1">
+                <p className="text-xs text-slate-400 uppercase tracking-wider mb-1">
                   FPY
                 </p>
                 <p className={`text-xl font-semibold ${getFpyColor(line.fpy)}`}>
@@ -201,7 +201,7 @@ export default function LineDrawer({ line, trend, onClose }: LineDrawerProps) {
                 </p>
               </div>
               <div>
-                <p className="text-xs text-slate-500 uppercase tracking-wider mb-1">
+                <p className="text-xs text-slate-400 uppercase tracking-wider mb-1">
                   HPU
                 </p>
                 <p className={`text-xl font-semibold ${getHpuColor(line.hpu)}`}>
@@ -209,7 +209,7 @@ export default function LineDrawer({ line, trend, onClose }: LineDrawerProps) {
                 </p>
               </div>
               <div>
-                <p className="text-xs text-slate-500 uppercase tracking-wider mb-1">
+                <p className="text-xs text-slate-400 uppercase tracking-wider mb-1">
                   C/O
                 </p>
                 <p className="text-xl font-semibold">{line.changeovers}</p>
@@ -220,7 +220,7 @@ export default function LineDrawer({ line, trend, onClose }: LineDrawerProps) {
             <div className="flex flex-col gap-6 p-5 overflow-y-auto">
               {/* Hourly output */}
               <div>
-                <p className="text-xs text-slate-500 uppercase tracking-wider mb-3">
+                <p className="text-xs text-slate-400 uppercase tracking-wider mb-3">
                   Hourly Output
                   {line.changeovers > 0 && (
                     <span className="ml-2 text-status-amber normal-case">
@@ -235,18 +235,18 @@ export default function LineDrawer({ line, trend, onClose }: LineDrawerProps) {
                   >
                     <CartesianGrid
                       strokeDasharray="3 3"
-                      stroke="#1e2433"
+                      stroke="#253044"
                       vertical={false}
                     />
                     <XAxis
                       dataKey="time"
-                      tick={{ fill: "#64748b", fontSize: 10 }}
-                      axisLine={{ stroke: "#1e2433" }}
+                      tick={{ fill: "#94a3b8", fontSize: 10 }}
+                      axisLine={{ stroke: "#253044" }}
                       tickLine={false}
                       interval={3}
                     />
                     <YAxis
-                      tick={{ fill: "#64748b", fontSize: 10 }}
+                      tick={{ fill: "#94a3b8", fontSize: 10 }}
                       axisLine={false}
                       tickLine={false}
                       width={28}
@@ -267,7 +267,7 @@ export default function LineDrawer({ line, trend, onClose }: LineDrawerProps) {
                     <Bar
                       dataKey="output"
                       name="Output"
-                      fill="#f97316"
+                      fill="#edb81a"
                       radius={[3, 3, 0, 0]}
                     />
                   </BarChart>
@@ -276,7 +276,7 @@ export default function LineDrawer({ line, trend, onClose }: LineDrawerProps) {
 
               {/* FPY trend */}
               <div>
-                <p className="text-xs text-slate-500 uppercase tracking-wider mb-3">
+                <p className="text-xs text-slate-400 uppercase tracking-wider mb-3">
                   FPY Trend
                 </p>
                 <ResponsiveContainer width="100%" height={140}>
@@ -286,18 +286,18 @@ export default function LineDrawer({ line, trend, onClose }: LineDrawerProps) {
                   >
                     <CartesianGrid
                       strokeDasharray="3 3"
-                      stroke="#1e2433"
+                      stroke="#253044"
                       vertical={false}
                     />
                     <XAxis
                       dataKey="time"
-                      tick={{ fill: "#64748b", fontSize: 10 }}
-                      axisLine={{ stroke: "#1e2433" }}
+                      tick={{ fill: "#94a3b8", fontSize: 10 }}
+                      axisLine={{ stroke: "#253044" }}
                       tickLine={false}
                       interval={3}
                     />
                     <YAxis
-                      tick={{ fill: "#64748b", fontSize: 10 }}
+                      tick={{ fill: "#94a3b8", fontSize: 10 }}
                       axisLine={false}
                       tickLine={false}
                       width={36}
@@ -329,7 +329,7 @@ export default function LineDrawer({ line, trend, onClose }: LineDrawerProps) {
 
               {/* HPU trend */}
               <div>
-                <p className="text-xs text-slate-500 uppercase tracking-wider mb-3">
+                <p className="text-xs text-slate-400 uppercase tracking-wider mb-3">
                   HPU Trend
                 </p>
                 <ResponsiveContainer width="100%" height={140}>
@@ -339,18 +339,18 @@ export default function LineDrawer({ line, trend, onClose }: LineDrawerProps) {
                   >
                     <CartesianGrid
                       strokeDasharray="3 3"
-                      stroke="#1e2433"
+                      stroke="#253044"
                       vertical={false}
                     />
                     <XAxis
                       dataKey="time"
-                      tick={{ fill: "#64748b", fontSize: 10 }}
-                      axisLine={{ stroke: "#1e2433" }}
+                      tick={{ fill: "#94a3b8", fontSize: 10 }}
+                      axisLine={{ stroke: "#253044" }}
                       tickLine={false}
                       interval={3}
                     />
                     <YAxis
-                      tick={{ fill: "#64748b", fontSize: 10 }}
+                      tick={{ fill: "#94a3b8", fontSize: 10 }}
                       axisLine={false}
                       tickLine={false}
                       width={36}

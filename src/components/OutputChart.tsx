@@ -25,7 +25,7 @@ export default function OutputChart({ lines }: OutputChartProps) {
 
   return (
     <div className="bg-surface border border-border rounded-lg p-5">
-      <div className="text-slate-500 text-xs font-medium uppercase tracking-wider mb-4">
+      <div className="text-slate-400 text-xs font-medium uppercase tracking-wider mb-4">
         Output vs Target
       </div>
       <ResponsiveContainer width="100%" height={300}>
@@ -35,15 +35,15 @@ export default function OutputChart({ lines }: OutputChartProps) {
           barCategoryGap="25%"
           barGap={3}
         >
-          <CartesianGrid strokeDasharray="3 3" stroke="#1e2433" vertical={false} />
+          <CartesianGrid strokeDasharray="3 3" stroke="#253044" vertical={false} />
           <XAxis
             dataKey="line"
-            tick={{ fill: "#64748b", fontSize: 11 }}
-            axisLine={{ stroke: "#1e2433" }}
+            tick={{ fill: "#94a3b8", fontSize: 11 }}
+            axisLine={{ stroke: "#253044" }}
             tickLine={false}
           />
           <YAxis
-            tick={{ fill: "#64748b", fontSize: 11 }}
+            tick={{ fill: "#94a3b8", fontSize: 11 }}
             axisLine={false}
             tickLine={false}
             width={40}
@@ -51,29 +51,29 @@ export default function OutputChart({ lines }: OutputChartProps) {
           <Tooltip
             cursor={{ fill: "rgba(255,255,255,0.03)" }}
             contentStyle={{
-              backgroundColor: "#131720",
-              border: "1px solid #1e2433",
+              backgroundColor: "#161c2a",
+              border: "1px solid #253044",
               borderRadius: "6px",
               fontSize: "12px",
             }}
             labelStyle={{ color: "#94a3b8" }}
-            itemStyle={{ color: "#e2e8f0" }}
+            itemStyle={{ color: "#edf2f8" }}
           />
           <Legend
-            wrapperStyle={{ fontSize: "12px", color: "#64748b" }}
+            wrapperStyle={{ fontSize: "12px", color: "#94a3b8" }}
           />
           <Bar
             dataKey="output"
             name="Output"
-            fill="#f97316"
+            fill="#edb81a"
             radius={[3, 3, 0, 0]}
           />
           <Bar
             dataKey="target"
             name="Target"
-            fill="#1e2433"
+            fill="#2d4f7a"
             radius={[3, 3, 0, 0]}
-            stroke="#334155"
+            stroke="#3d5a88"
             strokeWidth={1}
           />
         </BarChart>

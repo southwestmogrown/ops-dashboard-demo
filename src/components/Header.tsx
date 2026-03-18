@@ -25,7 +25,7 @@ export default function Header({
           <span className="text-accent font-semibold text-lg tracking-tight whitespace-nowrap">
             Ops Dashboard
           </span>
-          <span className="text-slate-600 text-sm hidden md:block">
+          <span className="text-slate-500 text-sm hidden md:block">
             RealTruck BAK · Demo
           </span>
         </div>
@@ -37,7 +37,7 @@ export default function Header({
 
         {/* Right — timestamp + export placeholder */}
         <div className="flex items-center gap-4 min-w-0">
-          <span className="text-slate-500 text-sm whitespace-nowrap">
+          <span className="text-slate-400 text-sm whitespace-nowrap">
             {lastUpdated
               ? `Updated ${lastUpdated.toLocaleTimeString()}`
               : "Fetching..."}

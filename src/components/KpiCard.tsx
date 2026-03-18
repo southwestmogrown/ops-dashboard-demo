@@ -17,7 +17,7 @@ export default function KpiCard({
 }: KpiCardProps) {
   return (
     <div className="bg-surface border border-border rounded-lg p-5 flex flex-col gap-1">
-      <span className="text-slate-500 text-xs font-medium uppercase tracking-wider">
+      <span className="text-slate-400 text-xs font-medium uppercase tracking-wider">
         {label}
       </span>
       <div className="flex items-baseline gap-1.5">
@@ -29,7 +29,7 @@ export default function KpiCard({
         )}
       </div>
       {subtext && (
-        <span className="text-slate-500 text-xs">{subtext}</span>
+        <span className="text-slate-400 text-xs">{subtext}</span>
       )}
     </div>
   );
