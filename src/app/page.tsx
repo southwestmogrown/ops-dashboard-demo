@@ -7,6 +7,19 @@ import Header from "@/components/Header";
 import KpiCard from "@/components/KpiCard";
 import LineTable from "@/components/LineTable";
 import { useState } from "react";
+import TrendChart from "@/components/TrendChart";
+
+// Add to your test data in page.tsx
+const trendData = [
+  { time: "06:00", vs1Output: 0, vs2Output: 0 },
+  { time: "06:30", vs1Output: 45, vs2Output: 28 },
+  { time: "07:00", vs1Output: 92, vs2Output: 58 },
+  { time: "07:30", vs1Output: 134, vs2Output: 84 },
+  { time: "08:00", vs1Output: 180, vs2Output: 112 },
+  { time: "08:30", vs1Output: 224, vs2Output: 138 },
+  { time: "09:00", vs1Output: 271, vs2Output: 165 },
+  { time: "09:30", vs1Output: 315, vs2Output: 190 },
+];
 
 function getFpyColor(fpy: number): string {
   if (fpy >= 95) return "text-status-green";
@@ -66,6 +79,7 @@ export default function Home() {
         onSelectLine={(lineId) => console.log(lineId)}
         selectedLineId={null}
       />
+      <TrendChart data={trendData} />
     </main>
   );
 }
