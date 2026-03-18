@@ -1,3 +1,4 @@
+import { Line } from "@/lib/types";
 
 interface KpiCardProps {
   label: string;

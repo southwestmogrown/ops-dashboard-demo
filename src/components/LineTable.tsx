@@ -8,6 +8,17 @@ interface LineTableProps {
     selectedLineId: string | null;
 }
 
+
+function isAtRisk(line: Line): boolean {
+  return line.fpy < 90 && line.output < line.target;
+}
+
+function getFpyColor(fpy: number): string {
+  if (fpy >= 95) return "text-status-green";
+  if (fpy >= 90) return "text-status-amber";
+  return "text-status-red";
+}
+
 // Two grouped sections. Each group has a header row (VS1 / VS2) and its lines
 // beneath it. Clicking a row calls onSelectLine with that line's id.
 export default function LineTable({
@@ -41,7 +52,11 @@ export default function LineTable({
                             <tr
                                 key={line.id}
                                 className={`cursor-pointer ${
-                                line.id === selectedLineId ? "bg-accent/20 border-l-2 border-accent" : "border-l-2 border-transparent hover:bg-white/5"
+                                    line.id === selectedLineId
+                                    ? "bg-accent/20 border-l-2 border-accent"
+                                    : isAtRisk(line)
+                                    ? "border-l-2 border-status-red"
+                                    : "border-l-2 border-transparent hover:bg-white/5"
                                 }`}
                                 onClick={() => onSelectLine(line.id)}
                             >
@@ -67,14 +82,20 @@ export default function LineTable({
                             <tr
                                 key={line.id}
                                 className={`cursor-pointer ${
-                                    line.id === selectedLineId ? "bg-accent/20 border-l-2 border-accent" : "border-l-2 border-transparent hover:bg-white/5"
+                                    line.id === selectedLineId 
+                                    ? "bg-accent/20 border-l-2 border-accent" 
+                                    : isAtRisk(line) 
+                                    ? "border-l-2 border-status-red" 
+                                    : "border-l-2 border-transparent hover:bg-white/5"
                                 }`}
                                 onClick={() => onSelectLine(line.id)}
                             >
                                 <td className="py-2">{line.name}</td>
                                 <td className="text-right py-2">{line.output}</td>
                                 <td className="text-right py-2 text-slate-500">{line.target}</td>
-                                <td className="text-right py-2">{line.fpy.toFixed(1)}%</td>
+                                <td className={`text-right py-2 ${getFpyColor(line.fpy)}`}>
+                                    {line.fpy.toFixed(1)}%
+                                </td>
                                 <td className="text-right py-2">{line.hpu.toFixed(2)} hrs</td>
                                 <td className="text-right py-2">{line.headcount}</td>
                             </tr>

@@ -2,7 +2,7 @@
 
 import "./globals.css";
 
-import { ShiftName } from "@/lib/types";
+import { Line, ShiftName } from "@/lib/types";
 import Header from "@/components/Header";
 import KpiCard from "@/components/KpiCard";
 import LineTable from "@/components/LineTable";
@@ -50,28 +50,33 @@ function getOutputColor(output: number, target: number): string {
 export default function Home() {
   const [shift, setShift] = useState<ShiftName>("day");
 
+  const totalOutput = 847;   // replace with real data in Issue #9
+  const totalTarget = 1200;
+  const avgFpy = 94.7;
+  const avgHpu = 0.38;
+
   return (
     <main className="p-8">
       <Header shift={shift} onShiftChange={setShift} lastUpdated={new Date()} />
       <div className="p-8 grid grid-cols-4 gap-4">
         <KpiCard
           label="Total Output"
-          value={847}
+          value={totalOutput}
           unit="units"
-          subtext="Target: 1200"
-          valueColor="text-status-amber"
+          subtext={`Target: ${totalTarget}`}
+          valueColor={getOutputColor(totalOutput, totalTarget)}
         />
         <KpiCard
           label="Avg FPY"
-          value="94.7"
+          value={avgFpy}
           unit="%"
-          valueColor="text-status-green"
+          valueColor={getFpyColor(avgFpy)}
         />
         <KpiCard
           label="Avg HPU"
-          value="0.38"
+          value={avgHpu}
           unit="hrs"
-          valueColor="text-status-amber"
+          valueColor={getHpuColor(avgHpu)}
         />
         <KpiCard label="Headcount" value={42} unit="operators" />
       </div>
