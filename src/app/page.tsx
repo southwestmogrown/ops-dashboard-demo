@@ -7,7 +7,14 @@ import Header from "@/components/Header";
 import KpiCard from "@/components/KpiCard";
 import LineTable from "@/components/LineTable";
 import { useState } from "react";
-import TrendChart from "@/components/TrendChart";
+import dynamic from "next/dynamic";
+
+const TrendChart = dynamic(() => import("@/components/TrendChart"), {
+  ssr: false,
+  loading: () => (
+    <div className="bg-surface border border-border rounded-lg p-5 h-[364px]" />
+  ),
+});
 
 // Add to your test data in page.tsx
 const trendData = [
