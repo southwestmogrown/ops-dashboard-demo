@@ -20,7 +20,8 @@ BAK Industries runs multiple production lines across two value streams. Historic
 
 ## Screenshots
 
-> Add a screenshot of the main dashboard and the LineDrawer open on an at-risk line. This is the highest-ROI addition you can make to this README.
+![ops-dashboard](public/ops-dashboard.png)
+![line-drawer](public/line-drawer.png)
 
 ---
 
