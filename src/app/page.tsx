@@ -39,23 +39,72 @@ function getHpuColor(hpu: number): string {
   return "text-status-red";
 }
 
-// ── Test data (replaced by real API data in Issue #9) ────────────────────────
+// ── Loading skeleton ──────────────────────────────────────────────────────────
 
-// const testLines = [
-//   { id: "vs1-l1", name: "Line 1", valueStream: "VS1", output: 274, target: 275, fpy: 95.2, hpu: 0.34, headcount: 20, changeovers: 2 },
-//   { id: "vs1-l2", name: "Line 2", valueStream: "VS1", output: 300, target: 225, fpy: 92.5, hpu: 0.42, headcount: 22, changeovers: 3 },
-//   { id: "vs1-l3", name: "Line 3", valueStream: "VS1", output: 200, target: 250, fpy: 88.7, hpu: 0.50, headcount: 18, changeovers: 4 },
-//   { id: "vs2-l1", name: "Line 1", valueStream: "VS2", output: 90,  target: 100, fpy: 90.1, hpu: 0.40, headcount: 16, changeovers: 2 },
-//   { id: "vs2-l2", name: "Line 2", valueStream: "VS2", output: 225, target: 225, fpy: 96.5, hpu: 0.30, headcount: 25, changeovers: 1 },
-// ];
+function DashboardSkeleton() {
+  return (
+    <main className="min-h-screen bg-background">
+      {/* Header */}
+      <div className="bg-surface border-b border-border px-8 py-4">
+        <div className="flex items-center justify-between">
+          <div className="h-5 w-32 bg-border rounded animate-pulse" />
+          <div className="h-8 w-40 bg-border rounded animate-pulse" />
+          <div className="h-5 w-24 bg-border rounded animate-pulse" />
+        </div>
+      </div>
 
-// // ── Derived summary values ───────────────────────────────────────────────────
+      {/* KPI cards */}
+      <div className="p-6 grid grid-cols-4 gap-4">
+        {[...Array(4)].map((_, i) => (
+          <div
+            key={i}
+            className="bg-surface border border-border rounded-lg p-5 flex flex-col gap-3"
+          >
+            <div className="h-3 w-20 bg-border rounded animate-pulse" />
+            <div className="h-8 w-24 bg-border rounded animate-pulse" />
+          </div>
+        ))}
+      </div>
 
-// const totalOutput   = testLines.reduce((sum, l) => sum + l.output, 0);
-// const totalTarget   = testLines.reduce((sum, l) => sum + l.target, 0);
-// const avgFpy        = testLines.reduce((sum, l) => sum + l.fpy, 0) / testLines.length;
-// const avgHpu        = testLines.reduce((sum, l) => sum + l.hpu, 0) / testLines.length;
-// const totalHeadcount = testLines.reduce((sum, l) => sum + l.headcount, 0);
+      {/* Table + chart */}
+      <div className="px-6 pb-6 grid grid-cols-3 gap-4">
+        <div className="col-span-2 bg-surface border border-border rounded-lg p-5">
+          <div className="flex flex-col gap-3">
+            <div className="h-3 w-16 bg-border rounded animate-pulse mb-2" />
+            {[...Array(5)].map((_, i) => (
+              <div key={i} className="h-9 bg-border/50 rounded animate-pulse" />
+            ))}
+          </div>
+        </div>
+        <div className="bg-surface border border-border rounded-lg p-5 h-[364px] animate-pulse" />
+      </div>
+    </main>
+  );
+}
+
+// ── Error screen (initial load failure) ──────────────────────────────────────
+
+function ErrorScreen({
+  message,
+  onRetry,
+}: {
+  message: string;
+  onRetry: () => void;
+}) {
+  return (
+    <main className="min-h-screen bg-background flex flex-col items-center justify-center gap-4">
+      <p className="text-status-red text-sm font-medium">Failed to load metrics</p>
+      <p className="text-slate-500 text-xs">{message}</p>
+      <button
+        onClick={onRetry}
+        className="px-4 py-2 rounded text-sm border border-border text-slate-400
+                   hover:text-white hover:border-accent transition-colors"
+      >
+        Retry
+      </button>
+    </main>
+  );
+}
 
 // ── Component ────────────────────────────────────────────────────────────────
 
@@ -63,30 +112,42 @@ export default function Home() {
   const [metrics, setMetrics] = useState<ShiftMetrics | null>(null);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [fetchError, setFetchError] = useState<string | null>(null);
   const [shift, setShift] = useState<ShiftName>("day");
   const [selectedLineId, setSelectedLineId] = useState<string | null>(null);
   const closeDrawer = useCallback(() => setSelectedLineId(null), []);
 
   const fetchMetrics = async () => {
-    const res = await fetch(`/api/metrics?shift=${shift}`);
-    const data: ShiftMetrics = await res.json();
-    setMetrics(data);
-    setLastUpdated(new Date());
-    setIsLoading(false);
+    setIsLoading(true);
+    try {
+      const res = await fetch(`/api/metrics?shift=${shift}`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data: ShiftMetrics = await res.json();
+      setMetrics(data);
+      setLastUpdated(new Date());
+      setFetchError(null);
+    } catch (err) {
+      setFetchError(err instanceof Error ? err.message : "Request failed");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   useEffect(() => {
+    setMetrics(null);
+    setIsLoading(true);
+    setFetchError(null);
     fetchMetrics();
     const interval = setInterval(fetchMetrics, 30000);
     return () => clearInterval(interval);
   }, [shift]);
 
-  if (isLoading && !metrics) {
-    return (
-      <main className="min-h-screen bg-background flex items-center justify-center">
-        <p className="text-slate-500 text-sm">Loading...</p>
-      </main>
-    );
+  // Initial load — show skeleton instead of empty flash
+  if (isLoading && !metrics) return <DashboardSkeleton />;
+
+  // Initial fetch failed — show error screen with retry
+  if (fetchError && !metrics) {
+    return <ErrorScreen message={fetchError} onRetry={fetchMetrics} />;
   }
 
   const lines = metrics!.lines;
@@ -100,6 +161,9 @@ export default function Home() {
   const avgHpu         = lines.reduce((sum, l) => sum + l.hpu, 0) / lines.length;
   const totalHeadcount = lines.reduce((sum, l) => sum + l.headcount, 0);
 
+  // True only during background polls — dims metrics to signal a refresh is in flight
+  const isRefreshing = isLoading && !!metrics;
+
   return (
     <main className="min-h-screen bg-background">
 
@@ -110,8 +174,21 @@ export default function Home() {
         lines={lines}
       />
 
+      {/* Background poll error banner — keeps existing data visible */}
+      {fetchError && metrics && (
+        <div className="px-6 pt-4">
+          <div className="bg-status-red/10 border border-status-red/30 rounded-lg px-4 py-2.5 text-sm text-status-red">
+            Refresh failed — showing last known data · {fetchError}
+          </div>
+        </div>
+      )}
+
       {/* KPI cards */}
-      <div className="p-6 grid grid-cols-4 gap-4">
+      <div
+        className={`p-6 grid grid-cols-4 gap-4 transition-opacity duration-300 ${
+          isRefreshing ? "opacity-60" : "opacity-100"
+        }`}
+      >
         <KpiCard
           label="Total Output"
           value={totalOutput}
@@ -139,7 +216,11 @@ export default function Home() {
       </div>
 
       {/* Main content */}
-      <div className="px-6 pb-6 grid grid-cols-3 gap-4">
+      <div
+        className={`px-6 pb-6 grid grid-cols-3 gap-4 transition-opacity duration-300 ${
+          isRefreshing ? "opacity-60" : "opacity-100"
+        }`}
+      >
         <div className="col-span-2">
           <LineTable
             lines={lines}
