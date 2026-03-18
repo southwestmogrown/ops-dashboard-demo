@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import dynamic from "next/dynamic";
 import { ShiftMetrics, ShiftName } from "@/lib/types";
 import Header from "@/components/Header";
@@ -12,6 +12,10 @@ const OutputChart = dynamic(() => import("@/components/OutputChart"), {
   loading: () => (
     <div className="bg-surface border border-border rounded-lg p-5 h-[364px]" />
   ),
+});
+
+const LineDrawer = dynamic(() => import("@/components/LineDrawer"), {
+  ssr: false,
 });
 
 // ── Color helpers ────────────────────────────────────────────────────────────
@@ -61,6 +65,7 @@ export default function Home() {
   const [isLoading, setIsLoading] = useState(true);
   const [shift, setShift] = useState<ShiftName>("day");
   const [selectedLineId, setSelectedLineId] = useState<string | null>(null);
+  const closeDrawer = useCallback(() => setSelectedLineId(null), []);
 
   const fetchMetrics = async () => {
     const res = await fetch(`/api/metrics?shift=${shift}`);
@@ -85,6 +90,9 @@ export default function Home() {
   }
 
   const lines = metrics!.lines;
+  const selectedLine = selectedLineId
+    ? (lines.find((l) => l.id === selectedLineId) ?? null)
+    : null;
 
   const totalOutput    = lines.reduce((sum, l) => sum + l.output, 0);
   const totalTarget    = lines.reduce((sum, l) => sum + l.target, 0);
@@ -140,6 +148,12 @@ export default function Home() {
         </div>
         <OutputChart lines={lines} />
       </div>
+
+      <LineDrawer
+        line={selectedLine}
+        trend={metrics!.trend}
+        onClose={closeDrawer}
+      />
 
     </main>
   );
