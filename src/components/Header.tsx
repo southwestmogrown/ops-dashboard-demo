@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { Line, ShiftName } from "@/lib/types";
 import ShiftSelector from "./ShiftSelector";
 import ExportButton from "./ExportButton";
@@ -43,6 +44,12 @@ export default function Header({
               : "Fetching..."}
           </span>
           <ExportButton lines={lines} shift={shift} />
+          <Link
+            href="/eos"
+            className="text-xs text-slate-500 hover:text-accent border border-border hover:border-accent px-3 py-1.5 rounded tracking-widest uppercase transition-colors whitespace-nowrap"
+          >
+            EOS Report
+          </Link>
         </div>
       </div>
     </header>
