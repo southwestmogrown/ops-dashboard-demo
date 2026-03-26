@@ -118,7 +118,6 @@ export default function Home() {
   const closeDrawer = useCallback(() => setSelectedLineId(null), []);
 
   const fetchMetrics = async () => {
-    setIsLoading(true);
     try {
       const res = await fetch(`/api/metrics?shift=${shift}`);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -161,9 +160,6 @@ export default function Home() {
   const avgHpu         = lines.reduce((sum, l) => sum + l.hpu, 0) / lines.length;
   const totalHeadcount = lines.reduce((sum, l) => sum + l.headcount, 0);
 
-  // True only during background polls — dims metrics to signal a refresh is in flight
-  const isRefreshing = isLoading && !!metrics;
-
   return (
     <main className="min-h-screen bg-background">
 
@@ -184,11 +180,7 @@ export default function Home() {
       )}
 
       {/* KPI cards */}
-      <div
-        className={`p-6 grid grid-cols-4 gap-4 transition-opacity duration-300 ${
-          isRefreshing ? "opacity-60" : "opacity-100"
-        }`}
-      >
+      <div className="p-6 grid grid-cols-4 gap-4">
         <KpiCard
           label="Total Output"
           value={totalOutput}
@@ -216,11 +208,7 @@ export default function Home() {
       </div>
 
       {/* Main content */}
-      <div
-        className={`px-6 pb-6 grid grid-cols-3 gap-4 transition-opacity duration-300 ${
-          isRefreshing ? "opacity-60" : "opacity-100"
-        }`}
-      >
+      <div className="px-6 pb-6 grid grid-cols-3 gap-4">
         <div className="col-span-2">
           <LineTable
             lines={lines}
