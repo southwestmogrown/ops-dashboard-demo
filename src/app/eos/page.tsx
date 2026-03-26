@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import type { ShiftMetrics } from "@/lib/types";
+import type { LineState } from "@/lib/mesTypes";
 import type { EOSFormData, EOSLineDescriptor, EOSLineEntry, EOSValueStream } from "@/lib/eosTypes";
 import { calculateHPU, downloadAllReports } from "@/lib/eosReports";
 import EOSLineCard from "@/components/eos/EOSLineCard";
@@ -56,13 +57,20 @@ export default function EOSPage() {
   const [activeStream, setActiveStream] = useState("vs1");
   const [activeView, setActiveView]     = useState<"entry" | "email">("entry");
 
-  // Pre-populate output and headcount from the live dashboard feed
+  // Pre-populate fields from the live dashboard feed + MES simulator state
   useEffect(() => {
-    fetch(`/api/metrics?shift=${formData.shift.toLowerCase()}`)
-      .then((r) => r.json())
-      .then((metrics: ShiftMetrics) => {
+    const metricsPromise = fetch(`/api/metrics?shift=${formData.shift.toLowerCase()}`)
+      .then((r) => r.json() as Promise<ShiftMetrics>);
+    const mesPromise = fetch("/api/mes/state")
+      .then((r) => r.json() as Promise<LineState[]>)
+      .catch(() => [] as LineState[]);
+
+    Promise.all([metricsPromise, mesPromise])
+      .then(([metrics, mesStates]) => {
         setFormData((prev) => {
           const updatedLines = { ...prev.lines };
+
+          // Output + headcount from dashboard metrics
           metrics.lines.forEach((line) => {
             const lineKey = line.id.replace("-l", ":Line ");
             if (!(lineKey in updatedLines)) return;
@@ -74,10 +82,24 @@ export default function EOSPage() {
             merged.hpu = calculateHPU(merged.output, merged.headcount, merged.hoursWorked);
             updatedLines[lineKey] = merged;
           });
+
+          // Order tracking from MES state (only when a schedule is loaded)
+          mesStates.forEach((state) => {
+            if (!state.schedule || !state.currentOrder) return;
+            const lineKey = state.lineId.replace("-l", ":Line ");
+            if (!(lineKey in updatedLines)) return;
+            updatedLines[lineKey] = {
+              ...updatedLines[lineKey],
+              orderAtPackout:       state.currentOrder,
+              remainingOnOrder:     String(state.remainingOnOrder),
+              remainingOnRunSheet:  String(state.remainingOnRunSheet),
+            };
+          });
+
           return { ...prev, lines: updatedLines };
         });
       })
-      .catch(() => {/* silently ignore — form remains editable without pre-fill */});
+      .catch(() => {/* silently ignore */});
   }, [formData.shift]);
 
   // ── Handlers ────────────────────────────────────────────────────────────────
