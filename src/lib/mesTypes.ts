@@ -35,9 +35,12 @@ export interface LineState {
   lineId: string;
   schedule: LineSchedule | null;
   totalOutput: number;           // total scans this session
-  currentOrder: string | null;   // model # of first incomplete item
-  remainingOnOrder: number;      // qty − completed for current order
-  remainingOnRunSheet: number;   // totalTarget − totalOutput
+  /** First incomplete order, or last order on sheet when fully complete */
+  currentOrder: string | null;
+  remainingOnOrder: number;      // 0 when sheet is done
+  remainingOnRunSheet: number;   // 0 when sheet is done
+  /** Number of fully completed orders — used as changeover count in EOS */
+  completedOrders: number;
   /** units per hour bucket, key = "HH:00", e.g. "07:00" → 12 */
   hourlyOutput: Record<string, number>;
 }

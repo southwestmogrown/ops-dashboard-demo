@@ -88,11 +88,19 @@ export function getLineState(lineId: string): LineState {
 
   let currentOrder: string | null = null;
   let remainingOnOrder = 0;
+  let completedOrders = 0;
+
   if (schedule) {
+    completedOrders = schedule.items.filter((it) => it.completed >= it.qty).length;
     const incomplete = schedule.items.find((it) => it.completed < it.qty);
     if (incomplete) {
+      // Sheet still in progress — point to the active order
       currentOrder = incomplete.model;
       remainingOnOrder = incomplete.qty - incomplete.completed;
+    } else if (schedule.items.length > 0) {
+      // Sheet fully complete — use the last order so EOS still has something to show
+      currentOrder = schedule.items[schedule.items.length - 1].model;
+      remainingOnOrder = 0;
     }
   }
 
@@ -100,7 +108,7 @@ export function getLineState(lineId: string): LineState {
     ? Math.max(0, schedule.totalTarget - totalOutput)
     : 0;
 
-  return { lineId, schedule, totalOutput, currentOrder, remainingOnOrder, remainingOnRunSheet, hourlyOutput };
+  return { lineId, schedule, totalOutput, currentOrder, remainingOnOrder, remainingOnRunSheet, completedOrders, hourlyOutput };
 }
 
 export function getAllLineStates(): LineState[] {

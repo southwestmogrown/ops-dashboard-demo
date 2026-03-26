@@ -85,14 +85,15 @@ export default function EOSPage() {
 
           // Order tracking from MES state (only when a schedule is loaded)
           mesStates.forEach((state) => {
-            if (!state.schedule || !state.currentOrder) return;
+            if (!state.schedule) return;
             const lineKey = state.lineId.replace("-l", ":Line ");
             if (!(lineKey in updatedLines)) return;
             updatedLines[lineKey] = {
               ...updatedLines[lineKey],
-              orderAtPackout:       state.currentOrder,
-              remainingOnOrder:     String(state.remainingOnOrder),
-              remainingOnRunSheet:  String(state.remainingOnRunSheet),
+              orderAtPackout:      state.currentOrder ?? "",
+              remainingOnOrder:    String(state.remainingOnOrder),
+              remainingOnRunSheet: String(state.remainingOnRunSheet),
+              changeovers:         String(state.completedOrders),
             };
           });
 
