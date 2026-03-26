@@ -36,15 +36,15 @@ export default function AdminPage() {
 
   useEffect(() => { refresh(); }, [refresh]);
 
-  function scheduleFor(lineId: string): LineSchedule | null {
-    return mesStates.find((s) => s.lineId === lineId)?.schedule ?? null;
+  function stateFor(lineId: string) {
+    return mesStates.find((s) => s.lineId === lineId) ?? null;
   }
 
-  async function handleScheduleLoaded(lineId: string, schedule: LineSchedule) {
+  async function handleScheduleLoaded(lineId: string, schedule: LineSchedule, mode: "replace" | "queue") {
     await fetch("/api/mes/schedule", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ lineId, schedule }),
+      body: JSON.stringify({ lineId, schedule, mode }),
     });
     await refresh();
   }
@@ -106,7 +106,8 @@ export default function AdminPage() {
                 key={lineId}
                 lineId={lineId}
                 label={label}
-                schedule={scheduleFor(lineId)}
+                schedule={stateFor(lineId)?.schedule ?? null}
+                queuedCount={stateFor(lineId)?.queuedCount ?? 0}
                 savedTarget={adminConfig[lineId]?.target}
                 savedHeadcount={adminConfig[lineId]?.headcount}
                 onScheduleLoaded={handleScheduleLoaded}
@@ -127,7 +128,8 @@ export default function AdminPage() {
                 key={lineId}
                 lineId={lineId}
                 label={label}
-                schedule={scheduleFor(lineId)}
+                schedule={stateFor(lineId)?.schedule ?? null}
+                queuedCount={stateFor(lineId)?.queuedCount ?? 0}
                 savedTarget={adminConfig[lineId]?.target}
                 savedHeadcount={adminConfig[lineId]?.headcount}
                 onScheduleLoaded={handleScheduleLoaded}

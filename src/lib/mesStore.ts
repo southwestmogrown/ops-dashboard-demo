@@ -2,6 +2,9 @@
  * Server-side in-memory MES store.
  * Uses globalThis so state survives Next.js hot reloads in development.
  * Resets on cold start (process restart / Vercel cold invocation) — acceptable for demo.
+ *
+ * Each line holds a queue of LineSchedules. The first item is the active schedule.
+ * When it completes, the queue auto-advances to the next on the following tick.
  */
 import type { LineSchedule, LineState, ScanEvent } from "./mesTypes";
 
@@ -14,7 +17,7 @@ export interface AdminLineConfig {
 
 declare global {
   // eslint-disable-next-line no-var
-  var __mesSchedules:   Record<string, LineSchedule>    | undefined;
+  var __mesQueues:      Record<string, LineSchedule[]>  | undefined;
   // eslint-disable-next-line no-var
   var __mesScanLog:     ScanEvent[]                     | undefined;
   // eslint-disable-next-line no-var
@@ -23,7 +26,7 @@ declare global {
   var __mesAdminConfig: Record<string, AdminLineConfig> | undefined;
 }
 
-const schedules:   Record<string, LineSchedule>    = (globalThis.__mesSchedules   ??= {});
+const queues:      Record<string, LineSchedule[]>  = (globalThis.__mesQueues      ??= {});
 const scanLog:     ScanEvent[]                     = (globalThis.__mesScanLog     ??= []);
 const adminConfig: Record<string, AdminLineConfig> = (globalThis.__mesAdminConfig ??= {});
 
@@ -39,24 +42,50 @@ function shiftForHour(hour: number): "day" | "night" {
   return hour >= 6 && hour < 18 ? "day" : "night";
 }
 
-// ── Public API ────────────────────────────────────────────────────────────────
+/**
+ * Advance past any fully-completed schedules at the head of the queue,
+ * as long as there is at least one more waiting behind it.
+ */
+function advanceQueue(lineId: string): void {
+  const queue = queues[lineId];
+  if (!queue || queue.length <= 1) return;
+  while (
+    queue.length > 1 &&
+    queue[0].items.every((it) => it.completed >= it.qty)
+  ) {
+    queue.shift();
+  }
+}
 
+// ── Schedule management ───────────────────────────────────────────────────────
+
+/** Replace the entire queue with a single schedule. */
 export function setSchedule(lineId: string, schedule: LineSchedule): void {
-  schedules[lineId] = { ...schedule };
+  queues[lineId] = [{ ...schedule, items: schedule.items.map((i) => ({ ...i })) }];
+}
+
+/** Append a schedule to the end of the queue without disturbing the active one. */
+export function enqueueSchedule(lineId: string, schedule: LineSchedule): void {
+  if (!queues[lineId]) queues[lineId] = [];
+  queues[lineId].push({ ...schedule, items: schedule.items.map((i) => ({ ...i })) });
 }
 
 export function getSchedule(lineId: string): LineSchedule | undefined {
-  return schedules[lineId];
+  return queues[lineId]?.[0];
 }
+
+// ── Simulation ────────────────────────────────────────────────────────────────
 
 /**
  * Emit `units` scan events for `lineId`, filling orders FIFO.
- * Stops when all orders on this line are complete.
+ * Auto-advances to the next queued schedule when the current one completes.
  */
 export function tickLine(lineId: string, units: number, now = new Date()): void {
-  const schedule = schedules[lineId];
-  if (!schedule) return;
+  advanceQueue(lineId);
+  const queue = queues[lineId];
+  if (!queue || queue.length === 0) return;
 
+  const schedule = queue[0];
   const shift = shiftForHour(now.getHours());
   let remaining = units;
 
@@ -81,8 +110,14 @@ export function tickLine(lineId: string, units: number, now = new Date()): void 
   }
 }
 
+// ── State derivation ──────────────────────────────────────────────────────────
+
 export function getLineState(lineId: string): LineState {
-  const schedule = schedules[lineId] ?? null;
+  advanceQueue(lineId);
+  const queue    = queues[lineId] ?? [];
+  const schedule = queue[0] ?? null;
+  const queuedCount = Math.max(0, queue.length - 1);
+
   const lineScans = scanLog.filter((s) => s.lineId === lineId);
 
   const hourlyOutput: Record<string, number> = {};
@@ -102,11 +137,9 @@ export function getLineState(lineId: string): LineState {
     completedOrders = schedule.items.filter((it) => it.completed >= it.qty).length;
     const incomplete = schedule.items.find((it) => it.completed < it.qty);
     if (incomplete) {
-      // Sheet still in progress — point to the active order
       currentOrder = incomplete.model;
       remainingOnOrder = incomplete.qty - incomplete.completed;
     } else if (schedule.items.length > 0) {
-      // Sheet fully complete — use the last order so EOS still has something to show
       currentOrder = schedule.items[schedule.items.length - 1].model;
       remainingOnOrder = 0;
     }
@@ -116,12 +149,16 @@ export function getLineState(lineId: string): LineState {
     ? Math.max(0, schedule.totalTarget - totalOutput)
     : 0;
 
-  return { lineId, schedule, totalOutput, currentOrder, remainingOnOrder, remainingOnRunSheet, completedOrders, hourlyOutput };
+  return {
+    lineId, schedule, totalOutput,
+    currentOrder, remainingOnOrder, remainingOnRunSheet,
+    completedOrders, queuedCount, hourlyOutput,
+  };
 }
 
 export function getAllLineStates(): LineState[] {
   const allIds = new Set([
-    ...Object.keys(schedules),
+    ...Object.keys(queues),
     ...scanLog.map((s) => s.lineId),
   ]);
   return Array.from(allIds).map(getLineState);
@@ -145,8 +182,10 @@ export function getAllAdminConfig(): Record<string, AdminLineConfig> {
   return { ...adminConfig };
 }
 
+// ── Reset ─────────────────────────────────────────────────────────────────────
+
 export function resetAll(): void {
-  for (const key of Object.keys(schedules)) delete schedules[key];
+  for (const key of Object.keys(queues)) delete queues[key];
   scanLog.length = 0;
   globalThis.__mesSerial = 610000;
 }

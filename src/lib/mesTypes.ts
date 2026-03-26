@@ -41,6 +41,8 @@ export interface LineState {
   remainingOnRunSheet: number;   // 0 when sheet is done
   /** Number of fully completed orders — used as changeover count in EOS */
   completedOrders: number;
+  /** Number of schedules waiting behind the active one */
+  queuedCount: number;
   /** units per hour bucket, key = "HH:00", e.g. "07:00" → 12 */
   hourlyOutput: Record<string, number>;
 }

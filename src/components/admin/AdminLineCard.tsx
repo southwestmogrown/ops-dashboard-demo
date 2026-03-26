@@ -7,22 +7,26 @@ interface AdminLineCardProps {
   lineId: string;
   label: string;
   schedule: LineSchedule | null;
+  queuedCount: number;
   savedTarget: number | undefined;
   savedHeadcount: number | undefined;
-  onScheduleLoaded: (lineId: string, schedule: LineSchedule) => void;
+  onScheduleLoaded: (lineId: string, schedule: LineSchedule, mode: "replace" | "queue") => void;
   onConfigSaved: (lineId: string, target: number | undefined, headcount: number | undefined) => void;
 }
 
 export default function AdminLineCard({
-  lineId, label, schedule,
+  lineId, label, schedule, queuedCount,
   savedTarget, savedHeadcount,
   onScheduleLoaded, onConfigSaved,
 }: AdminLineCardProps) {
-  const inputRef  = useRef<HTMLInputElement>(null);
-  const [parsing, setParsing]     = useState(false);
-  const [parseError, setParseError] = useState<string | null>(null);
-  const [isDragOver, setIsDragOver] = useState(false);
-  const [target, setTarget]       = useState(savedTarget !== undefined ? String(savedTarget) : "");
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const [parsing, setParsing]           = useState(false);
+  const [parseError, setParseError]     = useState<string | null>(null);
+  const [isDragOver, setIsDragOver]     = useState(false);
+  const [pending, setPending]           = useState<LineSchedule | null>(null);
+
+  const [target, setTarget]       = useState(savedTarget    !== undefined ? String(savedTarget)    : "");
   const [headcount, setHeadcount] = useState(savedHeadcount !== undefined ? String(savedHeadcount) : "");
   const [saved, setSaved]         = useState(false);
 
@@ -34,7 +38,7 @@ export default function AdminLineCard({
       const { parseRunSheet } = await import("@/lib/pdfParser");
       const s = await parseRunSheet(file, lineId);
       if (s.items.length === 0) { setParseError("No orders found"); return; }
-      onScheduleLoaded(lineId, s);
+      setPending(s);
     } catch (e) {
       setParseError(e instanceof Error ? e.message : "Parse failed");
     } finally {
@@ -47,6 +51,12 @@ export default function AdminLineCard({
     setIsDragOver(false);
     const file = e.dataTransfer.files[0];
     if (file) handleFile(file);
+  }
+
+  function commitPending(mode: "replace" | "queue") {
+    if (!pending) return;
+    onScheduleLoaded(lineId, pending, mode);
+    setPending(null);
   }
 
   async function handleSave() {
@@ -66,15 +76,65 @@ export default function AdminLineCard({
   return (
     <div className="bg-surface border border-border rounded-lg p-4 flex flex-col gap-4">
 
-      {/* Label */}
-      <div className="text-xs tracking-widest uppercase text-slate-400 font-semibold">{label}</div>
+      {/* Label + queue badge */}
+      <div className="flex items-center justify-between">
+        <div className="text-xs tracking-widest uppercase text-slate-400 font-semibold">{label}</div>
+        {queuedCount > 0 && (
+          <span className="text-xs bg-accent/15 text-accent border border-accent/30 rounded-full px-2 py-0.5">
+            +{queuedCount} queued
+          </span>
+        )}
+      </div>
 
-      {/* Run sheet */}
+      {/* Run sheet section */}
       <div>
         <div className="text-xs text-slate-500 tracking-widest uppercase mb-1.5">Run Sheet</div>
-        {schedule ? (
+
+        {/* Pending preview — shown after parsing, before commit */}
+        {pending && (
+          <div className="bg-background border border-accent/30 rounded p-3 flex flex-col gap-2 mb-2">
+            <div className="text-xs text-accent tracking-widest uppercase font-semibold">Ready to load</div>
+            <div className="text-xs text-slate-400">
+              {pending.items.length} orders · {pending.totalTarget} units · {pending.date}
+            </div>
+            <div className="max-h-24 overflow-y-auto">
+              <table className="w-full text-xs">
+                <tbody>
+                  {pending.items.map((item) => (
+                    <tr key={item.model} className="text-slate-300">
+                      <td className="font-mono py-0.5">{item.model}</td>
+                      <td className="text-right py-0.5">{item.qty}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <div className="flex gap-2 pt-1">
+              <button
+                onClick={() => commitPending("replace")}
+                className="flex-1 bg-accent text-black border-none rounded py-1.5 text-xs tracking-widest uppercase font-bold cursor-pointer"
+              >
+                Replace
+              </button>
+              <button
+                onClick={() => commitPending("queue")}
+                className="flex-1 bg-transparent border border-accent text-accent rounded py-1.5 text-xs tracking-widest uppercase font-semibold cursor-pointer hover:bg-accent/10 transition-colors"
+              >
+                + Queue
+              </button>
+              <button
+                onClick={() => setPending(null)}
+                className="bg-transparent border border-border text-slate-500 rounded px-2.5 text-xs cursor-pointer hover:border-slate-500 transition-colors"
+              >
+                ✕
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Active schedule */}
+        {schedule && !pending ? (
           <div className="bg-background rounded p-3 flex flex-col gap-2">
-            {/* Progress */}
             <div className="w-full h-1.5 bg-border rounded-full overflow-hidden">
               <div
                 className="h-full rounded-full transition-all"
@@ -88,7 +148,6 @@ export default function AdminLineCard({
               <span>{schedule.items.length} orders · {schedule.totalTarget} units</span>
               <span>{pct}%</span>
             </div>
-            {/* Order list */}
             <div className="max-h-28 overflow-y-auto mt-1">
               <table className="w-full text-xs">
                 <thead>
@@ -116,10 +175,11 @@ export default function AdminLineCard({
               onClick={() => inputRef.current?.click()}
               className="text-xs text-slate-600 hover:text-slate-400 text-left bg-transparent border-none p-0 cursor-pointer transition-colors"
             >
-              ↺ Replace
+              ↺ Load another PDF…
             </button>
           </div>
-        ) : (
+        ) : !pending ? (
+          /* Empty drop zone */
           <div
             className={[
               "border-2 border-dashed rounded-lg flex flex-col items-center justify-center gap-1.5 py-5 cursor-pointer transition-colors",
@@ -136,7 +196,8 @@ export default function AdminLineCard({
             <span className="text-xs">{parsing ? "Parsing…" : "Drop PDF or click"}</span>
             {parseError && <span className="text-xs text-red-400">{parseError}</span>}
           </div>
-        )}
+        ) : null}
+
         <input
           ref={inputRef}
           type="file"
