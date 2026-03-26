@@ -1,34 +1,72 @@
 # ops-dashboard-demo — Claude context
 
 ## Project summary
-A Next.js 16 (App Router) operations dashboard for a manufacturing floor. Displays production-line KPIs, a line table grouped by value stream, and an output chart. Refreshes every 30 seconds via a mock `/api/metrics` endpoint.
+A Next.js 16 (App Router) operations dashboard for a manufacturing floor. Displays production-line KPIs, a line table grouped by value stream, and an output chart. Includes an EOS (end-of-shift) report generator, an admin page for schedule/target/headcount configuration, and a MES simulator that drives live output numbers from PDF run sheets.
 
 ## Tech stack
 - **Next.js 16 + React 19** (App Router, `"use client"` where needed)
 - **TypeScript 5**
 - **Tailwind CSS 4** — utility classes only, no CSS modules
 - **Recharts 3** — all charts; must be dynamically imported (`ssr: false`)
+- **pdfjs-dist** — client-side PDF parsing for run sheets
+
+## Routes
+| Route | Purpose |
+|---|---|
+| `/` | Main dashboard — KPIs, line table, output chart, line drawer |
+| `/eos` | End-of-shift report — CSV export + email draft |
+| `/admin` | Admin — schedule queue (PDF upload), daily target, headcount per line |
+| `/sim` | MES simulator — start/pause/reset, speed control, hourly table |
+| `GET /api/metrics` | Returns `ShiftMetrics`; overlays admin target/headcount + MES scan output |
+| `GET /api/mes/state` | Returns `LineState[]` for all lines |
+| `POST /api/mes/schedule` | Load or queue a schedule (`mode: "replace" \| "queue"`) |
+| `POST /api/mes/tick` | Emit N scan events (`all: true` or `lineId`) |
+| `POST /api/mes/reset` | Clear all schedules and scan log |
+| `GET/POST /api/admin/config` | Per-line target and headcount overrides |
 
 ## Folder layout
 ```
 src/
   app/
-    page.tsx          ← sole page; owns all top-level state
+    page.tsx              ← dashboard; polls /api/metrics every 5 s
     layout.tsx
-    globals.css       ← Tailwind theme + custom CSS variables
-    api/metrics/
-      route.ts        ← GET /api/metrics?shift=day|night
+    globals.css           ← Tailwind theme + custom CSS variables
+    eos/page.tsx          ← EOS report
+    admin/page.tsx        ← admin config page
+    sim/page.tsx          ← MES simulator control panel
+    api/
+      metrics/route.ts    ← GET /api/metrics?shift=day|night
+      mes/schedule/       ← POST
+      mes/tick/           ← POST
+      mes/state/          ← GET
+      mes/reset/          ← POST
+      admin/config/       ← GET + POST
   components/
-    Header.tsx        ← shift selector + last-updated timestamp
+    Header.tsx            ← shift selector, timestamp, EOS + Admin nav links
     ShiftSelector.tsx
     KpiCard.tsx
-    LineTable.tsx     ← clickable rows fire onSelectLine(lineId)
-    OutputChart.tsx   ← BarChart — output vs target per line
-    LineDrawer.tsx    ← slide-out detail panel (opened by row click)
-    ExportButton.tsx  ← placeholder
+    LineTable.tsx         ← clickable rows fire onSelectLine(lineId)
+    OutputChart.tsx       ← BarChart — output vs target per line
+    LineDrawer.tsx        ← slide-out detail panel
+    ExportButton.tsx
+    eos/
+      EOSLineCard.tsx
+      EOSMetaForm.tsx
+      EOSEmailPreview.tsx
+    admin/
+      AdminLineCard.tsx   ← PDF drop + pending preview + Replace/Queue buttons + target/HC inputs
+    sim/
+      LineSimCard.tsx
+      SimControls.tsx
+      HourlyTable.tsx
   lib/
-    types.ts          ← ShiftName, Line, TimePoint, ShiftMetrics
-    generateMetrics.ts← seeded mock data (Mulberry32 RNG)
+    types.ts              ← ShiftName, Line, TimePoint, ShiftMetrics
+    generateMetrics.ts    ← seeded mock data (Mulberry32 RNG)
+    mesTypes.ts           ← RunSheetItem, LineSchedule, ScanEvent, LineState
+    mesStore.ts           ← server-side singleton (globalThis); schedule queue, scan log, admin config
+    pdfParser.ts          ← parseRunSheet(file, lineId) — handles VS1 and VS2 formats
+    eosTypes.ts
+    eosReports.ts
 ```
 
 ## Key types (`src/lib/types.ts`)
@@ -60,6 +98,44 @@ interface ShiftMetrics {
   trend: TimePoint[];  // 16 half-hour points per shift
 }
 ```
+
+## MES types (`src/lib/mesTypes.ts`)
+```ts
+interface RunSheetItem  { model: string; qty: number; completed: number; }
+interface LineSchedule  { lineId: string; date: string; totalTarget: number; items: RunSheetItem[]; }
+interface ScanEvent     { id: string; timestamp: string; lineId: string; shift: "day"|"night"; partNumber: string; }
+interface LineState {
+  lineId: string;
+  schedule: LineSchedule | null;   // active (head of queue)
+  totalOutput: number;
+  currentOrder: string | null;     // first incomplete order; last order when sheet done
+  remainingOnOrder: number;
+  remainingOnRunSheet: number;
+  completedOrders: number;         // → EOS changeovers field
+  queuedCount: number;             // schedules waiting behind the active one
+  hourlyOutput: Record<string, number>; // "07:00" → units that hour
+}
+```
+
+## MES store (`src/lib/mesStore.ts`)
+- Module-level singleton via `globalThis` — survives Next.js hot reloads; resets on cold start
+- `queues: Record<lineId, LineSchedule[]>` — head is active; auto-advances when head completes
+- `scanLog: ScanEvent[]` — append-only; 1 event = 1 finished unit
+- `adminConfig: Record<lineId, { target?, headcount? }>` — overrides seeded mock values
+- Key exports: `setSchedule`, `enqueueSchedule`, `tickLine`, `getLineState`, `getAllLineStates`, `getOutputForLine`, `setAdminConfig`, `getAllAdminConfig`, `resetAll`
+
+## Run sheet PDF formats
+Two formats in use — `pdfParser.ts` handles both:
+- **VS1 (HFC):** `MODEL *MODEL* QTY …` e.g. `449324TS *449324TS* 40`
+- **VS2 (HRC):** `*MODEL* MODEL QTY …` e.g. `*80120* 80120 12`
+- Line number is NOT parsed from the PDF — it comes from whichever card the user dropped it on
+
+## Data flow
+1. `page.tsx` fetches `/api/metrics?shift=…` on mount and every **5 s** (silent — no loading flash).
+2. `/api/metrics` runs `generateMetrics` (seeded mock), then overlays admin target/headcount, then MES scan output.
+3. EOS page fetches both `/api/metrics` and `/api/mes/state` on mount and shift change — pre-fills output, headcount, orderAtPackout, remainingOnOrder, remainingOnRunSheet, changeovers.
+4. Admin page: drop PDF → parse client-side → preview → Replace or Queue → `POST /api/mes/schedule`.
+5. Sim page: Start → `setInterval` → `POST /api/mes/tick` every 1 s → polls `/api/mes/state` every 2 s.
 
 ## Colour system (Tailwind custom vars in `globals.css`)
 | Variable | Hex | Tailwind class |
@@ -106,12 +182,23 @@ interface ShiftMetrics {
 - Changeover markers are rendered as `<ReferenceLine>` on each chart.
 - **Earmarked** for promotion to `/line/[id]` route in a future release.
 
-## Data flow
-1. `page.tsx` fetches `/api/metrics?shift=…` on mount and every 30 s.
-2. Full `ShiftMetrics` stored in state; `lines` and `trend` passed to children.
-3. `LineTable` fires `onSelectLine(id)` → `setSelectedLineId`.
-4. `LineDrawer` receives `line: Line | null` and `trend: TimePoint[]`.
-
 ## Mock data
 `generateMetrics` uses Mulberry32 seeded by shift. Seeds: `day=1001`, `night=3003`.
 Set `DEMO_SEED` env var to override for deterministic demos.
+
+## Improvement backlog (prioritised)
+### High
+1. **Hour-by-hour in LineDrawer** — `hourlyOutput` from `LineState` is available but not shown in the drawer; add a bar chart or table below the existing trend charts
+2. **Pace indicator** — show whether each line is ahead/behind pace for its daily target: `(output / elapsed_shift_hours) * total_shift_hours`; surface in KPI cards and LineDrawer
+3. **Current order in LineDrawer** — show active model #, remaining on order, remaining on sheet when MES data exists
+4. **Admin queue visibility** — list queued schedules (not just count); allow removing individual items
+
+### Medium
+5. **EOS "Refresh from MES" button** — re-pull MES state without changing shift
+6. **Shift time remaining** — clock in header showing elapsed/remaining shift time; feeds pace calc
+7. **At-risk pace highlighting** — lines behind pace turn amber/red in LineTable independent of static target %
+
+### Lower
+8. **Sim page cleanup** — admin owns PDF upload now; trim `/sim` to controls + hourly table only
+9. **Admin queue management** — reorder or remove queued schedules
+10. **Basic admin auth** — PIN or env-variable password gate on `/admin`
