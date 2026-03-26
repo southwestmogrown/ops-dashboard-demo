@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
+import type { ShiftMetrics } from "@/lib/types";
 import type { EOSFormData, EOSLineDescriptor, EOSLineEntry, EOSValueStream } from "@/lib/eosTypes";
 import { calculateHPU, downloadAllReports } from "@/lib/eosReports";
 import EOSLineCard from "@/components/eos/EOSLineCard";
@@ -54,6 +55,30 @@ export default function EOSPage() {
   const [hiddenLines, setHiddenLines] = useState<Set<string>>(new Set());
   const [activeStream, setActiveStream] = useState("vs1");
   const [activeView, setActiveView]     = useState<"entry" | "email">("entry");
+
+  // Pre-populate output and headcount from the live dashboard feed
+  useEffect(() => {
+    fetch(`/api/metrics?shift=${formData.shift.toLowerCase()}`)
+      .then((r) => r.json())
+      .then((metrics: ShiftMetrics) => {
+        setFormData((prev) => {
+          const updatedLines = { ...prev.lines };
+          metrics.lines.forEach((line) => {
+            const lineKey = line.id.replace("-l", ":Line ");
+            if (!(lineKey in updatedLines)) return;
+            const merged = {
+              ...updatedLines[lineKey],
+              output:    String(line.output),
+              headcount: String(line.headcount),
+            };
+            merged.hpu = calculateHPU(merged.output, merged.headcount, merged.hoursWorked);
+            updatedLines[lineKey] = merged;
+          });
+          return { ...prev, lines: updatedLines };
+        });
+      })
+      .catch(() => {/* silently ignore — form remains editable without pre-fill */});
+  }, [formData.shift]);
 
   // ── Handlers ────────────────────────────────────────────────────────────────
 
