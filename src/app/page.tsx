@@ -138,7 +138,7 @@ export default function Home() {
     setIsLoading(true);
     setFetchError(null);
     fetchMetrics();
-    const interval = setInterval(fetchMetrics, 30000);
+    const interval = setInterval(fetchMetrics, 5000);
     return () => clearInterval(interval);
   }, [shift]);
 

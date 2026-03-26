@@ -1,25 +1,33 @@
 /**
  * Server-side in-memory MES store.
- * Module-level singleton — persists for the lifetime of the Node process.
- * Acceptable for demo use; resets on cold start.
+ * Uses globalThis so state survives Next.js hot reloads in development.
+ * Resets on cold start (process restart / Vercel cold invocation) — acceptable for demo.
  */
-import type { LineSchedule, LineState, RunSheetItem, ScanEvent } from "./mesTypes";
+import type { LineSchedule, LineState, ScanEvent } from "./mesTypes";
 
-// ── Internal state ────────────────────────────────────────────────────────────
+// ── Persistent global state ───────────────────────────────────────────────────
 
-const schedules: Record<string, LineSchedule> = {};
-const scanLog: ScanEvent[] = [];
-let serialCounter = 610000; // generates BK0610000, BK0610001, …
+declare global {
+  // eslint-disable-next-line no-var
+  var __mesSchedules: Record<string, LineSchedule> | undefined;
+  // eslint-disable-next-line no-var
+  var __mesScanLog: ScanEvent[] | undefined;
+  // eslint-disable-next-line no-var
+  var __mesSerial: number | undefined;
+}
+
+const schedules: Record<string, LineSchedule> = (globalThis.__mesSchedules ??= {});
+const scanLog: ScanEvent[]                    = (globalThis.__mesScanLog   ??= []);
+
+function getSerial(): number { return (globalThis.__mesSerial ??= 610000); }
+function bumpSerial(): string {
+  globalThis.__mesSerial = getSerial() + 1;
+  return `BK${String(globalThis.__mesSerial).padStart(7, "0")}`;
+}
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-function nextSerial(): string {
-  serialCounter += 1;
-  return `BK${String(serialCounter).padStart(7, "0")}`;
-}
-
 function shiftForHour(hour: number): "day" | "night" {
-  // Day shift: 06:00 – 17:59; night shift: 18:00 – 05:59
   return hour >= 6 && hour < 18 ? "day" : "night";
 }
 
@@ -35,7 +43,7 @@ export function getSchedule(lineId: string): LineSchedule | undefined {
 
 /**
  * Emit `units` scan events for `lineId`, filling orders FIFO.
- * Scans are timestamped to `now`. Stops if all orders are complete.
+ * Stops when all orders on this line are complete.
  */
 export function tickLine(lineId: string, units: number, now = new Date()): void {
   const schedule = schedules[lineId];
@@ -55,7 +63,7 @@ export function tickLine(lineId: string, units: number, now = new Date()): void 
 
     for (let i = 0; i < toAdd; i++) {
       scanLog.push({
-        id: nextSerial(),
+        id: bumpSerial(),
         timestamp: now.toISOString(),
         lineId,
         shift,
@@ -69,7 +77,6 @@ export function getLineState(lineId: string): LineState {
   const schedule = schedules[lineId] ?? null;
   const lineScans = scanLog.filter((s) => s.lineId === lineId);
 
-  // Hourly bucket: "07:00" → count
   const hourlyOutput: Record<string, number> = {};
   for (const scan of lineScans) {
     const h = new Date(scan.timestamp).getHours();
@@ -79,7 +86,6 @@ export function getLineState(lineId: string): LineState {
 
   const totalOutput = lineScans.length;
 
-  // First incomplete item
   let currentOrder: string | null = null;
   let remainingOnOrder = 0;
   if (schedule) {
@@ -94,15 +100,7 @@ export function getLineState(lineId: string): LineState {
     ? Math.max(0, schedule.totalTarget - totalOutput)
     : 0;
 
-  return {
-    lineId,
-    schedule,
-    totalOutput,
-    currentOrder,
-    remainingOnOrder,
-    remainingOnRunSheet,
-    hourlyOutput,
-  };
+  return { lineId, schedule, totalOutput, currentOrder, remainingOnOrder, remainingOnRunSheet, hourlyOutput };
 }
 
 export function getAllLineStates(): LineState[] {
@@ -113,7 +111,6 @@ export function getAllLineStates(): LineState[] {
   return Array.from(allIds).map(getLineState);
 }
 
-/** Total output across all lines for a given shift (for metrics overlay) */
 export function getOutputForLine(lineId: string): number {
   return scanLog.filter((s) => s.lineId === lineId).length;
 }
@@ -121,5 +118,5 @@ export function getOutputForLine(lineId: string): number {
 export function resetAll(): void {
   for (const key of Object.keys(schedules)) delete schedules[key];
   scanLog.length = 0;
-  serialCounter = 610000;
+  globalThis.__mesSerial = 610000;
 }
