@@ -50,6 +50,12 @@ export default function Header({
           >
             EOS Report
           </Link>
+          <Link
+            href="/admin"
+            className="text-xs text-slate-500 hover:text-accent border border-border hover:border-accent px-3 py-1.5 rounded tracking-widest uppercase transition-colors whitespace-nowrap"
+          >
+            Admin
+          </Link>
         </div>
       </div>
     </header>

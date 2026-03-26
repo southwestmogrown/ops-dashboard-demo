@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { generateMetrics } from "@/lib/generateMetrics";
 import { ShiftName } from "@/lib/types";
-import { getOutputForLine } from "@/lib/mesStore";
+import { getOutputForLine, getAdminConfig } from "@/lib/mesStore";
 
 // The valid shift values the client can request
 const VALID_SHIFTS: ShiftName[] = ["day", "night"];
@@ -27,12 +27,14 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   // Generate base metrics from seeded mock data
   const metrics = generateMetrics(shiftParam as ShiftName, overrideSeed);
 
-  // Overlay real MES output where the simulator has scan data
+  // Overlay admin-configured target and headcount, then MES output
   for (const line of metrics.lines) {
+    const admin = getAdminConfig(line.id);
+    if (admin.target    !== undefined) line.target    = admin.target;
+    if (admin.headcount !== undefined) line.headcount = admin.headcount;
+
     const mesOutput = getOutputForLine(line.id);
-    if (mesOutput > 0) {
-      line.output = mesOutput;
-    }
+    if (mesOutput > 0) line.output = mesOutput;
   }
 
   return NextResponse.json(metrics);

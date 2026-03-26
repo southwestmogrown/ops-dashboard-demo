@@ -5,19 +5,27 @@
  */
 import type { LineSchedule, LineState, ScanEvent } from "./mesTypes";
 
+export interface AdminLineConfig {
+  target?:    number;
+  headcount?: number;
+}
+
 // ── Persistent global state ───────────────────────────────────────────────────
 
 declare global {
   // eslint-disable-next-line no-var
-  var __mesSchedules: Record<string, LineSchedule> | undefined;
+  var __mesSchedules:   Record<string, LineSchedule>    | undefined;
   // eslint-disable-next-line no-var
-  var __mesScanLog: ScanEvent[] | undefined;
+  var __mesScanLog:     ScanEvent[]                     | undefined;
   // eslint-disable-next-line no-var
-  var __mesSerial: number | undefined;
+  var __mesSerial:      number                          | undefined;
+  // eslint-disable-next-line no-var
+  var __mesAdminConfig: Record<string, AdminLineConfig> | undefined;
 }
 
-const schedules: Record<string, LineSchedule> = (globalThis.__mesSchedules ??= {});
-const scanLog: ScanEvent[]                    = (globalThis.__mesScanLog   ??= []);
+const schedules:   Record<string, LineSchedule>    = (globalThis.__mesSchedules   ??= {});
+const scanLog:     ScanEvent[]                     = (globalThis.__mesScanLog     ??= []);
+const adminConfig: Record<string, AdminLineConfig> = (globalThis.__mesAdminConfig ??= {});
 
 function getSerial(): number { return (globalThis.__mesSerial ??= 610000); }
 function bumpSerial(): string {
@@ -121,6 +129,20 @@ export function getAllLineStates(): LineState[] {
 
 export function getOutputForLine(lineId: string): number {
   return scanLog.filter((s) => s.lineId === lineId).length;
+}
+
+// ── Admin config ──────────────────────────────────────────────────────────────
+
+export function setAdminConfig(lineId: string, config: AdminLineConfig): void {
+  adminConfig[lineId] = { ...adminConfig[lineId], ...config };
+}
+
+export function getAdminConfig(lineId: string): AdminLineConfig {
+  return adminConfig[lineId] ?? {};
+}
+
+export function getAllAdminConfig(): Record<string, AdminLineConfig> {
+  return { ...adminConfig };
 }
 
 export function resetAll(): void {
