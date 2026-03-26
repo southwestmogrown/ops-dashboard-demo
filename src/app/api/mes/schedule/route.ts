@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { setSchedule, enqueueSchedule } from "@/lib/mesStore";
+import { setSchedule, enqueueSchedule, clearLine } from "@/lib/mesStore";
 import type { LineSchedule } from "@/lib/mesTypes";
 
 interface ScheduleBody {
@@ -23,5 +23,14 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     setSchedule(body.lineId, body.schedule);
   }
 
+  return NextResponse.json({ ok: true });
+}
+
+export async function DELETE(request: NextRequest): Promise<NextResponse> {
+  const body = await request.json().catch(() => null);
+  if (!body?.lineId) {
+    return NextResponse.json({ error: "lineId required" }, { status: 400 });
+  }
+  clearLine(body.lineId);
   return NextResponse.json({ ok: true });
 }

@@ -10,23 +10,24 @@ interface AdminLineCardProps {
   queuedSchedules: LineSchedule[];
   savedTarget: number | undefined;
   savedHeadcount: number | undefined;
-  onScheduleLoaded: (lineId: string, schedule: LineSchedule, mode: "replace" | "queue") => void;
+  onScheduleLoaded: (lineId: string, schedule: LineSchedule) => void;
   onConfigSaved: (lineId: string, target: number | undefined, headcount: number | undefined) => void;
   onRemoveQueued: (lineId: string, index: number) => void;
+  onClearSchedule: (lineId: string) => void;
 }
 
 export default function AdminLineCard({
   lineId, label, schedule, queuedSchedules,
   savedTarget, savedHeadcount,
-  onScheduleLoaded, onConfigSaved, onRemoveQueued,
+  onScheduleLoaded, onConfigSaved, onRemoveQueued, onClearSchedule,
 }: AdminLineCardProps) {
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const [parsing, setParsing]           = useState(false);
-  const [parseError, setParseError]     = useState<string | null>(null);
-  const [isDragOver, setIsDragOver]     = useState(false);
-  const [pending, setPending]           = useState<LineSchedule | null>(null);
-  const [queueOpen, setQueueOpen]       = useState(false);
+  const [parsing, setParsing]       = useState(false);
+  const [parseError, setParseError] = useState<string | null>(null);
+  const [isDragOver, setIsDragOver] = useState(false);
+  const [loadedFlash, setLoadedFlash] = useState(false);
+  const [queueOpen, setQueueOpen]   = useState(false);
 
   const [target, setTarget]       = useState(savedTarget    !== undefined ? String(savedTarget)    : "");
   const [headcount, setHeadcount] = useState(savedHeadcount !== undefined ? String(savedHeadcount) : "");
@@ -40,7 +41,10 @@ export default function AdminLineCard({
       const { parseRunSheet } = await import("@/lib/pdfParser");
       const s = await parseRunSheet(file, lineId);
       if (s.items.length === 0) { setParseError("No orders found"); return; }
-      setPending(s);
+      // Auto-commit: caller decides replace vs queue based on current state
+      onScheduleLoaded(lineId, s);
+      setLoadedFlash(true);
+      setTimeout(() => setLoadedFlash(false), 1500);
     } catch (e) {
       setParseError(e instanceof Error ? e.message : "Parse failed");
     } finally {
@@ -53,12 +57,6 @@ export default function AdminLineCard({
     setIsDragOver(false);
     const file = e.dataTransfer.files[0];
     if (file) handleFile(file);
-  }
-
-  function commitPending(mode: "replace" | "queue") {
-    if (!pending) return;
-    onScheduleLoaded(lineId, pending, mode);
-    setPending(null);
   }
 
   async function handleSave() {
@@ -96,7 +94,7 @@ export default function AdminLineCard({
       {/* Expandable queue list */}
       {queueOpen && queuedCount > 0 && (
         <div className="bg-background border border-border rounded p-2.5 flex flex-col gap-1.5">
-          <div className="text-xs text-slate-500 uppercase tracking-widest mb-1">Queue</div>
+          <div className="text-xs text-slate-500 uppercase tracking-widest mb-1">Up next</div>
           {queuedSchedules.map((sched, i) => (
             <div key={i} className="flex items-center justify-between gap-2">
               <div className="text-xs text-slate-300 min-w-0">
@@ -121,50 +119,8 @@ export default function AdminLineCard({
       <div>
         <div className="text-xs text-slate-500 tracking-widest uppercase mb-1.5">Run Sheet</div>
 
-        {/* Pending preview — shown after parsing, before commit */}
-        {pending && (
-          <div className="bg-background border border-accent/30 rounded p-3 flex flex-col gap-2 mb-2">
-            <div className="text-xs text-accent tracking-widest uppercase font-semibold">Ready to load</div>
-            <div className="text-xs text-slate-400">
-              {pending.items.length} orders · {pending.totalTarget} units · {pending.date}
-            </div>
-            <div className="max-h-24 overflow-y-auto">
-              <table className="w-full text-xs">
-                <tbody>
-                  {pending.items.map((item) => (
-                    <tr key={item.model} className="text-slate-300">
-                      <td className="font-mono py-0.5">{item.model}</td>
-                      <td className="text-right py-0.5">{item.qty}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            <div className="flex gap-2 pt-1">
-              <button
-                onClick={() => commitPending("replace")}
-                className="flex-1 bg-accent text-black border-none rounded py-1.5 text-xs tracking-widest uppercase font-bold cursor-pointer"
-              >
-                Replace
-              </button>
-              <button
-                onClick={() => commitPending("queue")}
-                className="flex-1 bg-transparent border border-accent text-accent rounded py-1.5 text-xs tracking-widest uppercase font-semibold cursor-pointer hover:bg-accent/10 transition-colors"
-              >
-                + Queue
-              </button>
-              <button
-                onClick={() => setPending(null)}
-                className="bg-transparent border border-border text-slate-500 rounded px-2.5 text-xs cursor-pointer hover:border-slate-500 transition-colors"
-              >
-                ✕
-              </button>
-            </div>
-          </div>
-        )}
-
         {/* Active schedule */}
-        {schedule && !pending ? (
+        {schedule ? (
           <div className="bg-background rounded p-3 flex flex-col gap-2">
             <div className="w-full h-1.5 bg-border rounded-full overflow-hidden">
               <div
@@ -202,20 +158,30 @@ export default function AdminLineCard({
                 </tbody>
               </table>
             </div>
-            <button
-              onClick={() => inputRef.current?.click()}
-              className="text-xs text-slate-600 hover:text-slate-400 text-left bg-transparent border-none p-0 cursor-pointer transition-colors"
-            >
-              ↺ Load another PDF…
-            </button>
+            <div className="flex items-center justify-between pt-1">
+              <button
+                onClick={() => inputRef.current?.click()}
+                className="text-xs text-slate-600 hover:text-slate-400 bg-transparent border-none p-0 cursor-pointer transition-colors"
+              >
+                {loadedFlash ? "✓ Queued!" : "↑ Load another PDF"}
+              </button>
+              <button
+                onClick={() => onClearSchedule(lineId)}
+                className="text-xs text-slate-600 hover:text-status-red bg-transparent border-none p-0 cursor-pointer transition-colors"
+              >
+                ✕ Clear
+              </button>
+            </div>
           </div>
-        ) : !pending ? (
-          /* Empty drop zone */
+        ) : (
+          /* Drop zone */
           <div
             className={[
               "border-2 border-dashed rounded-lg flex flex-col items-center justify-center gap-1.5 py-5 cursor-pointer transition-colors",
               isDragOver
                 ? "border-accent bg-accent/5 text-accent"
+                : loadedFlash
+                ? "border-status-green bg-status-green/5 text-status-green"
                 : "border-border text-slate-600 hover:border-slate-500 hover:text-slate-400",
             ].join(" ")}
             onDragOver={(e) => { e.preventDefault(); setIsDragOver(true); }}
@@ -223,11 +189,13 @@ export default function AdminLineCard({
             onDrop={onDrop}
             onClick={() => inputRef.current?.click()}
           >
-            <span className="text-xl">📄</span>
-            <span className="text-xs">{parsing ? "Parsing…" : "Drop PDF or click"}</span>
+            <span className="text-xl">{loadedFlash ? "✓" : "📄"}</span>
+            <span className="text-xs">
+              {parsing ? "Parsing…" : loadedFlash ? "Loaded!" : "Drop PDF or click to load"}
+            </span>
             {parseError && <span className="text-xs text-red-400">{parseError}</span>}
           </div>
-        ) : null}
+        )}
 
         <input
           ref={inputRef}

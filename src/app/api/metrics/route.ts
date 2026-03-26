@@ -33,8 +33,8 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     if (admin.target    !== undefined) line.target    = admin.target;
     if (admin.headcount !== undefined) line.headcount = admin.headcount;
 
-    const mesOutput = getOutputForLine(line.id);
-    if (mesOutput > 0) line.output = mesOutput;
+    // Always use MES scan count — 0 when no scans yet, grows as sim runs
+    line.output = getOutputForLine(line.id);
   }
 
   return NextResponse.json(metrics);

@@ -40,11 +40,22 @@ export default function AdminPage() {
     return mesStates.find((s) => s.lineId === lineId) ?? null;
   }
 
-  async function handleScheduleLoaded(lineId: string, schedule: LineSchedule, mode: "replace" | "queue") {
+  async function handleScheduleLoaded(lineId: string, schedule: LineSchedule) {
+    // Auto-decide: queue if a schedule is already active, otherwise replace
+    const mode = stateFor(lineId)?.schedule ? "queue" : "replace";
     await fetch("/api/mes/schedule", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ lineId, schedule, mode }),
+    });
+    await refresh();
+  }
+
+  async function handleClearSchedule(lineId: string) {
+    await fetch("/api/mes/schedule", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ lineId }),
     });
     await refresh();
   }
@@ -122,6 +133,7 @@ export default function AdminPage() {
                 onScheduleLoaded={handleScheduleLoaded}
                 onConfigSaved={handleConfigSaved}
                 onRemoveQueued={handleRemoveQueued}
+                onClearSchedule={handleClearSchedule}
               />
             ))}
           </div>
@@ -145,6 +157,7 @@ export default function AdminPage() {
                 onScheduleLoaded={handleScheduleLoaded}
                 onConfigSaved={handleConfigSaved}
                 onRemoveQueued={handleRemoveQueued}
+                onClearSchedule={handleClearSchedule}
               />
             ))}
           </div>

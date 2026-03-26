@@ -74,6 +74,11 @@ export function getSchedule(lineId: string): LineSchedule | undefined {
   return queues[lineId]?.[0];
 }
 
+/** Remove all schedules (active + queued) for a line. */
+export function clearLine(lineId: string): void {
+  delete queues[lineId];
+}
+
 /**
  * Remove a queued (non-active) schedule by its position in the queue.
  * index 1 = first queued item (behind the active schedule at index 0).

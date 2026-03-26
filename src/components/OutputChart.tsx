@@ -67,6 +67,7 @@ export default function OutputChart({ lines }: OutputChartProps) {
             name="Output"
             fill="#edb81a"
             radius={[3, 3, 0, 0]}
+            isAnimationActive={false}
           />
           <Bar
             dataKey="target"
@@ -75,6 +76,7 @@ export default function OutputChart({ lines }: OutputChartProps) {
             radius={[3, 3, 0, 0]}
             stroke="#3d5a88"
             strokeWidth={1}
+            isAnimationActive={false}
           />
         </BarChart>
       </ResponsiveContainer>
