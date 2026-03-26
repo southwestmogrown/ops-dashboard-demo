@@ -3,9 +3,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import dynamic from "next/dynamic";
-import type { LineSchedule, LineState } from "@/lib/mesTypes";
+import type { LineState } from "@/lib/mesTypes";
 
-const LineSimCard = dynamic(() => import("@/components/sim/LineSimCard"), { ssr: false });
 const SimControls = dynamic(() => import("@/components/sim/SimControls"),  { ssr: false });
 const HourlyTable  = dynamic(() => import("@/components/sim/HourlyTable"),  { ssr: false });
 
@@ -47,17 +46,6 @@ export default function SimPage() {
       if (pollInterval.current) clearInterval(pollInterval.current);
     };
   }, [pollState]);
-
-  // ── Schedule upload ───────────────────────────────────────────────────────
-
-  async function handleScheduleLoaded(lineId: string, schedule: LineSchedule) {
-    await fetch("/api/mes/schedule", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ lineId, schedule }),
-    });
-    await pollState();
-  }
 
   // ── Simulation controls ───────────────────────────────────────────────────
 
@@ -109,12 +97,6 @@ export default function SimPage() {
     };
   }, []);
 
-  // ── Helpers ───────────────────────────────────────────────────────────────
-
-  function stateFor(lineId: string): LineState | null {
-    return states.find((s) => s.lineId === lineId) ?? null;
-  }
-
   const totalOutput   = states.reduce((s, st) => s + st.totalOutput, 0);
   const totalTarget   = states.reduce((s, st) => s + (st.schedule?.totalTarget ?? 0), 0);
   const scheduledLines = states.filter((s) => s.schedule !== null).length;
@@ -163,42 +145,13 @@ export default function SimPage() {
 
         {scheduledLines === 0 && (
           <div className="text-xs text-slate-600 text-center py-2">
-            Drop a run sheet PDF onto any line card below to load its schedule.
+            Load run sheets from the{" "}
+            <Link href="/admin" className="text-slate-500 hover:text-slate-300 underline">
+              Admin panel
+            </Link>
+            , then use the controls above to simulate production.
           </div>
         )}
-
-        {/* Line cards */}
-        <div>
-          <div className="text-xs text-slate-500 tracking-widest uppercase font-semibold mb-3">
-            Value Stream 1 — HFC
-          </div>
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-            {LINES.filter((l) => l.lineId.startsWith("vs1")).map(({ lineId, label }) => (
-              <LineSimCard
-                key={lineId}
-                lineId={lineId}
-                label={label}
-                state={stateFor(lineId)}
-                onScheduleLoaded={handleScheduleLoaded}
-              />
-            ))}
-          </div>
-
-          <div className="text-xs text-slate-500 tracking-widest uppercase font-semibold mb-3">
-            Value Stream 2 — HRC
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            {LINES.filter((l) => l.lineId.startsWith("vs2")).map(({ lineId, label }) => (
-              <LineSimCard
-                key={lineId}
-                lineId={lineId}
-                label={label}
-                state={stateFor(lineId)}
-                onScheduleLoaded={handleScheduleLoaded}
-              />
-            ))}
-          </div>
-        </div>
 
         {/* Hour-by-hour table */}
         {scheduledLines > 0 && (

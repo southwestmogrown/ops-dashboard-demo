@@ -62,6 +62,15 @@ export default function AdminPage() {
     await refresh();
   }
 
+  async function handleRemoveQueued(lineId: string, index: number) {
+    await fetch("/api/admin/queue", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ lineId, index }),
+    });
+    await refresh();
+  }
+
   const vs1Lines = LINES.filter((l) => l.vs === "vs1");
   const vs2Lines = LINES.filter((l) => l.vs === "vs2");
 
@@ -107,11 +116,12 @@ export default function AdminPage() {
                 lineId={lineId}
                 label={label}
                 schedule={stateFor(lineId)?.schedule ?? null}
-                queuedCount={stateFor(lineId)?.queuedCount ?? 0}
+                queuedSchedules={stateFor(lineId)?.queue ?? []}
                 savedTarget={adminConfig[lineId]?.target}
                 savedHeadcount={adminConfig[lineId]?.headcount}
                 onScheduleLoaded={handleScheduleLoaded}
                 onConfigSaved={handleConfigSaved}
+                onRemoveQueued={handleRemoveQueued}
               />
             ))}
           </div>
@@ -129,11 +139,12 @@ export default function AdminPage() {
                 lineId={lineId}
                 label={label}
                 schedule={stateFor(lineId)?.schedule ?? null}
-                queuedCount={stateFor(lineId)?.queuedCount ?? 0}
+                queuedSchedules={stateFor(lineId)?.queue ?? []}
                 savedTarget={adminConfig[lineId]?.target}
                 savedHeadcount={adminConfig[lineId]?.headcount}
                 onScheduleLoaded={handleScheduleLoaded}
                 onConfigSaved={handleConfigSaved}
+                onRemoveQueued={handleRemoveQueued}
               />
             ))}
           </div>

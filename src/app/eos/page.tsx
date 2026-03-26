@@ -56,51 +56,56 @@ export default function EOSPage() {
   const [hiddenLines, setHiddenLines] = useState<Set<string>>(new Set());
   const [activeStream, setActiveStream] = useState("vs1");
   const [activeView, setActiveView]     = useState<"entry" | "email">("entry");
+  const [mesRefreshing, setMesRefreshing] = useState(false);
 
-  // Pre-populate fields from the live dashboard feed + MES simulator state
-  useEffect(() => {
-    const metricsPromise = fetch(`/api/metrics?shift=${formData.shift.toLowerCase()}`)
-      .then((r) => r.json() as Promise<ShiftMetrics>);
-    const mesPromise = fetch("/api/mes/state")
-      .then((r) => r.json() as Promise<LineState[]>)
-      .catch(() => [] as LineState[]);
+  async function refreshFromMes(shift: string) {
+    setMesRefreshing(true);
+    try {
+      const [metrics, mesStates] = await Promise.all([
+        fetch(`/api/metrics?shift=${shift.toLowerCase()}`).then((r) => r.json() as Promise<ShiftMetrics>),
+        fetch("/api/mes/state").then((r) => r.json() as Promise<LineState[]>).catch(() => [] as LineState[]),
+      ]);
 
-    Promise.all([metricsPromise, mesPromise])
-      .then(([metrics, mesStates]) => {
-        setFormData((prev) => {
-          const updatedLines = { ...prev.lines };
+      setFormData((prev) => {
+        const updatedLines = { ...prev.lines };
 
-          // Output + headcount from dashboard metrics
-          metrics.lines.forEach((line) => {
-            const lineKey = line.id.replace("-l", ":Line ");
-            if (!(lineKey in updatedLines)) return;
-            const merged = {
-              ...updatedLines[lineKey],
-              output:    String(line.output),
-              headcount: String(line.headcount),
-            };
-            merged.hpu = calculateHPU(merged.output, merged.headcount, merged.hoursWorked);
-            updatedLines[lineKey] = merged;
-          });
-
-          // Order tracking from MES state (only when a schedule is loaded)
-          mesStates.forEach((state) => {
-            if (!state.schedule) return;
-            const lineKey = state.lineId.replace("-l", ":Line ");
-            if (!(lineKey in updatedLines)) return;
-            updatedLines[lineKey] = {
-              ...updatedLines[lineKey],
-              orderAtPackout:      state.currentOrder ?? "",
-              remainingOnOrder:    String(state.remainingOnOrder),
-              remainingOnRunSheet: String(state.remainingOnRunSheet),
-              changeovers:         String(state.completedOrders),
-            };
-          });
-
-          return { ...prev, lines: updatedLines };
+        metrics.lines.forEach((line) => {
+          const lineKey = line.id.replace("-l", ":Line ");
+          if (!(lineKey in updatedLines)) return;
+          const merged = {
+            ...updatedLines[lineKey],
+            output:    String(line.output),
+            headcount: String(line.headcount),
+          };
+          merged.hpu = calculateHPU(merged.output, merged.headcount, merged.hoursWorked);
+          updatedLines[lineKey] = merged;
         });
-      })
-      .catch(() => {/* silently ignore */});
+
+        mesStates.forEach((state) => {
+          if (!state.schedule) return;
+          const lineKey = state.lineId.replace("-l", ":Line ");
+          if (!(lineKey in updatedLines)) return;
+          updatedLines[lineKey] = {
+            ...updatedLines[lineKey],
+            orderAtPackout:      state.currentOrder ?? "",
+            remainingOnOrder:    String(state.remainingOnOrder),
+            remainingOnRunSheet: String(state.remainingOnRunSheet),
+            changeovers:         String(state.completedOrders),
+          };
+        });
+
+        return { ...prev, lines: updatedLines };
+      });
+    } catch {
+      // silently ignore
+    } finally {
+      setMesRefreshing(false);
+    }
+  }
+
+  // Pre-populate on mount and shift change
+  useEffect(() => {
+    refreshFromMes(formData.shift);
   }, [formData.shift]);
 
   // ── Handlers ────────────────────────────────────────────────────────────────
@@ -271,6 +276,13 @@ export default function EOSPage() {
                 className="flex-1 min-w-48 bg-transparent text-accent border border-accent px-7 py-3.5 rounded cursor-pointer font-bold text-xs tracking-widest uppercase hover:bg-accent hover:text-black transition-colors"
               >
                 ✉ Preview Email
+              </button>
+              <button
+                onClick={() => refreshFromMes(formData.shift)}
+                disabled={mesRefreshing}
+                className="bg-transparent text-slate-400 border border-border px-5 py-3.5 rounded cursor-pointer text-xs tracking-widest uppercase hover:border-slate-500 transition-colors disabled:opacity-50"
+              >
+                {mesRefreshing ? "Refreshing…" : "↺ Refresh from MES"}
               </button>
               <button
                 onClick={handleReset}

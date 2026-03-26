@@ -14,10 +14,14 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import { Line as LineData, TimePoint } from "@/lib/types";
+import type { LineState } from "@/lib/mesTypes";
+import type { ShiftProgress } from "@/lib/shiftTime";
 
 interface LineDrawerProps {
   line: LineData | null;
   trend: TimePoint[];
+  mesState: LineState | null;
+  shiftProgress: ShiftProgress;
   onClose: () => void;
 }
 
@@ -50,6 +54,13 @@ function getFpyColor(fpy: number): string {
 function getHpuColor(hpu: number): string {
   if (hpu <= 0.35) return "text-status-green";
   if (hpu <= 0.45) return "text-status-amber";
+  return "text-status-red";
+}
+
+function getPaceColor(projected: number, target: number): string {
+  const r = projected / target;
+  if (r >= 0.9) return "text-status-green";
+  if (r >= 0.75) return "text-status-amber";
   return "text-status-red";
 }
 
@@ -105,6 +116,13 @@ function buildChartData(line: LineData, trend: TimePoint[]): ChartPoint[] {
   });
 }
 
+/** Convert MES hourlyOutput bucket map to sorted chart data. */
+function buildMesHourlyData(hourlyOutput: Record<string, number>) {
+  return Object.entries(hourlyOutput)
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([time, output]) => ({ time, output }));
+}
+
 const tooltipStyle = {
   contentStyle: {
     backgroundColor: "#161c2a",
@@ -116,7 +134,13 @@ const tooltipStyle = {
   itemStyle: { color: "#edf2f8" },
 };
 
-export default function LineDrawer({ line, trend, onClose }: LineDrawerProps) {
+export default function LineDrawer({
+  line,
+  trend,
+  mesState,
+  shiftProgress,
+  onClose,
+}: LineDrawerProps) {
   const isOpen = line !== null;
 
   useEffect(() => {
@@ -130,6 +154,21 @@ export default function LineDrawer({ line, trend, onClose }: LineDrawerProps) {
 
   const chartData = line && trend.length > 0 ? buildChartData(line, trend) : [];
   const changeoverTimes = chartData.filter((d) => d.isChangeover).map((d) => d.time);
+
+  // Use real MES hourly output when available; fall back to synthetic
+  const hasMesHourly =
+    mesState && Object.keys(mesState.hourlyOutput).length > 0;
+  const hourlyBarData = hasMesHourly
+    ? buildMesHourlyData(mesState!.hourlyOutput)
+    : chartData.map(({ time, output }) => ({ time, output }));
+
+  // Pace for this line (only when schedule loaded and elapsed > 15 min)
+  const linePace =
+    mesState?.schedule && shiftProgress.elapsedHours >= 0.25
+      ? Math.round(
+          (mesState.totalOutput / shiftProgress.elapsedHours) * shiftProgress.totalHours
+        )
+      : null;
 
   return (
     <>
@@ -184,7 +223,7 @@ export default function LineDrawer({ line, trend, onClose }: LineDrawerProps) {
             </div>
 
             {/* Metric summary row */}
-            <div className="grid grid-cols-4 gap-3 p-5 border-b border-border shrink-0">
+            <div className="grid grid-cols-5 gap-3 p-5 border-b border-border shrink-0">
               <div>
                 <p className="text-xs text-slate-400 uppercase tracking-wider mb-1">
                   Output
@@ -214,23 +253,70 @@ export default function LineDrawer({ line, trend, onClose }: LineDrawerProps) {
                 </p>
                 <p className="text-xl font-semibold">{line.changeovers}</p>
               </div>
+              <div>
+                <p className="text-xs text-slate-400 uppercase tracking-wider mb-1">
+                  Pace
+                </p>
+                {linePace !== null ? (
+                  <>
+                    <p className={`text-xl font-semibold ${getPaceColor(linePace, line.target)}`}>
+                      {linePace}
+                    </p>
+                    <p className="text-xs text-slate-400">proj.</p>
+                  </>
+                ) : (
+                  <p className="text-xl font-semibold text-slate-600">—</p>
+                )}
+              </div>
             </div>
+
+            {/* Active order strip — only when MES schedule is loaded */}
+            {mesState?.schedule && (
+              <div className="grid grid-cols-3 gap-3 px-5 py-3 bg-background border-b border-border shrink-0">
+                <div>
+                  <p className="text-xs text-slate-500 uppercase tracking-wider mb-0.5">
+                    Active Order
+                  </p>
+                  <p className="text-sm font-mono text-white truncate">
+                    {mesState.currentOrder ?? (
+                      <span className="text-status-green">All complete</span>
+                    )}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs text-slate-500 uppercase tracking-wider mb-0.5">
+                    Rem. on Order
+                  </p>
+                  <p className="text-sm text-white">{mesState.remainingOnOrder}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-slate-500 uppercase tracking-wider mb-0.5">
+                    Rem. on Sheet
+                  </p>
+                  <p className="text-sm text-white">{mesState.remainingOnRunSheet}</p>
+                </div>
+              </div>
+            )}
 
             {/* Charts */}
             <div className="flex flex-col gap-6 p-5 overflow-y-auto">
-              {/* Hourly output */}
+              {/* Hourly output — real MES data when available, else synthetic */}
               <div>
                 <p className="text-xs text-slate-400 uppercase tracking-wider mb-3">
                   Hourly Output
-                  {line.changeovers > 0 && (
-                    <span className="ml-2 text-status-amber normal-case">
-                      · amber lines = changeovers
-                    </span>
+                  {hasMesHourly ? (
+                    <span className="ml-2 text-accent/70 normal-case">· live MES</span>
+                  ) : (
+                    line.changeovers > 0 && (
+                      <span className="ml-2 text-status-amber normal-case">
+                        · amber lines = changeovers
+                      </span>
+                    )
                   )}
                 </p>
                 <ResponsiveContainer width="100%" height={160}>
                   <BarChart
-                    data={chartData}
+                    data={hourlyBarData}
                     margin={{ top: 4, right: 8, left: 0, bottom: 0 }}
                   >
                     <CartesianGrid
@@ -243,7 +329,7 @@ export default function LineDrawer({ line, trend, onClose }: LineDrawerProps) {
                       tick={{ fill: "#94a3b8", fontSize: 10 }}
                       axisLine={{ stroke: "#253044" }}
                       tickLine={false}
-                      interval={3}
+                      interval={hasMesHourly ? 0 : 3}
                     />
                     <YAxis
                       tick={{ fill: "#94a3b8", fontSize: 10 }}
@@ -255,15 +341,17 @@ export default function LineDrawer({ line, trend, onClose }: LineDrawerProps) {
                       cursor={{ fill: "rgba(255,255,255,0.03)" }}
                       {...tooltipStyle}
                     />
-                    {changeoverTimes.map((t) => (
-                      <ReferenceLine
-                        key={t}
-                        x={t}
-                        stroke="#f59e0b"
-                        strokeDasharray="4 2"
-                        label={{ value: "C/O", fill: "#f59e0b", fontSize: 9 }}
-                      />
-                    ))}
+                    {/* Changeover markers only on synthetic data */}
+                    {!hasMesHourly &&
+                      changeoverTimes.map((t) => (
+                        <ReferenceLine
+                          key={t}
+                          x={t}
+                          stroke="#f59e0b"
+                          strokeDasharray="4 2"
+                          label={{ value: "C/O", fill: "#f59e0b", fontSize: 9 }}
+                        />
+                      ))}
                     <Bar
                       dataKey="output"
                       name="Output"

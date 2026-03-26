@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useState } from "react";
 import dynamic from "next/dynamic";
 import { ShiftMetrics, ShiftName } from "@/lib/types";
+import type { LineState } from "@/lib/mesTypes";
+import { getShiftProgress } from "@/lib/shiftTime";
 import Header from "@/components/Header";
 import KpiCard from "@/components/KpiCard";
 import LineTable from "@/components/LineTable";
@@ -36,6 +38,13 @@ function getFpyColor(fpy: number): string {
 function getHpuColor(hpu: number): string {
   if (hpu <= 0.35) return "text-status-green";
   if (hpu <= 0.45) return "text-status-amber";
+  return "text-status-red";
+}
+
+function getPaceColor(projected: number, target: number): string {
+  const ratio = projected / target;
+  if (ratio >= 0.9) return "text-status-green";
+  if (ratio >= 0.75) return "text-status-amber";
   return "text-status-red";
 }
 
@@ -110,6 +119,7 @@ function ErrorScreen({
 
 export default function Home() {
   const [metrics, setMetrics] = useState<ShiftMetrics | null>(null);
+  const [mesStates, setMesStates] = useState<LineState[]>([]);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
@@ -119,10 +129,14 @@ export default function Home() {
 
   const fetchMetrics = async () => {
     try {
-      const res = await fetch(`/api/metrics?shift=${shift}`);
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data: ShiftMetrics = await res.json();
+      const [metricsRes, mesRes] = await Promise.all([
+        fetch(`/api/metrics?shift=${shift}`),
+        fetch("/api/mes/state"),
+      ]);
+      if (!metricsRes.ok) throw new Error(`HTTP ${metricsRes.status}`);
+      const data: ShiftMetrics = await metricsRes.json();
       setMetrics(data);
+      if (mesRes.ok) setMesStates(await mesRes.json());
       setLastUpdated(new Date());
       setFetchError(null);
     } catch (err) {
@@ -160,6 +174,18 @@ export default function Home() {
   const avgHpu         = lines.reduce((sum, l) => sum + l.hpu, 0) / lines.length;
   const totalHeadcount = lines.reduce((sum, l) => sum + l.headcount, 0);
 
+  // MES-derived data
+  const lineStateMap = new Map(mesStates.map((s) => [s.lineId, s]));
+  const shiftProgress = getShiftProgress(shift, new Date());
+
+  // Pace: only meaningful after 15 min and when at least one schedule is active
+  const hasSchedule = mesStates.some((s) => s.schedule !== null);
+  const mesTotal = mesStates.reduce((sum, s) => sum + s.totalOutput, 0);
+  const pacedOutput =
+    hasSchedule && shiftProgress.elapsedHours >= 0.25
+      ? Math.round((mesTotal / shiftProgress.elapsedHours) * shiftProgress.totalHours)
+      : null;
+
   return (
     <main className="min-h-screen bg-background">
 
@@ -180,7 +206,7 @@ export default function Home() {
       )}
 
       {/* KPI cards */}
-      <div className="p-6 grid grid-cols-4 gap-4">
+      <div className="p-6 grid grid-cols-2 md:grid-cols-4 xl:grid-cols-5 gap-4">
         <KpiCard
           label="Total Output"
           value={totalOutput}
@@ -205,6 +231,21 @@ export default function Home() {
           value={totalHeadcount}
           unit="operators"
         />
+        <KpiCard
+          label="Pace"
+          value={pacedOutput ?? "—"}
+          unit={pacedOutput !== null ? "proj." : ""}
+          subtext={
+            pacedOutput !== null
+              ? `Target ${totalTarget} · ${pacedOutput >= totalTarget ? "On track" : "Behind"}`
+              : "Load a schedule to track pace"
+          }
+          valueColor={
+            pacedOutput !== null
+              ? getPaceColor(pacedOutput, totalTarget)
+              : "text-slate-500"
+          }
+        />
       </div>
 
       {/* Main content */}
@@ -212,6 +253,8 @@ export default function Home() {
         <div className="col-span-2">
           <LineTable
             lines={lines}
+            mesStateMap={lineStateMap}
+            shiftProgress={shiftProgress}
             onSelectLine={setSelectedLineId}
             selectedLineId={selectedLineId}
           />
@@ -222,6 +265,8 @@ export default function Home() {
       <LineDrawer
         line={selectedLine}
         trend={metrics!.trend}
+        mesState={selectedLine ? (lineStateMap.get(selectedLine.id) ?? null) : null}
+        shiftProgress={shiftProgress}
         onClose={closeDrawer}
       />
 

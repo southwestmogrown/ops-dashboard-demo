@@ -43,6 +43,8 @@ export interface LineState {
   completedOrders: number;
   /** Number of schedules waiting behind the active one */
   queuedCount: number;
+  /** The schedules waiting behind the active one (index 0 = next up) */
+  queue: LineSchedule[];
   /** units per hour bucket, key = "HH:00", e.g. "07:00" → 12 */
   hourlyOutput: Record<string, number>;
 }

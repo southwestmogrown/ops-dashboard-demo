@@ -7,17 +7,18 @@ interface AdminLineCardProps {
   lineId: string;
   label: string;
   schedule: LineSchedule | null;
-  queuedCount: number;
+  queuedSchedules: LineSchedule[];
   savedTarget: number | undefined;
   savedHeadcount: number | undefined;
   onScheduleLoaded: (lineId: string, schedule: LineSchedule, mode: "replace" | "queue") => void;
   onConfigSaved: (lineId: string, target: number | undefined, headcount: number | undefined) => void;
+  onRemoveQueued: (lineId: string, index: number) => void;
 }
 
 export default function AdminLineCard({
-  lineId, label, schedule, queuedCount,
+  lineId, label, schedule, queuedSchedules,
   savedTarget, savedHeadcount,
-  onScheduleLoaded, onConfigSaved,
+  onScheduleLoaded, onConfigSaved, onRemoveQueued,
 }: AdminLineCardProps) {
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -25,6 +26,7 @@ export default function AdminLineCard({
   const [parseError, setParseError]     = useState<string | null>(null);
   const [isDragOver, setIsDragOver]     = useState(false);
   const [pending, setPending]           = useState<LineSchedule | null>(null);
+  const [queueOpen, setQueueOpen]       = useState(false);
 
   const [target, setTarget]       = useState(savedTarget    !== undefined ? String(savedTarget)    : "");
   const [headcount, setHeadcount] = useState(savedHeadcount !== undefined ? String(savedHeadcount) : "");
@@ -73,6 +75,8 @@ export default function AdminLineCard({
       )
     : 0;
 
+  const queuedCount = queuedSchedules.length;
+
   return (
     <div className="bg-surface border border-border rounded-lg p-4 flex flex-col gap-4">
 
@@ -80,11 +84,38 @@ export default function AdminLineCard({
       <div className="flex items-center justify-between">
         <div className="text-xs tracking-widest uppercase text-slate-400 font-semibold">{label}</div>
         {queuedCount > 0 && (
-          <span className="text-xs bg-accent/15 text-accent border border-accent/30 rounded-full px-2 py-0.5">
-            +{queuedCount} queued
-          </span>
+          <button
+            onClick={() => setQueueOpen((o) => !o)}
+            className="text-xs bg-accent/15 text-accent border border-accent/30 rounded-full px-2 py-0.5 cursor-pointer hover:bg-accent/25 transition-colors"
+          >
+            +{queuedCount} queued {queueOpen ? "▲" : "▼"}
+          </button>
         )}
       </div>
+
+      {/* Expandable queue list */}
+      {queueOpen && queuedCount > 0 && (
+        <div className="bg-background border border-border rounded p-2.5 flex flex-col gap-1.5">
+          <div className="text-xs text-slate-500 uppercase tracking-widest mb-1">Queue</div>
+          {queuedSchedules.map((sched, i) => (
+            <div key={i} className="flex items-center justify-between gap-2">
+              <div className="text-xs text-slate-300 min-w-0">
+                <span className="font-mono">{sched.date}</span>
+                <span className="text-slate-500 ml-1.5">
+                  {sched.items.length} orders · {sched.totalTarget} units
+                </span>
+              </div>
+              <button
+                onClick={() => onRemoveQueued(lineId, i + 1)}
+                title="Remove from queue"
+                className="text-xs text-slate-600 hover:text-status-red bg-transparent border-none cursor-pointer transition-colors shrink-0"
+              >
+                ✕
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* Run sheet section */}
       <div>

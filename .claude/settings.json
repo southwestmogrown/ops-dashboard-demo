@@ -1,0 +1,28 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(xargs dirname:*)",
+      "Bash(npm run:*)",
+      "Bash(npx tsc:*)",
+      "Bash(ls /workspaces/ops-dashboard-demo/node_modules/@tailwindcss/oxide/*.node)",
+      "Bash(node -e \"const os = require\\(''os''\\); console.log\\(os.platform\\(\\), os.arch\\(\\)\\);\")",
+      "Bash(node -e \"const p = require\\(''''./node_modules/@types/node/package.json''''\\); console.log\\(JSON.stringify\\(p.exports, null, 2\\)\\)\")",
+      "Bash(python3 -c \"import sys,json; p=json.load\\(sys.stdin\\); print\\(''''version:'''', p.get\\(''''version''''\\)\\); print\\(''''types:'''', p.get\\(''''types''''\\)\\); print\\(''''typesVersions:'''', p.get\\(''''typesVersions''''\\)\\)\")",
+      "Bash(grep -r 'reference types' /workspaces/ops-dashboard-demo/node_modules/next/dist/client/components/*.d.ts)",
+      "Bash(git -C /workspaces/ops-dashboard-demo status)",
+      "Bash(git -C /workspaces/ops-dashboard-demo diff --stat)",
+      "Bash(git -C /workspaces/ops-dashboard-demo log --oneline -5)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git -C /workspaces/ops-dashboard-demo push origin main)",
+      "Bash(gh pr:*)",
+      "Bash(git -C /workspaces/ops-dashboard-demo checkout -b feat/eos-dashboard-sync)",
+      "Bash(git push:*)",
+      "Bash(git checkout:*)",
+      "Bash(git merge:*)",
+      "Bash(npm install:*)",
+      "Bash(node -e \"console.log\\(require\\(''/workspaces/ops-dashboard-demo/node_modules/pdfjs-dist/package.json''\\).version\\)\")",
+      "Bash(ls /workspaces/ops-dashboard-demo/*.config*)"
+    ]
+  }
+}

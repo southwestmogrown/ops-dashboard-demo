@@ -1,7 +1,9 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Line, ShiftName } from "@/lib/types";
+import { getShiftProgress, formatShiftTime } from "@/lib/shiftTime";
 import ShiftSelector from "./ShiftSelector";
 import ExportButton from "./ExportButton";
 
@@ -18,6 +20,17 @@ export default function Header({
   lastUpdated,
   lines,
 }: HeaderProps) {
+  const [progress, setProgress] = useState(() => getShiftProgress(shift, new Date()));
+
+  // Recalculate on shift change and tick every minute
+  useEffect(() => {
+    setProgress(getShiftProgress(shift, new Date()));
+    const id = setInterval(() => setProgress(getShiftProgress(shift, new Date())), 60_000);
+    return () => clearInterval(id);
+  }, [shift]);
+
+  const { elapsedHours, remainingHours } = progress;
+
   return (
     <header className="bg-surface border-b border-border px-8 py-4">
       <div className="flex items-center justify-between">
@@ -36,8 +49,17 @@ export default function Header({
           <ShiftSelector value={shift} onChange={onShiftChange} />
         </div>
 
-        {/* Right — timestamp + export placeholder */}
+        {/* Right — clock, timestamp, nav */}
         <div className="flex items-center gap-4 min-w-0">
+          {/* Shift clock */}
+          <div className="hidden lg:flex items-center gap-1.5 text-xs text-slate-500 whitespace-nowrap">
+            <span className="text-slate-400">{formatShiftTime(elapsedHours)}</span>
+            <span>elapsed</span>
+            <span className="text-slate-600">·</span>
+            <span className="text-slate-400">{formatShiftTime(remainingHours)}</span>
+            <span>left</span>
+          </div>
+
           <span className="text-slate-400 text-sm whitespace-nowrap">
             {lastUpdated
               ? `Updated ${lastUpdated.toLocaleTimeString()}`

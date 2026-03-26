@@ -74,6 +74,18 @@ export function getSchedule(lineId: string): LineSchedule | undefined {
   return queues[lineId]?.[0];
 }
 
+/**
+ * Remove a queued (non-active) schedule by its position in the queue.
+ * index 1 = first queued item (behind the active schedule at index 0).
+ * Returns false if out of range or if attempting to remove index 0.
+ */
+export function removeFromQueue(lineId: string, index: number): boolean {
+  const queue = queues[lineId];
+  if (!queue || index < 1 || index >= queue.length) return false;
+  queue.splice(index, 1);
+  return true;
+}
+
 // ── Simulation ────────────────────────────────────────────────────────────────
 
 /**
@@ -152,7 +164,9 @@ export function getLineState(lineId: string): LineState {
   return {
     lineId, schedule, totalOutput,
     currentOrder, remainingOnOrder, remainingOnRunSheet,
-    completedOrders, queuedCount, hourlyOutput,
+    completedOrders, queuedCount,
+    queue: queue.slice(1),
+    hourlyOutput,
   };
 }
 
