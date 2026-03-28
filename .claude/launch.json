@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "ops-dashboard-dev",
+      "runtimeExecutable": "wsl",
+      "runtimeArgs": ["bash", "-lc", "cd /home/shane/personal-projects/portfolio-projects/ops-dashboard-demo && npm run dev"],
+      "port": 3000
+    }
+  ]
+}

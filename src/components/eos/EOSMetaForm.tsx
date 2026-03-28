@@ -10,17 +10,20 @@ interface Props {
 }
 
 const inputCls =
-  "w-full bg-background border border-border rounded px-3.5 py-2.5 text-slate-200 text-sm outline-none font-mono focus:border-accent";
+  "w-full bg-surface-highest border-none rounded-sm px-3.5 py-2.5 text-[#e1e2ec] text-sm outline-none font-mono focus:ring-1 focus:ring-accent/40 placeholder:text-[#e1e2ec]/20";
 
 export default function EOSMetaForm({ data, onChangeMeta }: Props) {
   return (
-    <div className="bg-surface border border-border rounded-lg p-6 mb-8">
-      <div className="text-xs text-slate-500 tracking-widest uppercase font-semibold mb-4">
-        Shift Information
+    <div className="bg-surface-low p-6 border-l-2 border-vs2/30">
+      <div className="flex items-center gap-2 mb-4">
+        <span className="material-symbols-outlined text-vs2">assignment_ind</span>
+        <h3 className="font-['Space_Grotesk',sans-serif] text-lg font-bold tracking-tight uppercase">
+          Shift Information
+        </h3>
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <div>
-          <label className="block text-xs text-slate-400 mb-1.5 tracking-widest uppercase font-medium">
+          <label className="block text-[10px] text-[#e1e2ec]/40 mb-1.5 tracking-widest uppercase font-bold">
             Supervisor
           </label>
           <input
@@ -32,7 +35,7 @@ export default function EOSMetaForm({ data, onChangeMeta }: Props) {
           />
         </div>
         <div>
-          <label className="block text-xs text-slate-400 mb-1.5 tracking-widest uppercase font-medium">
+          <label className="block text-[10px] text-[#e1e2ec]/40 mb-1.5 tracking-widest uppercase font-bold">
             Date
           </label>
           <input
@@ -43,7 +46,7 @@ export default function EOSMetaForm({ data, onChangeMeta }: Props) {
           />
         </div>
         <div>
-          <label className="block text-xs text-slate-400 mb-1.5 tracking-widest uppercase font-medium">
+          <label className="block text-[10px] text-[#e1e2ec]/40 mb-1.5 tracking-widest uppercase font-bold">
             Shift
           </label>
           <select

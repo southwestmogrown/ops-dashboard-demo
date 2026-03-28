@@ -33,6 +33,7 @@ const LINE_DEFINITIONS = [
   { id: "vs1-l1", name: "Line 1", valueStream: "VS1" },
   { id: "vs1-l2", name: "Line 2", valueStream: "VS1" },
   { id: "vs1-l3", name: "Line 3", valueStream: "VS1" },
+  { id: "vs1-l4", name: "Line 4", valueStream: "VS1" },
   { id: "vs2-l1", name: "Line 1", valueStream: "VS2" },
   { id: "vs2-l2", name: "Line 2", valueStream: "VS2" },
 ];
@@ -59,8 +60,8 @@ export function generateMetrics(
       valueStream: def.valueStream,
       output,
       target,
-      fpy: randBetween(rng, 88.0, 98.5),
-      hpu: randBetween(rng, 0.28, 0.52),
+      fpy: 100.0,
+      hpu: 0.0,
       headcount: Math.round(randBetween(rng, 6, 14)),
       changeovers: Math.round(randBetween(rng, 0, 3)),
     };
@@ -100,4 +101,20 @@ export function generateMetrics(
   };
 }
 
-generateMetrics("day"); // Example usage — generates metrics for the day shift
+/**
+ * Default headcount by line type.
+ * Folding lines (VS1): 45
+ * Revolver lines (VS2): 40
+ */
+export function getDefaultHeadcount(lineId: string): number {
+  return lineId.startsWith("vs1-") ? 45 : 40;
+}
+
+/**
+ * Default daily target by line type.
+ * Folding lines (VS1): 225
+ * Revolver lines (VS2): 200
+ */
+export function getDefaultTarget(lineId: string): number {
+  return lineId.startsWith("vs1-") ? 225 : 200;
+}

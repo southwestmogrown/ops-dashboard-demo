@@ -1,322 +1,942 @@
-# Code Review Issues
-
-Generated from post-build code review. 10 issues across 7 files.
+# Issues: Role-Based Views + Hour-by-Hour Table
 
 ---
 
-## Parallel Execution Plan
+## Recently Completed
 
-All 7 branches touch **different files** with no overlap — they can be opened and worked simultaneously.
+### M7: SQLite Persistence ✅
+**Files:** `src/lib/db.ts` (new), `src/lib/mesStore.ts` (refactored), `src/lib/mesTypes.ts` (updated)
 
-```
-Wave 1 (all parallel)
-├── branch: fix/export-button-bugs         → issues #1 #2 #3  (ExportButton.tsx)
-├── branch: fix/api-seed-nan-guard         → issue  #4         (route.ts)
-├── branch: refactor/extract-rng-util      → issues #5 #9      (generateMetrics.ts + LineDrawer.tsx + new rng.ts)
-├── branch: chore/remove-dead-code         → issue  #6         (page.tsx)
-├── branch: refactor/line-table-component  → issue  #7         (LineTable.tsx)
-├── branch: fix/shift-selector-name        → issue  #8         (ShiftSelector.tsx)
-└── branch: chore/update-claude-md         → issue  #10        (CLAUDE.md)
+All MES state now persists to SQLite (`data/ops.db`) via a write-through cache in `mesStore.ts`. Cold starts and hot reloads no longer wipe state. Tables: `scan_events`, `line_queues`, `admin_config`, `line_comments`, `scrap_log`, `sim_clock`, `db_meta`. `AdminLineConfig` type moved to `mesTypes.ts` to avoid circular imports.
 
-Wave 2
-└── Merge all into main (no conflicts expected)
-```
+`data/` directory added to `.gitignore`.
 
-Issues #5 and #9 are batched onto one branch because both modify `generateMetrics.ts` and the fix for #9 (extracting `rng.ts`) makes #5 (removing the orphaned call) a natural cleanup in the same pass.
+### Bug Fixes ✅ (session: 2026-03-28)
+- `ShiftSelector.tsx`: `text-white` on yellow accent → `text-black` (WCAG contrast)
+- `ShiftSelector.tsx`: component renamed from `function Header` → `function ShiftSelector`
+- `Header.tsx`: SIM badge `text-white` → `text-black`
+- `Header.tsx`: `useEffect` closure staleness on `simClock` — added `simClockRef` so interval always reads latest value
+- `ReworkPanel.tsx`: replaced unsafe double-cast type narrowing with discriminated union access
+- `AdminLineCard.tsx`: "Not Running" toggle now calls `onConfigSaved()` to keep parent state in sync
+- `middleware.ts`: removed `/team-lead` redirect for supervisors — loop fixed
+- `sim/SimControls.tsx`: deleted (dead code, never imported)
+- `generateMetrics.ts`: removed module-load example call (`generateMetrics("day")`)
+
+
+
+### EOS: auto-hide lines without a schedule
+**File:** `src/app/eos/page.tsx`
+
+On mount/shift change, `refreshFromMes` now checks each line's MES state. If `!state.schedule`, the line's key is added to `hiddenLines` — the line is collapsed into the "Hidden" strip automatically. Manual show/hide still works as before.
+
+### HPU: dynamic calculation replacing mock fallback
+**Files:** `src/app/api/metrics/route.ts`, `src/lib/generateMetrics.ts`
+
+`generateMetrics` no longer generates a random HPU — fallback is `0.0`. The `/api/metrics` route now computes `HPU = (headcount × elapsedHours) / output` using `getShiftProgress`, mirroring the EOS formula. Falls back to `0` when output is zero.
 
 ---
 
-## Issues
+Two features: (1) role-based access separating supervisors/managers (full admin) from team leads (single-line view), and (2) an hour-by-hour breakdown on the team lead view with per-hour comments for explaining misses.
+
+**Shift schedules:**
+- Day: 6:00 AM – 4:30 PM (6:00–16:30), 10 h work time after 75 min breaks
+- Night: 5:00 PM – 3:30 AM (17:00–03:30), 10 h work time after 75 min breaks
+- Each shift: 3×15 min paid breaks + 1×30 min unpaid lunch = 75 min total breaks
+- Day pattern: 2 paid breaks → lunch → 1 paid break
+- Night pattern: 1 paid break → lunch → 2 paid breaks
+- Work time = 600 − 75 = **525 minutes** per shift
+
+**Hourly target formula:** `planned = round(target × (workingMinutes / 525))` where `workingMinutes` excludes any break minutes in that hour.
 
 ---
 
-### Issue #1 — ExportButton download fails in Firefox
+## Milestone 1 — Auth Foundation
 
-**Label:** `bug`
-**File:** `src/components/ExportButton.tsx`
-**Branch:** `fix/export-button-bugs`
-
-#### Description
-
-The anchor element used to trigger the CSV download is never appended to the DOM. Firefox requires the element to exist in the document tree to fire a download; Chrome does not. Any Firefox user clicking Export CSV receives no file.
-
-#### Steps to reproduce
-
-1. Open the dashboard in Firefox
-2. Click **Export CSV**
-3. No download is triggered
-
-#### Fix
-
-```ts
-// Before
-const a = document.createElement("a");
-a.href = url;
-a.download = filename;
-a.click();
-URL.revokeObjectURL(url);
-
-// After
-const a = document.createElement("a");
-a.href = url;
-a.download = filename;
-document.body.appendChild(a);
-a.click();
-document.body.removeChild(a);
-URL.revokeObjectURL(url);
+### Issue 1.1 — Create auth types
+**File:** `src/lib/authTypes.ts` (new)
+```typescript
+export type UserRole = "supervisor" | "team-lead";
+export const AUTH_PIN = process.env.AUTH_PIN ?? "bak2026";
 ```
 
-#### Acceptance criteria
-- CSV download works in Firefox, Chrome, and Safari
-- Anchor element is removed from the DOM after click
+### Issue 1.2 — Create useAuth hook
+**File:** `src/hooks/useAuth.ts` (new)
+- `useAuth(): { role, isAuthenticated, login(pin, role), logout }`
+- Reads/writes `{ pin, role }` to `localStorage` key `"ops-auth"`
+- On login success: also sets `document.cookie = "ops-role=<role>; path=/"` for middleware
+- `login()` validates PIN against `AUTH_PIN`, returns boolean
 
----
+### Issue 1.3 — Create PinGate component
+**File:** `src/components/PinGate.tsx` (new)
+- Full-screen overlay (`fixed inset-0 z-50 bg-background/90 backdrop-blur-sm`)
+- Centered card: BAK logo, "Enter PIN" label, masked PIN input, role radio buttons (Supervisor/Manager, Team Lead), Submit button
+- Wrong PIN: inline error message below input
+- On success: writes to localStorage + sets cookie, overlay unmounts
 
-### Issue #2 — `revokeObjectURL` race condition produces empty downloads
+### Issue 1.4 — Create route middleware
+**File:** `src/middleware.ts` (new)
+- Intercept `/admin` route (and any other protected routes)
+- Read `ops-role` cookie; if missing or not `"supervisor"` → redirect to `/team-lead`
+- If no cookie at all → redirect to `/` (PinGate will show)
 
-**Label:** `bug`
-**File:** `src/components/ExportButton.tsx`
-**Branch:** `fix/export-button-bugs`
+### Issue 1.5 — Wire PinGate into root layout
+**File:** `src/app/layout.tsx`
+- Import `useAuth` and `PinGate`
+- Render `PinGate` as overlay when `!isAuthenticated`
 
-#### Description
+### Issue 1.6 — Update Header with role-aware nav
+**File:** `src/components/Header.tsx`
+- Add `useAuth` hook
+- Show role badge (`SUP` / `TL`) next to app name
+- `Admin` link only when `role === "supervisor"`
+- `Team Lead` nav link when `role === "team-lead"`
+- Add `Logout` button that calls `logout()`
 
-`URL.revokeObjectURL(url)` is called synchronously immediately after `a.click()`. The click only schedules the download — the browser has not yet fetched the Blob URL when the URL is revoked. On slower machines or in certain Chromium builds this results in an empty or failed download.
+### Issue 1.7 — Create AdminLayout client guard
+**File:** `src/components/admin/AdminLayout.tsx` (new)
+- Client component; if `role === "team-lead"` → redirect to `/team-lead`
 
-#### Fix
+### Issue 1.8 — Wrap admin page with AdminLayout
+**File:** `src/app/admin/page.tsx`
+- Wrap default export in `<AdminLayout>`
 
-```ts
-// After click and DOM cleanup:
-setTimeout(() => URL.revokeObjectURL(url), 100);
+### Issue 1.9 — Add AUTH_PIN to .env.example
+**File:** `.env.example`
+```
+AUTH_PIN=bak2026
 ```
 
-#### Acceptance criteria
-- Downloaded file is never empty due to a revoked URL
-- Blob URL is still cleaned up after the download initiates
-
 ---
 
-### Issue #3 — CSV export does not quote string fields
+## Milestone 2 — Shift Break Windows + Hourly Targets
 
-**Label:** `bug`
-**File:** `src/components/ExportButton.tsx`
-**Branch:** `fix/export-button-bugs`
+### Issue 2.1 — Update shiftTime.ts with correct windows
+**File:** `src/lib/shiftTime.ts`
 
-#### Description
+Replace hardcoded values (day: 6–16h, night: 18–04h) with the correct shift schedule and break windows:
 
-`valueStream` and `name` fields are joined directly with commas and written to the CSV without quoting. If either field ever contains a comma, quote character, or newline the output will be malformed and parse incorrectly in Excel and Google Sheets. The current mock data is safe, but this violates the CSV spec and is a latent bug waiting on a data change.
+**Shift times:**
+- Day: start 6:00, end 16:30 (10.5 clock hours, stored as 6 and 16.5)
+- Night: start 17:00, end 03:30 (crosses midnight, stored as 17 and 27.5)
 
-#### Fix
-
-```ts
-const escape = (v: string) => `"${v.replace(/"/g, '""')}"`;
-
-const rows = lines.map((l) =>
-  [
-    escape(l.valueStream),
-    escape(l.name),
-    l.output,
-    l.target,
-    l.fpy.toFixed(1),
-    l.hpu.toFixed(2),
-    l.headcount,
-    l.changeovers,
-  ].join(",")
-);
+Add `getShiftWindows(shift): ShiftWindow`:
+```typescript
+interface ShiftWindow {
+  startHour: number;           // 6 or 17
+  endHour: number;             // 16.5 or 27.5
+  totalClockMinutes: number;    // 630
+  totalWorkMinutes: number;    // 525 (excludes 75 min breaks)
+  breakWindows: { start: number; end: number; paid: boolean }[];
+}
 ```
 
-#### Acceptance criteria
-- All string fields are wrapped in double quotes
-- Internal double-quote characters are escaped as `""`
-- Output passes CSV validation and opens correctly in Excel and Google Sheets
+**Break windows:**
+
+| Shift | Break | Window | Paid? |
+|---|---|---|---|
+| Day | Break 1 | 08:00–08:15 | yes |
+| Day | Break 2 | 10:00–10:15 | yes |
+| Day | Lunch | 12:00–12:30 | no |
+| Day | Break 3 | 14:00–14:15 | yes |
+| Night | Break 1 | 19:00–19:15 | yes |
+| Night | Lunch | 21:30–22:00 | no |
+| Night | Break 2 | 01:00–01:15 | yes |
+| Night | Break 3 | 02:00–02:15 | yes |
+
+### Issue 2.2 — Create shiftBreaks.ts
+**File:** `src/lib/shiftBreaks.ts` (new)
+
+`getHourlyTargets(target: number, shift: ShiftName, hourlyOutput: Record<string, number>): HourlyTargetRow[]`
+
+Algorithm:
+1. Call `getShiftWindows(shift)` → get `breakWindows[]` and `totalWorkMinutes`
+2. For each clock hour `H:00–H+1:00` that falls within the shift:
+   - `breakMins = sum(overlap([H, H+1), each break window))`
+   - `workingMins = 60 − breakMins`
+   - `planned = round(target × (workingMins / totalWorkMinutes))`
+   - If `workingMins === 0` → this is a break-only hour, `isBreak = true`, planned = 0
+3. `actual = hourlyOutput[hourKey] ?? 0`
+4. `variance = actual − planned`
+5. `status`: green ≥ planned, amber ≥ planned×0.9, else red
+6. Return sorted `HourlyTargetRow[]`
+
+### Issue 2.3 — Add HourlyTargetRow type
+**File:** `src/lib/types.ts`
+```typescript
+export interface HourlyTargetRow {
+  hour: string;
+  planned: number;
+  actual: number;
+  variance: number;
+  comment: string;
+  status: "green" | "amber" | "red";
+  isBreak: boolean;
+}
+```
+
+### Issue 2.4 — Admin-configurable break windows
+**File:** `src/lib/mesStore.ts`, `src/app/api/admin/breaks/route.ts` (new)
+
+Break windows must be overridable by admin. Defaults are hardcoded in `shiftTime.ts` (Issue 2.1). Admin can adjust them from the Admin page.
+
+Add to `mesStore.ts`:
+```typescript
+globalThis.__mesShiftBreaks: Record<ShiftName, { start: number; end: number; paid: boolean }[]> = {
+  day: [/* defaults from Issue 2.1 */],
+  night: [/* defaults from Issue 2.1 */],
+};
+getShiftBreaks(shift: ShiftName): { start: number; end: number; paid: boolean }[]
+setShiftBreaks(shift: ShiftName, windows): void
+```
+
+New API route `GET/POST /api/admin/breaks`:
+- `GET` → returns current break windows for both shifts
+- `POST { shift, windows }` → `setShiftBreaks(shift, windows)`
+
+Admin UI: add a "Shift Breaks" section to `AdminLineCard` or a separate panel — displays day/night break windows as editable time inputs (e.g. "08:00", "08:15"). On save → `POST /api/admin/breaks`.
+```
 
 ---
 
-### Issue #4 — Invalid `DEMO_SEED` silently corrupts the RNG
+## Milestone 3 — Comments Backend
 
-**Label:** `bug`
+### Issue 3.1 — Add comments to mesStore
+**File:** `src/lib/mesStore.ts`
+```typescript
+globalThis.__mesComments: Record<string, Record<string, string>> = {}
+setLineComment(lineId: string, hour: string, comment: string): void
+getLineComments(lineId: string): Record<string, string>
+```
+
+### Issue 3.2 — Add LineComments type
+**File:** `src/lib/mesTypes.ts`
+```typescript
+export type LineComments = Record<string, string>; // hour → comment
+```
+
+### Issue 3.3 — Create comments API route
+**File:** `src/app/api/line/comments/route.ts` (new)
+- `GET ?lineId=xxx` → `getLineComments(lineId)` → `Record<string, string>`
+- `POST` body `{ lineId, hour, comment }` → `setLineComment(lineId, hour, comment)`
+- Returns `{ ok: true }`
+
+---
+
+## Milestone 4 — Team Lead Page + HourlyTable
+
+### Issue 4.1 — Create LineSelector component
+**File:** `src/components/team-lead/LineSelector.tsx` (new)
+- Grid of 6 line buttons (vs1-l1 … vs2-l2)
+- Each shows: line name, VS badge (VS1/VS2 with color), live output/target
+- Data from `/api/metrics` + `/api/mes/state`
+- Click → sets selected line, shows LineDetailCard
+
+### Issue 4.2 — Create HourlyTable component
+**File:** `src/components/team-lead/HourlyTable.tsx` (new)
+
+**Columns:** Hour | Planned | Actual | Variance | Status | Comment
+
+**Row spec:**
+- Background by status: green tint (`bg-green-950/30`) / amber tint (`bg-amber-950/30`) / red tint (`bg-red-950/30`)
+- Break rows (`isBreak`): `text-slate-600`, diagonal stripe bg, `—` for all numeric values
+- Variance: green text if positive, red if negative
+- Status: colored dot (green/amber/red circle)
+- Comment: inline `<textarea>` auto-saves on blur (debounce 500ms → `POST /api/line/comments`); gold dot indicator if non-empty
+
+### Issue 4.3 — Create LineDetailCard component
+**File:** `src/components/team-lead/LineDetailCard.tsx` (new)
+- Header: line name + VS badge + "← Back to lines" link
+- KPI row: Output / Target / FPY / HPU / Headcount (from `/api/metrics`)
+- Active order strip (from `/api/mes/state`): current model, remaining on order, remaining on run sheet
+- `HourlyTable` below
+
+### Issue 4.4 — Create team-lead page
+**File:** `src/app/team-lead/page.tsx` (new)
+- `"use client"`
+- If no line selected → render `LineSelector`
+- If line selected → render `LineDetailCard`
+- Poll `/api/metrics` + `/api/mes/state` every 5 seconds
+- Load comments via `GET /api/line/comments?lineId=xxx` on line selection
+
+---
+
+## Milestone 5 — Integration
+
+### Issue 5.1 — Wrap admin page with AdminLayout
+**File:** `src/app/admin/page.tsx`
+- Wrap with `<AdminLayout>`
+
+### Issue 5.2 — Dashboard auth gate + redirect
+**File:** `src/app/page.tsx`
+- Import `useAuth`; if `!isAuthenticated` → render `PinGate`
+- If `role === "team-lead"` → redirect to `/team-lead`
+
+### Issue 5.3 — Conditional nav in Header
+**File:** `src/components/Header.tsx`
+- SUP role: show `Admin` link
+- TL role: show `Team Lead` link (instead of Admin)
+
+### Issue 5.4 — Cookie sync on login
+**File:** `src/hooks/useAuth.ts`
+- On login success: also `document.cookie = "ops-role=<role>; path=/"` so middleware can read it
+
+### Issue 5.5 — Verification checklist
+- [ ] Clear localStorage → visit `/admin` → redirect to `/`
+- [ ] Login as TL → visit `/admin` directly → redirect to `/team-lead`
+- [ ] Login as SUP → `/admin` renders normally
+- [ ] TL selects line → HourlyTable renders correct number of hours (10 day, 10 night)
+- [ ] Comment entered in HourlyTable → reload → comment persists
+- [ ] Break rows display with `—` and stripe background
+- [ ] Variance colors correct (green positive, red negative)
+- [ ] Status dot colors match variance thresholds
+
+---
+
+## Feature — Lines Not Running / Dormant Lines
+
+### Issue F1 — SCHEDULE NEEDED status
+**File:** `src/lib/status.ts`
+- Add `"unscheduled"` to `RiskLevel` union
+- Short-circuit `getRiskLevel` and `getStatusReasons` when `!mesState?.schedule` → return `"unscheduled"` / `["No schedule loaded"]`
+- Add `PILL_STYLE` export (moved from LineTable.tsx) with gray `"SCHEDULE NEEDED"` pill for `unscheduled`
+
+**File:** `src/components/LineTable.tsx`
+- Import `PILL_STYLE` from `status.ts`; remove local copy
+
+### Issue F2 — Per-line Not Running toggle
+**File:** `src/lib/mesStore.ts`
+- Add `isRunning?: boolean` to `AdminLineConfig`; `false` = line not running today
+
+**File:** `src/components/admin/AdminLineCard.tsx`
+- Add `savedIsRunning` prop; local `isRunning` state; "Running / Not Running" pill toggle at top of card
+- Card dims (`opacity-60`) when `isRunning === false`
+- Pass `isRunning` through `onConfigSaved(lineId, target, headcount, isRunning)`
+
+**File:** `src/app/admin/page.tsx`
+- Pass `savedIsRunning={adminConfig[lineId]?.isRunning}` to both `AdminLineCard` groups
+- `handleConfigSaved` now accepts and posts `isRunning`
+
+**File:** `src/app/page.tsx`
+- Derive `activeLines = metrics.lines.filter(l => adminConfig[l.id]?.isRunning !== false)`
+- KPI totals use `activeLines`; `LineTable`, `OutputChart`, `Header` receive `activeLines`
+- `selectedLine` lookup still uses full `metrics.lines` (drawer stays accessible for dormant lines)
+
+
+
+### Issue 6.1 — Scrap types
+**File:** `src/lib/reworkTypes.ts` (new)
+```typescript
+// PANEL_OPTIONS = ["A","B","C","D","E","F","G"]
+// DAMAGE_TYPES  = ["Damaged Panel","Bent Extrusion","Wrong Part","Missing Hardware","Other"]
+
+export interface ScrapEntryBase {
+  id: string; lineId: string; shift: ShiftName; model: string;
+  panel: PanelPosition; damageType: DamageType; boughtIn: boolean;
+}
+
+export interface ScrappedPanel extends ScrapEntryBase {
+  kind: "scrapped-panel"; stationFound: string; howDamaged: string;
+}
+
+export interface KickedLid extends ScrapEntryBase {
+  kind: "kicked-lid"; affectedArea: "panel"|"extrusion"; auditorInitials: string;
+}
+
+export type ScrapEntry = ScrappedPanel | KickedLid;
+export interface ScrapStats { kickedLids: number; scrappedPanels: number; totalBoughtIn: number; }
+```
+
+### Issue 6.2 — Scrap store helpers
+**File:** `src/lib/mesStore.ts` — add:
+- `__mesScrapLog: ScrapEntry[]`, `__mesScrapSerial: number` to `declare global`
+- `bumpScrapSerial()` → `"SCR-" + String(n).padStart(3, "0")`
+- `addScrapEntry(entry)`, `getScrapEntries(lineId, shift)`, `getScrapStats(lineId, shift)`, `getKickedLidsForLineShift(lineId, shift)`
+- `resetAll()` → clear scrap log and serial
+
+### Issue 6.3 — Scrap API route
+**File:** `src/app/api/scrap/route.ts` (new)
+- `GET ?lineId=&shift=` → `getScrapEntries(lineId, shift)`
+- `POST` → validate body, call `addScrapEntry()`, return 201
+
+### Issue 6.4 — FPY derivation from scrap log
+**Files:** `src/lib/generateMetrics.ts`, `src/app/api/metrics/route.ts`
+- `generateMetrics`: `fpy = 100.0` (scrap log is sole FPY driver); add `vs1-l4`; export `getDefaultHeadcount(lineId)` → VS1=45, VS2=40
+- Metrics route: after generating, `line.headcount = admin.headcount ?? getDefaultHeadcount(line.id)`; `line.fpy = totalOutput > 0 ? ((totalOutput - kickedLids) / totalOutput) * 100 : 100`
+
+### Issue 6.5 — ScrapForm component
+**File:** `src/components/team-lead/ScrapForm.tsx` (new)
+- Full-screen modal overlay with backdrop blur
+- Kind toggle: "Scrapped Panel" (red) / "Kicked Lid" (amber)
+- Shared fields: Model#, Panel (A–G grid), Damage Type (select)
+- Scrapped-panel: Station Found, How Damaged (textarea)
+- Kicked-lid: Affected Area (Panel/Extrusion toggle), Auditor Initials
+- POSTs to `/api/scrap`, calls `onCreated(entry)`, closes on success
+
+### Issue 6.6 — ReworkPanel component
+**File:** `src/components/team-lead/ReworkPanel.tsx` (new)
+- Collapsible panel; header shows count badges (red scrapped, amber kicked lids)
+- Lists each entry: kind badge (SC/KL), model, panel, damage type, time, ID
+- "BOUGHT IN" badge on entries where `boughtIn: true`
+- Empty state: italic "No entries this shift."
+
+### Issue 6.7 — Wire into LineDetailCard + team-lead page
+**Files:** `src/components/team-lead/LineDetailCard.tsx`, `src/app/team-lead/page.tsx`
+- LineDetailCard: add `scrapEntries`, `scrapStats`, `onRefreshScrap` props; render `ReworkPanel` + "+ Log Rework" button; show `ScrapForm` modal on click
+- Team-lead page: `scrapEntries` state; `refreshScrap()` callback; `useEffect` on `[selectedLineId, shift]`; pass to LineDetailCard
+
+### Future (Out of Scope for M6)
+- ERP/external system integration — `boughtIn` boolean is a placeholder; future work hooks this to an external product lookup
+- Bought-in product lookup by model# — API route that queries external system, auto-fills `boughtIn` flag on scrap entries
+
+---
+
+## Files Summary
+
+| File | Action |
+|---|---|
+| `src/lib/authTypes.ts` | CREATE |
+| `src/hooks/useAuth.ts` | CREATE |
+| `src/components/PinGate.tsx` | CREATE |
+| `src/components/admin/AdminLayout.tsx` | CREATE |
+| `src/components/team-lead/LineSelector.tsx` | CREATE |
+| `src/components/team-lead/HourlyTable.tsx` | CREATE |
+| `src/components/team-lead/LineDetailCard.tsx` | CREATE |
+| `src/app/team-lead/page.tsx` | CREATE |
+| `src/app/api/line/comments/route.ts` | CREATE |
+| `src/app/api/admin/breaks/route.ts` | CREATE |
+| `src/lib/shiftBreaks.ts` | CREATE |
+| `src/middleware.ts` | CREATE |
+| `src/lib/reworkTypes.ts` | CREATE |
+| `src/app/api/scrap/route.ts` | CREATE |
+| `src/components/team-lead/ScrapForm.tsx` | CREATE |
+| `src/components/team-lead/ReworkPanel.tsx` | CREATE |
+| `src/lib/mesStore.ts` | MODIFY — add `__mesScrapLog`, `__mesScrapSerial` globals + helpers + reset update; add `isRunning` to `AdminLineConfig` |
+| `src/lib/status.ts` | MODIFY — add `"unscheduled"` to `RiskLevel`; short-circuit `getRiskLevel`/`getStatusReasons`; export `PILL_STYLE` |
+| `src/lib/types.ts` | MODIFY — add `HourlyTargetRow` |
+| `src/lib/mesTypes.ts` | MODIFY — add `LineComments` type |
+| `src/lib/shiftTime.ts` | MODIFY — update shift windows + breaks |
+| `src/lib/generateMetrics.ts` | MODIFY — add vs1-l4, fpy=100, `getDefaultHeadcount` |
+| `src/app/api/metrics/route.ts` | MODIFY — derive FPY from scrap log, overlay default HC |
+| `src/app/layout.tsx` | MODIFY — add PinGate overlay |
+| `src/app/page.tsx` | MODIFY — auth gate + TL redirect + filter inactive lines from dashboard |
+| `src/app/admin/page.tsx` | MODIFY — wrap with AdminLayout; pass `savedIsRunning`; update `handleConfigSaved` |
+| `src/components/admin/AdminLineCard.tsx` | MODIFY — add `savedIsRunning` prop + "Not Running" toggle |
+| `src/components/LineTable.tsx` | MODIFY — import `PILL_STYLE` from `status.ts`, remove local copy |
+| `src/components/Header.tsx` | MODIFY — role badge + conditional nav |
+| `.env.example` | MODIFY — add `AUTH_PIN=bak2026` |
+
+## Open Questions
+
+*(All resolved.)*
+
+---
+
+## Milestone 7 — SQLite Persistence
+
+> **Context:** All MES state currently lives in `globalThis` variables in `mesStore.ts`. Cold restart (server restart, Vercel cold invocation, `next build` hot reload) silently wipes all schedules, scan events, scrap entries, comments, and admin config mid-shift. This is the single biggest blocker for production use.
+
+### Issue 7.1 — Install better-sqlite3
+**File:** `package.json`
+- `npm install better-sqlite3`
+- Also add `@types/better-sqlite3` to devDependencies
+- Note: `better-sqlite3` is synchronous — use it server-side only in API routes and `mesStore.ts` (never in client components)
+
+### Issue 7.2 — Create DB layer
+**File:** `src/lib/db.ts` (new)
+
+Initialize the DB file at `./data/ops.db` (create `./data/` dir if it doesn't exist). Run migrations on every import.
+
+```typescript
+// src/lib/db.ts
+import Database from "better-sqlite3";
+import path from "path";
+import fs from "fs";
+
+const DATA_DIR = path.join(process.cwd(), "data");
+const DB_PATH  = path.join(DATA_DIR, "ops.db");
+
+let _db: Database.Database | undefined;
+
+export function getDb(): Database.Database {
+  if (_db) return _db;
+  fs.mkdirSync(DATA_DIR, { recursive: true });
+  _db = new Database(DB_PATH);
+  _db.pragma("journal_mode = WAL");
+  _db.pragma("foreign_keys = ON");
+  runMigrations(_db);
+  return _db;
+}
+
+function runMigrations(db: Database.Database) {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS scan_events (
+      id        TEXT PRIMARY KEY,
+      timestamp TEXT NOT NULL,
+      line_id   TEXT NOT NULL,
+      shift     TEXT NOT NULL,
+      part_number TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_scan_line ON scan_events(line_id);
+    CREATE INDEX IF NOT EXISTS idx_scan_line_shift ON scan_events(line_id, shift);
+
+    CREATE TABLE IF NOT EXISTS line_queues (
+      line_id  TEXT PRIMARY KEY,
+      queue    TEXT NOT NULL  -- JSON-encoded LineSchedule[]
+    );
+
+    CREATE TABLE IF NOT EXISTS admin_config (
+      line_id   TEXT PRIMARY KEY,
+      target    REAL,
+      headcount INTEGER,
+      is_running INTEGER DEFAULT 1
+    );
+
+    CREATE TABLE IF NOT EXISTS line_comments (
+      line_id  TEXT NOT NULL,
+      hour     TEXT NOT NULL,   -- "07:00"
+      comment  TEXT NOT NULL,
+      PRIMARY KEY (line_id, hour)
+    );
+
+    CREATE TABLE IF NOT EXISTS scrap_log (
+      id        TEXT PRIMARY KEY,
+      line_id   TEXT NOT NULL,
+      shift     TEXT NOT NULL,
+      model     TEXT NOT NULL,
+      panel     TEXT NOT NULL,
+      damage_type TEXT NOT NULL,
+      bought_in INTEGER DEFAULT 0,
+      kind      TEXT NOT NULL,   -- "scrapped-panel" | "kicked-lid"
+      extra     TEXT NOT NULL,   -- JSON of remaining fields by kind
+      timestamp TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_scrap_line_shift ON scrap_log(line_id, shift);
+
+    CREATE TABLE IF NOT EXISTS sim_clock (
+      id    INTEGER PRIMARY KEY CHECK (id = 1),
+      clock   TEXT,       -- ISO timestamp or null
+      running INTEGER DEFAULT 0,
+      speed   REAL DEFAULT 60
+    );
+    INSERT OR IGNORE INTO sim_clock (id) VALUES (1);
+
+    CREATE TABLE IF NOT EXISTS db_meta (
+      key  TEXT PRIMARY KEY,
+      value TEXT NOT NULL
+    );
+  `);
+}
+```
+
+### Issue 7.3 — Wrap DB in helper functions
+**File:** `src/lib/db.ts`
+
+```typescript
+// Serial counters
+export function getMeta(key: string): string | undefined { ... }
+export function setMeta(key: string, value: string): void { ... }
+
+// Scan events
+export function dbInsertScan(event: ScanEvent): void { ... }
+export function dbGetScans(lineId: string): ScanEvent[]
+export function dbGetScansByLineShift(lineId: string, shift: string): ScanEvent[]
+export function dbGetAllScanLineIds(): string[]  // distinct lineIds in scan_log
+
+// Queues
+export function dbGetQueue(lineId: string): LineSchedule[] | undefined
+export function dbSetQueue(lineId: string, queue: LineSchedule[]): void
+export function dbDeleteQueue(lineId: string): void
+
+// Admin config
+export function dbGetAdminConfig(lineId: string): AdminLineConfig
+export function dbSetAdminConfig(lineId: string, config: AdminLineConfig): void
+export function dbGetAllAdminConfig(): Record<string, AdminLineConfig>
+
+// Comments
+export function dbGetComments(lineId: string): LineComments
+export function dbSetComment(lineId: string, hour: string, comment: string): void
+export function dbDeleteComment(lineId: string, hour: string): void
+
+// Scrap
+export function dbInsertScrap(entry: ScrapEntry): void
+export function dbGetScrapEntries(lineId: string, shift: string): ScrapEntry[]
+export function dbGetKickedLids(lineId: string, shift: string): number
+
+// Sim clock
+export function dbGetSimClock(): { clock: Date | null; running: boolean; speed: number }
+export function dbSetSimClock(clock: Date | null, running: boolean, speed: number): void
+```
+
+### Issue 7.4 — Refactor mesStore.ts to use DB
+**File:** `src/lib/mesStore.ts`
+
+Replace all `globalThis.__mes*` globals with calls to `db.ts`. All exported function signatures remain identical — callers need no changes.
+
+**Key changes:**
+- `queues[lineId]`, `scanLog`, `adminConfig`, `_comments`, `_scrapLog`, `_scrapSerial`, `_simClock`, `_simRunning`, `_simSpeed` — all read from DB on first access, cached in module scope for the lifetime of the worker
+- `setSchedule` → `dbSetQueue` + update in-memory cache
+- `tickLine` → `dbInsertScan` for each event (batch insert for performance)
+- `addScrapEntry` → `dbInsertScrap`
+- `setLineComment` → `dbSetComment`
+- `resetAll` → delete all rows from all tables + reset meta + clear in-memory cache
+
+**Caching strategy:** Keep in-memory copies (current approach) but write-through to DB on every mutation. On module init, load from DB into in-memory state. This keeps API latency low while ensuring persistence.
+
+```typescript
+// Initialization pattern (top of mesStore.ts):
+import { getDb, ... } from "./db";
+
+function loadFromDb() {
+  // Load all scan events into scanLog[]
+  // Load all queues into queues{}
+  // Load all admin config into adminConfig{}
+  // Load all comments into _comments{}
+  // Load all scrap entries into _scrapLog{}
+  // Load serial counters from db_meta
+  // Load sim clock state
+}
+
+let _initialized = false;
+function ensureInit() {
+  if (_initialized) return;
+  loadFromDb();
+  _initialized = true;
+}
+```
+
+### Issue 7.5 — Add data/ to .gitignore
+**File:** `.gitignore`
+```
+data/
+```
+
+---
+
+## Milestone 8 — Downtime / Line Stop Logging
+
+> **Context:** The most important missing operational feature. No structured way to log when a line stops, why, and how many units were lost. Stall detection (output doesn't change between polls) has no duration tracking or root cause capture.
+
+### Issue 8.1 — Add downtime types
+**File:** `src/lib/downtimeTypes.ts` (new)
+
+```typescript
+export type DowntimeReason =
+  | "machine-failure"
+  | "material-shortage"
+  | "quality-hold"
+  | "planned-maintenance"
+  | "operator-break"
+  | "safety-stop"
+  | "changeover"
+  | "other";
+
+export interface DowntimeEntry {
+  id:          string;       // "DT-001"
+  lineId:      string;
+  shift:       ShiftName;
+  reason:      DowntimeReason;
+  startTime:   string;       // ISO timestamp
+  endTime:     string | null; // null = ongoing
+  unitsLost:   number;
+  notes:       string;
+  createdBy:   string;       // role: "supervisor" | "team-lead"
+}
+```
+
+### Issue 8.2 — Add downtime helpers to db.ts
+**File:** `src/lib/db.ts`
+- `CREATE TABLE IF NOT EXISTS downtime_log (...)`
+- `dbInsertDowntime(entry)` — insert with auto-serial
+- `dbGetDowntimeEntries(lineId, shift)` — list all
+- `dbCloseDowntime(id, endTime)` — set endTime on an open entry
+- `dbGetOpenDowntime(lineId)` — find ongoing stop (endTime is null)
+- `dbGetTotalDowntimeMinutes(lineId, shift)` — sum of all closed + ongoing durations
+
+### Issue 8.3 — Downtime API route
+**File:** `src/app/api/downtime/route.ts` (new)
+- `GET ?lineId=&shift=` → `dbGetDowntimeEntries`
+- `POST { lineId, reason, startTime, unitsLost?, notes?, createdBy }` → `dbInsertDowntime`
+- `PATCH { id, endTime }` → `dbCloseDowntime`
+- `DELETE { id }` → delete entry (admin only)
+
+### Issue 8.4 — DowntimePanel component
+**File:** `src/components/team-lead/DowntimePanel.tsx` (new)
+- Collapsible panel in `LineDetailCard`
+- Header: total downtime this shift (e.g., "47 min downtime"), red flag icon
+- List of entries: reason badge, start→end (or "ONGOING" in red), duration, units lost
+- "+ Log Stop" button → opens `DowntimeForm` modal
+- Auto-refreshes with parent polling interval
+
+### Issue 8.5 — DowntimeForm modal
+**File:** `src/components/team-lead/DowntimeForm.tsx` (new)
+- Line ID (pre-filled), reason dropdown (all reason codes), start time (defaults to now), end time (optional — if omitted, entry is "ongoing"), units lost (number input), notes (textarea)
+- "Log Stop" button → POST `/api/downtime`; on success → close modal + refresh panel
+- "Mark Resolved" button → PATCH `/api/downtime` with current time as endTime
+
+### Issue 8.6 — Wire into LineDetailCard
+**Files:** `src/components/team-lead/LineDetailCard.tsx`, `src/app/team-lead/page.tsx`
+- Fetch downtime entries alongside metrics on poll
+- Show `DowntimePanel` in the card below rework panel
+
+### Issue 8.7 — Downtime in LineTable risk reasons
+**File:** `src/lib/status.ts`
+- `getStatusReasons`: if line has an open downtime entry → add `"Line stopped"` to reasons
+
+---
+
+## Milestone 9 — Real-Time Alerts
+
+> **Context:** Stalled lines generate a hover tooltip only. A supervisor managing 6 lines on a busy floor cannot afford to hover over every row. The system needs to push alerts proactively.
+
+### Issue 9.1 — Create alert store
+**File:** `src/lib/alertStore.ts` (new)
+
+```typescript
+export type AlertKind = "stall" | "fpydrop" | "pacealert" | "scheduleneeded" | "downtime";
+
+export interface Alert {
+  id:       string;
+  kind:     AlertKind;
+  lineId:   string;
+  lineName: string;
+  message:  string;   // human-readable: "VS1 Line 1 — no output for 12 min"
+  severity: "warning" | "critical";
+  createdAt: string;  // ISO
+  acknowledgedAt?: string;
+}
+
+export interface AlertState {
+  alerts: Alert[];
+  ackAlert(id: string): void;
+  addAlert(alert: Omit<Alert, "id" | "createdAt">): void;
+  dismissStale(): void;  // remove alerts older than 5 min not acknowledged
+}
+```
+
+Alerts are ephemeral (not persisted to DB) — they represent current-floor conditions only.
+
+### Issue 9.2 — Alert detection in metrics route
 **File:** `src/app/api/metrics/route.ts`
 
-**Branch:** `fix/api-seed-nan-guard`
+After deriving all line states, check:
+- **Stall:** if line has a schedule but output didn't change in the last 60 seconds → add stall alert
+- **FPY drop:** if FPY < 90% and severity ≥ warning threshold → add FPY alert
+- **Pace alert:** if pace < 75% of target → add critical pace alert
 
-#### Description
+Return alerts array alongside `ShiftMetrics`.
 
-```ts
-const overrideSeed = envSeed ? parseInt(envSeed, 10) : undefined;
-```
+### Issue 9.3 — AlertBanner component
+**File:** `src/components/AlertBanner.tsx` (new)
+- Fixed banner at top of dashboard (below header), above KPIs
+- Shows all unacknowledged alerts with severity color (amber=warning, red=critical)
+- Each alert: line name, message, "Acknowledge" button → removes from banner
+- "Clear All" button → acknowledges all
+- Animates in (slide down) when first alert fires, slides out when all acknowledged
+- `role="alert"` for screen readers
 
-If `DEMO_SEED` is set to a non-numeric string (typo, copy-paste error in Vercel), `parseInt` returns `NaN`. Because `NaN` is not `null` or `undefined`, the nullish coalescing operator `??` in `generateMetrics` does not fall back to the shift default — `createRng(NaN)` runs and silently produces a broken sequence. No error is logged and the response still returns 200 with corrupt data.
-
-#### Fix
-
-```ts
-const parsed = envSeed ? parseInt(envSeed, 10) : NaN;
-const overrideSeed = Number.isFinite(parsed) ? parsed : undefined;
-```
-
-#### Acceptance criteria
-- A non-numeric `DEMO_SEED` falls back to the shift default seed
-- No silent data corruption
-- Behaviour is the same as omitting the variable entirely
-
----
-
-### Issue #5 — Module-scope `generateMetrics("day")` call ships to production
-
-**Label:** `bug`
-**File:** `src/lib/generateMetrics.ts`
-**Branch:** `refactor/extract-rng-util`
-
-#### Description
-
-```ts
-generateMetrics("day"); // Example usage — generates metrics for the day shift
-```
-
-Line 103 calls `generateMetrics` at module scope with no guard. This runs on every import of the module — every API request in development, once per cold start in production. The comment acknowledges it was never intended to ship. It must be deleted.
-
-#### Fix
-
-Delete line 103.
-
-#### Acceptance criteria
-- `generateMetrics` is not called at module import time
-- No change to exported API or runtime behaviour
-
----
-
-### Issue #6 — Dead commented-out test data in `page.tsx`
-
-**Label:** `chore`
+### Issue 9.4 — Wire into dashboard page
 **File:** `src/app/page.tsx`
-**Branch:** `chore/remove-dead-code`
-
-#### Description
-
-Lines 42–58 contain a commented-out block of hardcoded test lines and derived summary values left over from before the real API was wired up. The comment says "replaced by real API data in Issue #9." The block adds cognitive overhead and creates a false impression that the hardcoded values are a fallback or alternative data source.
-
-#### Fix
-
-Delete lines 42–58 in their entirety.
-
-#### Acceptance criteria
-- No commented-out code remains in `page.tsx`
-- Runtime behaviour is unchanged
+- Add `alerts: Alert[]` state from metrics fetch
+- Render `<AlertBanner>` when `alerts.length > 0`
+- On acknowledge → `ackAlert(id)` and refetch to get updated list
 
 ---
 
-### Issue #7 — `LineTable` copy-pastes identical JSX for VS1 and VS2
+## Milestone 10 — OEE Tracking
 
-**Label:** `refactor`
+> **Context:** The system tracks output and FPY but not downtime-caused availability losses. OEE = Availability × Performance × Quality. Supervisors need this single number.
+
+### Issue 10.1 — Compute OEE in metrics route
+**File:** `src/app/api/metrics/route.ts`
+
+For each line:
+```typescript
+const totalMinutes = elapsedHours * 60;
+const downtimeMinutes = dbGetTotalDowntimeMinutes(lineId, shift); // from Issue 8.3
+const availableMinutes = totalMinutes - downtimeMinutes;
+const availability = availableMinutes > 0 ? availableMinutes / totalMinutes : 1;
+
+const performance = hpu > 0 ? Math.min(1, 0.35 / hpu) : 1; // 0.35 HPU = 100% performance
+// If HPU ≤ 0.35 → 100% performance; degrades as HPU rises above 0.35
+
+const quality = fpy / 100; // 0-1
+
+const oee = availability * performance * quality; // 0-1
+```
+
+Add to `Line` interface: `oee: number` (0-100).
+
+### Issue 10.2 — OEE card on dashboard
+**File:** `src/app/page.tsx`, `src/components/KpiCard.tsx`
+- Add `Avg OEE` KPI card showing average OEE across all active lines
+- Color: green ≥ 85%, amber ≥ 70%, red < 70%
+- Tooltip: breakdown of A × P × Q = OEE
+
+### Issue 10.3 — Per-line OEE in LineTable
 **File:** `src/components/LineTable.tsx`
-**Branch:** `refactor/line-table-component`
+- Add OEE column or inline in the line row
+- Clicking OEE in the row opens LineDrawer to the OEE tab
 
-#### Description
+### Issue 10.4 — OEE tab in LineDrawer
+**File:** `src/components/LineDrawer.tsx`
+- Add "OEE" tab alongside Output / FPY / HPU
+- Stacked area or bar chart: Availability, Performance, Quality, OEE over time
+- Per-hour breakdown table of the three OEE components
 
-The VS1 and VS2 sections are rendered by two near-identical `<table>` blocks. The only differences are the label string and the `filter` predicate. Any future change — a new column, updated at-risk logic, keyboard navigation, accessibility attributes — must be applied in two places. This is a DRY violation that will cause drift.
+---
 
-#### Fix
+## Milestone 11 — Shift Handoff
 
-Extract a `ValueStreamSection` inner component:
+> **Context:** EOS notes capture issues for the incoming shift, but there is no mechanism to push them or ensure they're acknowledged.
 
-```tsx
-interface SectionProps {
-  label: string;
-  lines: Line[];
-  onSelectLine: (id: string) => void;
-  selectedLineId: string | null;
+### Issue 11.1 — Handoff types
+**File:** `src/lib/handoffTypes.ts` (new)
+
+```typescript
+export interface ShiftHandoff {
+  id:          string;     // "HANDOVER-2026-03-28-day"
+  date:        string;      // "2026-03-28"
+  shift:       ShiftName;
+  outgoingId:  string;     // supervisor/team-lead name or ID
+  incomingId:  string | null;
+  status:      "pending" | "acknowledged";
+  acknowledgedAt: string | null;
+  issues:      HandoffIssue[];
+  openDowntime: number;    // count of ongoing downtime entries at handoff time
+  createdAt:   string;
 }
 
-function ValueStreamSection({ label, lines, onSelectLine, selectedLineId }: SectionProps) {
-  // single table implementation
+export interface HandoffIssue {
+  lineId:    string;
+  kind:      "quality" | "downtime" | "staffing" | "material" | "other";
+  summary:   string;
+  severity:  "info" | "warning" | "critical";
 }
 ```
 
-Render as:
-```tsx
-<ValueStreamSection label="VS1" lines={lines.filter(l => l.valueStream === "VS1")} ... />
-<ValueStreamSection label="VS2" lines={lines.filter(l => l.valueStream === "VS2")} ... />
-```
+### Issue 11.2 — Handoff DB table + helpers
+**File:** `src/lib/db.ts`
+- `CREATE TABLE IF NOT EXISTS shift_handoffs (...)`
+- `dbUpsertHandoff(h: ShiftHandoff): void`
+- `dbGetLatestHandoff(date, shift): ShiftHandoff | null`
+- `dbAcknowledgeHandoff(id, incomingId): void`
 
-#### Acceptance criteria
-- VS1 and VS2 table rendering is backed by a single component
-- Visual output is identical to the current implementation
-- A change to row structure only requires editing one place
+### Issue 11.3 — Handoff API route
+**File:** `src/app/api/handoff/route.ts` (new)
+- `GET ?date=&shift=` → `dbGetLatestHandoff`
+- `POST { ... }` → `dbUpsertHandoff` (creates or updates)
+- `PATCH { id, incomingId }` → `dbAcknowledgeHandoff`
 
----
+### Issue 11.4 — Handoff form on EOS page
+**File:** `src/app/eos/page.tsx`
+- Add a "Handoff" tab alongside "Line Status" / "Local" / "Pre/Post Shift"
+- Pre-populated with: all lines' open downtime count, top issues from per-hour comments
+- Supervisor fills outgoing name, selects incoming supervisor from a short list (or types name)
+- Issues auto-pulled from comments but editable
+- "Submit & Finish Shift" button → POST `/api/handoff` + normal EOS flow
 
-### Issue #8 — `ShiftSelector` component exported under the name `Header`
-
-**Label:** `bug`
-**File:** `src/components/ShiftSelector.tsx`
-**Branch:** `fix/shift-selector-name`
-
-#### Description
-
-```ts
-export default function Header({ value, onChange }: ShiftSelectorProps) {
-```
-
-The component is named `Header` but lives in `ShiftSelector.tsx` and renders shift toggle buttons. This mismatch surfaces in React DevTools, stack traces, and error boundaries — all of which will show `Header` instead of `ShiftSelector`, making debugging harder and confusing anyone reading the file for the first time.
-
-#### Fix
-
-```ts
-export default function ShiftSelector({ value, onChange }: ShiftSelectorProps) {
-```
-
-#### Acceptance criteria
-- Component function name matches the file name
-- React DevTools displays `ShiftSelector` in the component tree
-- No change to props, rendering, or behaviour
+### Issue 11.5 — Incoming shift handoff banner
+**File:** `src/app/page.tsx`, `src/components/HandoffBanner.tsx` (new)
+- On dashboard load, check for an unacknowledged handoff for today's shift
+- If exists and `status === "pending"` → show banner at top: "Open handoff from [outgoing] — [View & Acknowledge] button"
+- "Acknowledge" button → PATCH `/api/handoff` with incoming name → banner dismisses
 
 ---
 
-### Issue #9 — RNG utility duplicated across `generateMetrics.ts` and `LineDrawer.tsx`
+## Milestone 12 — EOS Scrap Auto-Fill
 
-**Label:** `refactor`
-**File:** `src/lib/generateMetrics.ts`, `src/components/LineDrawer.tsx`
-**Branch:** `refactor/extract-rng-util`
+> **Context:** Supervisors must manually transcribe scrap counts into the EOS form. The system already captures all scrap entries — EOS should pull them automatically.
 
-#### Description
+### Issue 12.1 — Add scrap stats to EOS refresh
+**File:** `src/app/eos/page.tsx`
+- `refreshFromMes()` already fetches `/api/metrics` and `/api/mes/state`
+- Also fetch `/api/scrap?lineId=<line>&shift=<shift>` for each visible line
+- Pre-fill EOS `scrapPanels` and `kickedLids` fields from the scrap stats
+- Show a small badge on each line: "3 KL, 1 SP" next to the line name if any entries exist
 
-`createRng` and `hashSeed` are copy-pasted verbatim into `LineDrawer.tsx` from `generateMetrics.ts`. The same Mulberry32 algorithm now exists in two files. If the RNG implementation ever needs to change — different distribution, seeding strategy, or a bug fix — it must be updated in both places and the risk of divergence is real.
-
-#### Fix
-
-Create `src/lib/rng.ts`:
-
-```ts
-export function createRng(seed: number): () => number { ... }
-export function hashSeed(str: string): number { ... }
-```
-
-Import in both `generateMetrics.ts` and `LineDrawer.tsx`. Delete the local copies.
-
-#### Acceptance criteria
-- `createRng` and `hashSeed` exist in exactly one place
-- Both `generateMetrics` and `LineDrawer` import from `src/lib/rng.ts`
-- Generated values are identical to before (same algorithm, same seeds)
+### Issue 12.2 — Scrap summary section on EOS
+**File:** `src/app/eos/page.tsx`
+- Below the line cards, add a "Quality Summary" section
+- Table: Line | Scrapped Panels | Kicked Lids | Total Defects | FPY (derived)
+- Pulled directly from `getScrapStats` — read-only, not editable
 
 ---
 
-### Issue #10 — `CLAUDE.md` documents `ExportButton` as a placeholder
+## Bug Fixes
 
-**Label:** `chore`
-**File:** `CLAUDE.md`
-**Branch:** `chore/update-claude-md`
+### Bug 1 — ShiftSelector selected state WCAG contrast violation
+**File:** `src/components/ShiftSelector.tsx` line ~27
+- Change `"bg-accent text-white"` → `"bg-accent text-black"` to fix yellow/white contrast
 
-#### Description
+### Bug 2 — Header SIM badge WCAG contrast violation
+**File:** `src/components/Header.tsx`
+- Change SIM badge `text-white` → `text-black` on yellow accent background
 
-```
-ExportButton.tsx  ← placeholder
-```
+### Bug 3 — Header useEffect simClock closure staleness
+**File:** `src/components/Header.tsx` lines 29-41
+- Remove `simClock` from the `useEffect` dependency array (it is only read as a fallback value, not used to trigger re-runs), OR refactor to use a ref
 
-`ExportButton` is now a full implementation accepting `lines: Line[]` and `shift: ShiftName`, generating a quoted CSV, and triggering a Blob download. The "placeholder" label in `CLAUDE.md` will mislead future agents or developers reading the file for context.
+### Bug 4 — Dead code: SimControls.tsx never imported
+**File:** `src/components/sim/SimControls.tsx`
+- Either remove this file, or verify it is truly unused and delete it
 
-#### Fix
+### Bug 5 — ReworkPanel fragile type cast
+**File:** `src/components/team-lead/ReworkPanel.tsx` lines ~94-98
+- Replace `(entry as unknown as { stationFound: string }).stationFound` with proper discriminated union narrowing:
+  ```typescript
+  if (entry.kind === "scrapped-panel") {
+    return entry.stationFound;
+  }
+  return (entry as KickedLid).affectedArea;  // for kicked-lid
+  ```
 
-Update the `ExportButton.tsx` entry in the folder layout section and add a note in the data flow or export section describing its props and behaviour.
+### Bug 6 — AdminLineCard NotRunning toggle bypasses parent state
+**File:** `src/components/admin/AdminLineCard.tsx` lines ~103-110
+- Call `onConfigSaved(lineId, undefined, undefined, nextIsRunning)` instead of calling `fetch` directly
+- OR call `onConfigSaved` as well as the direct fetch to keep parent in sync
 
-#### Acceptance criteria
-- `CLAUDE.md` accurately reflects `ExportButton`'s current interface and responsibility
-- No component in the folder layout is described as a placeholder unless it actually is one
+### Bug 7 — Middleware redirect loop for supervisors on /team-lead
+**File:** `src/middleware.ts` lines ~16-20
+- Supervisors (role = "supervisor") should be allowed on `/team-lead` — remove that redirect condition. Only `team-lead` role should be redirected away from `/admin`.
+
+### Bug 8 — ShiftSelector component exports as "Header"
+**File:** `src/components/ShiftSelector.tsx` line ~15
+- Rename export: `export default function ShiftSelector(...)` instead of `export default function Header(...)`
+
+### Bug 9 — generateMetrics dead example at bottom of file
+**File:** `src/lib/generateMetrics.ts` line ~104
+- Remove the example `console.log(generateMetrics("day"))` call — it runs at module load time and produces no useful output
+
+---
+
+## Files Summary (New Milestones)
+
+| File | Action |
+|---|---|
+| `src/lib/db.ts` | CREATE — SQLite wrapper + migrations |
+| `src/lib/downtimeTypes.ts` | CREATE |
+| `src/app/api/downtime/route.ts` | CREATE |
+| `src/components/team-lead/DowntimePanel.tsx` | CREATE |
+| `src/components/team-lead/DowntimeForm.tsx` | CREATE |
+| `src/lib/alertStore.ts` | CREATE |
+| `src/components/AlertBanner.tsx` | CREATE |
+| `src/lib/handoffTypes.ts` | CREATE |
+| `src/app/api/handoff/route.ts` | CREATE |
+| `src/components/HandoffBanner.tsx` | CREATE |
+| `data/` | CREATE — gitignored DB directory |
+| `package.json` | MODIFY — add `better-sqlite3`, `@types/better-sqlite3` |
+| `src/lib/mesStore.ts` | MODIFY — use db.ts for all persistence |
+| `src/lib/types.ts` | MODIFY — add `oee` to `Line` |
+| `src/app/api/metrics/route.ts` | MODIFY — compute OEE, return alerts, call downtime helpers |
+| `src/app/page.tsx` | MODIFY — wire AlertBanner, HandoffBanner |
+| `src/app/eos/page.tsx` | MODIFY — scrap auto-fill, quality summary, handoff tab |
+| `src/components/LineTable.tsx` | MODIFY — add OEE column, downtime reasons |
+| `src/components/LineDrawer.tsx` | MODIFY — OEE tab |
+| `src/components/team-lead/LineDetailCard.tsx` | MODIFY — wire DowntimePanel |
+| `src/app/team-lead/page.tsx` | MODIFY — fetch downtime entries |
+| `src/components/Header.tsx` | MODIFY — SIM badge contrast fix, useEffect fix |
+| `src/components/ShiftSelector.tsx` | MODIFY — contrast fix, rename to ShiftSelector |
+| `src/components/admin/AdminLineCard.tsx` | MODIFY — NotRunning toggle parent sync |
+| `src/components/team-lead/ReworkPanel.tsx` | MODIFY — type cast fix |
+| `src/lib/generateMetrics.ts` | MODIFY — remove dead example call |
+| `.gitignore` | MODIFY — add `data/` |

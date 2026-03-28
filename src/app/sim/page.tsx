@@ -4,164 +4,600 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import type { LineState } from "@/lib/mesTypes";
+import type { ShiftName } from "@/lib/types";
 
-const SimControls = dynamic(() => import("@/components/sim/SimControls"),  { ssr: false });
-const HourlyTable  = dynamic(() => import("@/components/sim/HourlyTable"),  { ssr: false });
+const HourlyTable = dynamic(() => import("@/components/sim/HourlyTable"), { ssr: false });
 
 // ── Config ────────────────────────────────────────────────────────────────────
 
-const LINES: { lineId: string; label: string }[] = [
-  { lineId: "vs1-l1", label: "VS1 · Line 1" },
-  { lineId: "vs1-l2", label: "VS1 · Line 2" },
-  { lineId: "vs1-l3", label: "VS1 · Line 3" },
-  { lineId: "vs1-l4", label: "VS1 · Line 4" },
-  { lineId: "vs2-l1", label: "VS2 · Line 1" },
-  { lineId: "vs2-l2", label: "VS2 · Line 2" },
+const LINES: { lineId: string; label: string; vs: string }[] = [
+  { lineId: "vs1-l1", label: "Line 1", vs: "VS1" },
+  { lineId: "vs1-l2", label: "Line 2", vs: "VS1" },
+  { lineId: "vs1-l3", label: "Line 3", vs: "VS1" },
+  { lineId: "vs1-l4", label: "Line 4", vs: "VS1" },
+  { lineId: "vs2-l1", label: "Line 1", vs: "VS2" },
+  { lineId: "vs2-l2", label: "Line 2", vs: "VS2" },
 ];
 
 const LINE_LABELS: Record<string, string> = Object.fromEntries(
-  LINES.map(({ lineId, label }) => [lineId, label])
+  LINES.map(({ lineId, label, vs }) => [lineId, `${vs} · ${label}`])
 );
+
+const SHIFT_START_HOUR: Record<ShiftName, number> = { day: 6, night: 17 };
+
+const SIDE_NAV = [
+  { icon: "dashboard", label: "Dashboard" },
+  { icon: "factory", label: "Assembly Lines" },
+  { icon: "inventory_2", label: "Inventory" },
+  { icon: "verified", label: "Quality Control" },
+  { icon: "build", label: "Maintenance" },
+] as const;
+
+const SPEED_OPTIONS = [
+  { label: "1×", value: 60, desc: "Realtime" },
+  { label: "5×", value: 300, desc: "Medium" },
+  { label: "15×", value: 900, desc: "Fast" },
+] as const;
 
 // ── Page ─────────────────────────────────────────────────────────────────────
 
 export default function SimPage() {
-  const [states, setStates]         = useState<LineState[]>([]);
-  const [running, setRunning]       = useState(false);
-  const [speed, setSpeed]           = useState(5);
-  const tickInterval                = useRef<ReturnType<typeof setInterval> | null>(null);
-  const pollInterval                = useRef<ReturnType<typeof setInterval> | null>(null);
+  const [states, setStates] = useState<LineState[]>([]);
+  const [running, setRunning] = useState(false);
+  const [speed, setSpeed] = useState(60);
+  const [shift, setShift] = useState<ShiftName>("day");
+  const [simClock, setSimClock] = useState<Date | null>(null);
+  const [now, setNow] = useState(new Date());
+  const tickInterval = useRef<ReturnType<typeof setInterval> | null>(null);
+  const pollInterval = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  // ── Polling ──────────────────────────────────────────────────────────────
+  // ── Clock ─────────────────────────────────────────────────────────────────
+  useEffect(() => {
+    const id = setInterval(() => setNow(new Date()), 1000);
+    return () => clearInterval(id);
+  }, []);
 
+  // ── Polling ─────────────────────────────────────────────────────────────────
   const pollState = useCallback(async () => {
-    const res = await fetch("/api/mes/state");
-    if (res.ok) setStates(await res.json());
+    const [stateRes, clockRes] = await Promise.all([
+      fetch("/api/mes/state"),
+      fetch("/api/sim/clock"),
+    ]);
+    if (stateRes.ok) setStates(await stateRes.json());
+    if (clockRes.ok) {
+      const c = await clockRes.json();
+      setRunning(c.running);
+      setSpeed(c.speed);
+      setSimClock(c.clock ? new Date(c.clock) : null);
+    }
   }, []);
 
   useEffect(() => {
     pollState();
     pollInterval.current = setInterval(pollState, 2000);
-    return () => {
-      if (pollInterval.current) clearInterval(pollInterval.current);
-    };
+    return () => { if (pollInterval.current) clearInterval(pollInterval.current); };
   }, [pollState]);
 
-  // ── Simulation controls ───────────────────────────────────────────────────
+  // ── Simulation controls ─────────────────────────────────────────────────────
+  function getShiftStart(shiftName: ShiftName): Date {
+    const d = new Date();
+    d.setHours(SHIFT_START_HOUR[shiftName], 0, 0, 0);
+    return d;
+  }
 
-  function startSim() {
+  async function startSim() {
     if (tickInterval.current) return;
+    await fetch("/api/sim/clock", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ clock: getShiftStart(shift).toISOString(), running: true, speed }),
+    });
     setRunning(true);
     tickInterval.current = setInterval(async () => {
       await fetch("/api/mes/tick", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ all: true, units: speed }),
+        body: JSON.stringify({ all: true, units: 1 }),
       });
     }, 1000);
   }
 
-  function pauseSim() {
-    if (tickInterval.current) {
-      clearInterval(tickInterval.current);
-      tickInterval.current = null;
-    }
+  async function pauseSim() {
+    if (tickInterval.current) { clearInterval(tickInterval.current); tickInterval.current = null; }
+    await fetch("/api/sim/clock", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ running: false }),
+    });
     setRunning(false);
   }
 
   async function resetSim() {
-    pauseSim();
-    await fetch("/api/mes/reset", { method: "POST" });
+    if (tickInterval.current) { clearInterval(tickInterval.current); tickInterval.current = null; }
+    await Promise.all([
+      fetch("/api/mes/reset", { method: "POST" }),
+      fetch("/api/sim/clock", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ clock: null, running: false, speed: 60 }),
+      }),
+    ]);
+    setSimClock(null);
+    setRunning(false);
+    setSpeed(60);
     await pollState();
   }
 
-  // Restart interval when speed changes while running
-  function handleSpeedChange(newSpeed: number) {
+  async function handleSpeedChange(newSpeed: number) {
     setSpeed(newSpeed);
-    if (running) {
-      if (tickInterval.current) clearInterval(tickInterval.current);
-      tickInterval.current = setInterval(async () => {
-        await fetch("/api/mes/tick", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ all: true, units: newSpeed }),
-        });
-      }, 1000);
-    }
+    await fetch("/api/sim/clock", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ speed: newSpeed }),
+    });
   }
 
-  // Clean up on unmount
   useEffect(() => {
-    return () => {
-      if (tickInterval.current) clearInterval(tickInterval.current);
-    };
+    return () => { if (tickInterval.current) clearInterval(tickInterval.current); };
   }, []);
 
-  const totalOutput   = states.reduce((s, st) => s + st.totalOutput, 0);
-  const totalTarget   = states.reduce((s, st) => s + (st.schedule?.totalTarget ?? 0), 0);
+  // ── Derived data ────────────────────────────────────────────────────────────
+  const totalOutput = states.reduce((s, st) => s + st.totalOutput, 0);
+  const totalTarget = states.reduce((s, st) => s + (st.schedule?.totalTarget ?? 0), 0);
   const scheduledLines = states.filter((s) => s.schedule !== null).length;
+  const efficiency = totalTarget > 0 ? Math.round((totalOutput / totalTarget) * 1000) / 10 : 0;
 
-  // ── Render ────────────────────────────────────────────────────────────────
+  const stateMap = new Map(states.map((s) => [s.lineId, s]));
+
+  // Collect recent scans for the live log (last 20 from hourlyOutput data)
+  // We'll derive a simple scan list from states
+  const recentScans = states
+    .filter((s) => s.schedule)
+    .flatMap((s) =>
+      Object.entries(s.hourlyOutput).map(([hour, count]) => ({
+        lineId: s.lineId,
+        hour,
+        count,
+        order: s.currentOrder ?? "—",
+      }))
+    )
+    .sort((a, b) => b.hour.localeCompare(a.hour))
+    .slice(0, 8);
+
+  // Speed label
+  const speedLabel = SPEED_OPTIONS.find((o) => o.value === speed)?.label ?? `${speed}`;
+  const speedDesc = SPEED_OPTIONS.find((o) => o.value === speed)?.desc ?? "";
+
+  // ── Render ──────────────────────────────────────────────────────────────────
 
   return (
-    <div className="min-h-screen bg-background text-slate-200">
+    <div className="h-screen flex flex-col overflow-hidden bg-background text-[#e1e2ec]">
 
-      {/* Header */}
-      <header className="bg-surface border-b border-border px-8 h-16 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <span className="bg-accent text-black font-black text-xs px-2.5 py-1 rounded tracking-widest">
-            BAK
-          </span>
-          <span className="text-slate-500 text-sm">|</span>
-          <span className="text-slate-400 text-sm tracking-widest uppercase">MES Simulator</span>
+      {/* ── Top nav ──────────────────────────────────────────────────────────── */}
+      <header className="fixed top-0 z-50 w-full flex justify-between items-center px-6 py-3 bg-[#0b0e15] border-b border-border/15 font-['Space_Grotesk',sans-serif] tracking-tight">
+        <div className="flex items-center gap-8">
+          <Link href="/" className="text-xl font-bold tracking-tighter text-accent uppercase">
+            KINETIC COMMAND
+          </Link>
+          <nav className="hidden md:flex items-center gap-6">
+            <Link href="/eos" className="text-[#e1e2ec]/60 hover:text-[#e1e2ec] transition-colors text-sm">EOS</Link>
+            <Link href="/admin" className="text-[#e1e2ec]/60 hover:text-[#e1e2ec] transition-colors text-sm">Admin</Link>
+            <Link href="/team-lead" className="text-[#e1e2ec]/60 hover:text-[#e1e2ec] transition-colors text-sm">Team Lead</Link>
+            <Link href="/sim" className="text-accent border-b-2 border-accent pb-1 font-bold text-sm">SIM</Link>
+          </nav>
         </div>
         <div className="flex items-center gap-6">
-          {totalTarget > 0 && (
-            <span className="text-xs text-slate-400">
-              <span className="text-accent font-semibold">{totalOutput}</span>
-              <span className="text-slate-600"> / {totalTarget} units</span>
-            </span>
-          )}
-          <Link
-            href="/"
-            className="text-xs text-slate-500 hover:text-slate-300 tracking-widest uppercase transition-colors"
-          >
-            ← Dashboard
-          </Link>
+          <div className="flex flex-col items-end">
+            <span className="text-[10px] uppercase tracking-widest text-[#e1e2ec]/40">Environment</span>
+            <span className="text-accent text-sm font-bold">Shift: {shift === "day" ? "Day" : "Night"}</span>
+          </div>
+          <div className="h-8 w-px bg-border/30" />
+          <div className="text-[#e1e2ec]/80 font-mono text-sm tabular-nums">
+            {now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false })}
+          </div>
         </div>
       </header>
 
-      <div className="px-8 py-8 max-w-6xl mx-auto flex flex-col gap-6">
+      <div className="flex flex-1 overflow-hidden pt-[52px]">
 
-        {/* Sim controls */}
-        <SimControls
-          running={running}
-          speed={speed}
-          onStart={startSim}
-          onPause={pauseSim}
-          onReset={resetSim}
-          onSpeedChange={handleSpeedChange}
-        />
-
-        {scheduledLines === 0 && (
-          <div className="text-xs text-slate-600 text-center py-2">
-            Load run sheets from the{" "}
-            <Link href="/admin" className="text-slate-500 hover:text-slate-300 underline">
-              Admin panel
-            </Link>
-            , then use the controls above to simulate production.
-          </div>
-        )}
-
-        {/* Hour-by-hour table */}
-        {scheduledLines > 0 && (
-          <div className="bg-surface border border-border rounded-lg p-5">
-            <div className="text-xs text-slate-500 tracking-widest uppercase font-semibold mb-4">
-              Hour-by-Hour Output
+        {/* ── Sidebar ────────────────────────────────────────────────────────── */}
+        <aside className="w-64 shrink-0 bg-surface-low flex flex-col border-r border-border/10 hidden lg:flex">
+          <div className="p-6 flex items-center space-x-3 border-b border-border/10">
+            <div className="w-10 h-10 rounded bg-accent/10 flex items-center justify-center border border-accent/20">
+              <span className="material-symbols-outlined text-accent" style={{ fontVariationSettings: "'FILL' 1" }}>precision_manufacturing</span>
             </div>
-            <HourlyTable states={states} lineLabels={LINE_LABELS} />
+            <div>
+              <h2 className="text-lg font-black text-accent font-['Space_Grotesk',sans-serif] uppercase leading-none">OP-CENTER</h2>
+              <p className="text-[10px] text-status-green font-medium tracking-tighter uppercase">
+                {running ? "Simulation Active" : "Standby"}
+              </p>
+            </div>
           </div>
-        )}
+          <nav className="flex-1 py-4 text-sm font-medium uppercase tracking-widest overflow-y-auto">
+            {SIDE_NAV.map((item) => (
+              <a key={item.label} className="flex items-center space-x-3 text-[#e1e2ec]/50 px-4 py-3 hover:bg-surface-high/50 hover:text-accent transition-all cursor-default">
+                <span className="material-symbols-outlined">{item.icon}</span>
+                <span>{item.label}</span>
+              </a>
+            ))}
+          </nav>
+          <div className="p-4 border-t border-border/10">
+            <button className="w-full bg-status-red/80 text-white py-3 rounded-sm font-bold uppercase tracking-widest text-xs flex items-center justify-center gap-2 hover:brightness-110 active:scale-[0.98] transition-all cursor-pointer border-none">
+              <span className="material-symbols-outlined text-sm">emergency</span>
+              Emergency Stop
+            </button>
+          </div>
+          <div className="pb-6 px-4 space-y-1">
+            <a className="flex items-center space-x-3 text-[#e1e2ec]/30 px-4 py-2 hover:text-[#e1e2ec] text-[11px] cursor-default">
+              <span className="material-symbols-outlined text-sm">help_center</span>
+              <span>Support</span>
+            </a>
+            <a className="flex items-center space-x-3 text-[#e1e2ec]/30 px-4 py-2 hover:text-[#e1e2ec] text-[11px] cursor-default">
+              <span className="material-symbols-outlined text-sm">history_edu</span>
+              <span>Logs</span>
+            </a>
+          </div>
+        </aside>
+
+        {/* ── Main content ───────────────────────────────────────────────────── */}
+        <main className="flex-1 overflow-y-auto p-6 custom-scrollbar bg-background">
+
+          {/* ── Simulator Control Bar + Status Bento ─────────────────────────── */}
+          <section className="grid grid-cols-12 gap-6 mb-10">
+
+            {/* Control Panel — left 7 cols */}
+            <div className="col-span-12 lg:col-span-7 bg-surface-low rounded-sm p-6 border-l-4 border-accent relative overflow-hidden">
+              <div className="absolute top-0 right-0 p-4 opacity-5 pointer-events-none">
+                <span className="material-symbols-outlined text-[120px]">play_circle</span>
+              </div>
+
+              <div className="flex items-center justify-between mb-6">
+                <div>
+                  <h3 className="font-['Space_Grotesk',sans-serif] text-2xl font-bold uppercase tracking-tight">
+                    MES Simulator
+                  </h3>
+                  <p className="text-[#e1e2ec]/40 text-xs font-medium uppercase tracking-widest">
+                    Global Master Controls
+                  </p>
+                </div>
+                <div className="flex gap-2">
+                  {!running ? (
+                    <button
+                      onClick={startSim}
+                      className="px-4 py-2 bg-accent text-black rounded-sm font-bold text-xs uppercase flex items-center gap-2 hover:opacity-90 transition-colors cursor-pointer border-none"
+                    >
+                      <span className="material-symbols-outlined text-sm" style={{ fontVariationSettings: "'FILL' 1" }}>play_arrow</span>
+                      Start
+                    </button>
+                  ) : (
+                    <button
+                      onClick={pauseSim}
+                      className="px-4 py-2 bg-surface-highest text-[#e1e2ec] rounded-sm font-bold text-xs uppercase flex items-center gap-2 border border-border/30 hover:bg-surface-high transition-colors cursor-pointer"
+                    >
+                      <span className="material-symbols-outlined text-sm">pause</span>
+                      Pause
+                    </button>
+                  )}
+                  <button
+                    onClick={resetSim}
+                    className="px-4 py-2 bg-surface-highest text-[#e1e2ec] rounded-sm font-bold text-xs uppercase flex items-center gap-2 border border-border/30 hover:bg-surface-high transition-colors cursor-pointer"
+                  >
+                    <span className="material-symbols-outlined text-sm">refresh</span>
+                    Reset
+                  </button>
+                </div>
+              </div>
+
+              {/* Speed slider area */}
+              <div className="space-y-4">
+                <div className="flex justify-between items-center text-xs uppercase font-bold tracking-widest text-[#e1e2ec]/40">
+                  <span>Simulation Speed</span>
+                  <span className="text-accent">Current: {speedLabel} ({speedDesc})</span>
+                </div>
+                <div className="flex gap-2">
+                  {SPEED_OPTIONS.map((opt) => (
+                    <button
+                      key={opt.value}
+                      onClick={() => handleSpeedChange(opt.value)}
+                      className={`flex-1 py-2.5 rounded-sm text-xs font-bold uppercase tracking-widest border transition-colors cursor-pointer ${
+                        speed === opt.value
+                          ? "bg-accent/15 text-accent border-accent/30"
+                          : "bg-transparent text-[#e1e2ec]/40 border-border hover:border-[#e1e2ec]/30"
+                      }`}
+                    >
+                      {opt.label} · {opt.desc}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Shift selector */}
+                <div className="flex items-center gap-3 pt-2">
+                  <span className="text-[10px] uppercase tracking-widest text-[#e1e2ec]/40 font-bold">Shift</span>
+                  {(["day", "night"] as ShiftName[]).map((s) => (
+                    <button
+                      key={s}
+                      onClick={() => setShift(s)}
+                      className={`px-4 py-1.5 rounded-sm text-xs font-bold uppercase tracking-widest border transition-colors cursor-pointer ${
+                        shift === s
+                          ? "bg-accent/15 text-accent border-accent/30"
+                          : "bg-transparent text-[#e1e2ec]/40 border-border hover:border-[#e1e2ec]/30"
+                      }`}
+                    >
+                      {s}
+                    </button>
+                  ))}
+
+                  {simClock && (
+                    <div className="ml-auto flex items-center gap-2 text-xs">
+                      <span className="w-2 h-2 rounded-full bg-accent animate-pulse" />
+                      <span className="font-mono text-accent">
+                        {simClock.getHours().toString().padStart(2, "0")}:
+                        {simClock.getMinutes().toString().padStart(2, "0")}
+                      </span>
+                      <span className="text-[#e1e2ec]/30">sim clock</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Status Bento — right 5 cols */}
+            <div className="col-span-12 lg:col-span-5 grid grid-cols-2 gap-4">
+              <div className="bg-surface p-4 rounded-sm flex flex-col justify-between border-t-2 border-status-green">
+                <span className="text-[10px] font-bold uppercase tracking-widest text-status-green">Efficiency</span>
+                <span className="font-['Space_Grotesk',sans-serif] text-4xl font-light tabular-nums">
+                  {efficiency}<span className="text-lg opacity-40">%</span>
+                </span>
+                <div className="h-1 w-full bg-surface-highest mt-2 rounded-full overflow-hidden">
+                  <div className="h-full bg-status-green transition-all duration-500" style={{ width: `${Math.min(efficiency, 100)}%` }} />
+                </div>
+              </div>
+              <div className="bg-surface p-4 rounded-sm flex flex-col justify-between border-t-2 border-accent">
+                <span className="text-[10px] font-bold uppercase tracking-widest text-accent">Total Output</span>
+                <span className="font-['Space_Grotesk',sans-serif] text-4xl font-light tabular-nums">
+                  {totalOutput.toLocaleString()}
+                </span>
+                <span className="text-[10px] text-[#e1e2ec]/40 mt-2 font-mono">
+                  / {totalTarget.toLocaleString()} target
+                </span>
+              </div>
+              <div className="col-span-2 bg-surface p-4 rounded-sm flex items-center justify-between">
+                <div>
+                  <span className="text-[10px] font-bold uppercase tracking-widest text-[#e1e2ec]/40">
+                    {running ? "Simulation Running" : scheduledLines > 0 ? "Simulation Paused" : "No Schedules Loaded"}
+                  </span>
+                  <div className="font-['Space_Grotesk',sans-serif] text-xl font-medium flex items-center gap-2 mt-0.5">
+                    <span className={`w-2.5 h-2.5 rounded-full ${running ? "bg-status-green animate-pulse" : "bg-[#e1e2ec]/20"}`} />
+                    {scheduledLines} / {LINES.length} <span className="text-sm opacity-50">Lines Active</span>
+                  </div>
+                </div>
+                <span className="material-symbols-outlined text-accent/20 text-4xl">timer</span>
+              </div>
+            </div>
+          </section>
+
+          {/* ── Empty state ──────────────────────────────────────────────────── */}
+          {scheduledLines === 0 && (
+            <div className="bg-surface-low rounded-sm p-12 text-center border border-border/10">
+              <span className="material-symbols-outlined text-5xl text-[#e1e2ec]/10 mb-4 block">upload_file</span>
+              <p className="text-sm text-[#e1e2ec]/40 mb-2">No run sheets loaded</p>
+              <p className="text-xs text-[#e1e2ec]/25">
+                Load run sheets from the{" "}
+                <Link href="/admin" className="text-accent hover:underline">Admin panel</Link>
+                , then use the controls above to simulate production.
+              </p>
+            </div>
+          )}
+
+          {/* ── Lines + Scan Log / Hourly Production ─────────────────────────── */}
+          {scheduledLines > 0 && (
+            <div className="grid grid-cols-12 gap-10">
+
+              {/* Left: Assembly Line Cards + Scan Log */}
+              <div className="col-span-12 xl:col-span-8 space-y-10">
+
+                {/* Assembly Line Cards */}
+                <div>
+                  <div className="flex items-center justify-between mb-4 border-b border-border/10 pb-2">
+                    <h3 className="font-['Space_Grotesk',sans-serif] text-lg font-bold uppercase tracking-widest">Active Assembly Lines</h3>
+                    <span className={`text-xs px-2 py-0.5 rounded border font-bold uppercase ${
+                      running
+                        ? "text-status-green bg-status-green/10 border-status-green/20"
+                        : "text-[#e1e2ec]/40 bg-surface-highest border-border"
+                    }`}>
+                      {running ? "All Systems Running" : "Paused"}
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {LINES.map(({ lineId, label, vs }) => {
+                      const st = stateMap.get(lineId);
+                      if (!st?.schedule) return null;
+                      const pct = st.schedule.totalTarget > 0
+                        ? Math.round((st.totalOutput / st.schedule.totalTarget) * 100)
+                        : 0;
+                      const isComplete = pct >= 100;
+                      const isBehind = pct < 50 && st.totalOutput > 0;
+                      const statusColor = isComplete ? "bg-status-green" : isBehind ? "bg-status-amber" : "bg-accent";
+                      const statusLabel = isComplete ? "Complete" : isBehind ? "Behind" : "Nominal";
+                      const statusTextColor = isComplete ? "text-status-green" : isBehind ? "text-status-amber" : "text-accent";
+
+                      return (
+                        <div key={lineId} className="bg-surface-low p-5 rounded-sm border border-border/5 hover:border-accent/20 transition-all group relative">
+                          <div className={`absolute top-0 left-0 w-1 h-full ${statusColor}`} />
+                          <div className="flex justify-between items-start mb-4">
+                            <div>
+                              <h4 className="font-['Space_Grotesk',sans-serif] font-bold leading-none mb-1">
+                                {vs} · {label}
+                              </h4>
+                              <p className="text-[10px] text-[#e1e2ec]/40 uppercase tracking-widest">
+                                Order: {st.currentOrder ?? "Complete"}
+                              </p>
+                            </div>
+                            <span className={`${statusTextColor} bg-current/10 text-[10px] font-black px-2 py-0.5 border rounded uppercase`}
+                              style={{ borderColor: "currentColor", backgroundColor: "transparent" }}>
+                              <span className={statusTextColor}>{statusLabel}</span>
+                            </span>
+                          </div>
+                          <div className="space-y-3 mb-4">
+                            <div className="flex justify-between text-xs font-mono">
+                              <span className="text-[#e1e2ec]/40">Progress</span>
+                              <span>{st.totalOutput} / {st.schedule.totalTarget}</span>
+                            </div>
+                            <div className="w-full h-1.5 bg-surface-highest rounded-full overflow-hidden">
+                              <div className={`h-full ${statusColor} transition-all duration-500`} style={{ width: `${Math.min(pct, 100)}%` }} />
+                            </div>
+                          </div>
+                          {st.remainingOnOrder > 0 && (
+                            <div className="text-[10px] text-[#e1e2ec]/30 font-mono">
+                              {st.remainingOnOrder} remaining on order · {st.remainingOnRunSheet} on sheet
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Live Scan Log (hourly output summary) */}
+                <div className="bg-surface-low rounded-sm overflow-hidden border border-border/10">
+                  <div className="bg-surface-highest px-6 py-3 flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className="material-symbols-outlined text-sm text-accent">analytics</span>
+                      <h3 className="text-xs font-black uppercase tracking-[0.2em]">Hourly Output Summary</h3>
+                    </div>
+                    <div className="flex gap-4">
+                      {running && <span className="text-[10px] font-mono text-status-green uppercase">Scanning...</span>}
+                      <span className="text-[10px] font-mono text-[#e1e2ec]/40 uppercase">
+                        {totalOutput} total scans
+                      </span>
+                    </div>
+                  </div>
+                  <div className="p-5">
+                    <HourlyTable states={states} lineLabels={LINE_LABELS} />
+                  </div>
+                </div>
+              </div>
+
+              {/* Right: Hourly Production Bars + Sim Info */}
+              <div className="col-span-12 xl:col-span-4 space-y-6">
+
+                {/* Hourly Production Bars */}
+                <div className="bg-surface rounded-sm p-6 border border-border/10">
+                  <h3 className="font-['Space_Grotesk',sans-serif] text-lg font-bold uppercase tracking-widest mb-6">
+                    Hourly Production
+                  </h3>
+                  <div className="space-y-4">
+                    {(() => {
+                      // Aggregate all lines' hourly output
+                      const hourMap: Record<string, number> = {};
+                      for (const st of states) {
+                        for (const [hour, count] of Object.entries(st.hourlyOutput)) {
+                          hourMap[hour] = (hourMap[hour] ?? 0) + count;
+                        }
+                      }
+                      const hours = Object.keys(hourMap).sort();
+                      const maxHourly = Math.max(...Object.values(hourMap), 1);
+
+                      if (hours.length === 0) {
+                        return (
+                          <p className="text-[10px] text-[#e1e2ec]/30 text-center py-4">
+                            No output yet — start the simulation.
+                          </p>
+                        );
+                      }
+
+                      return hours.map((hour, i) => {
+                        const actual = hourMap[hour];
+                        const pct = Math.round((actual / maxHourly) * 100);
+                        const nextHour = String((parseInt(hour) + 1) % 24).padStart(2, "0") + ":00";
+                        const isCurrent = i === hours.length - 1 && running;
+
+                        return (
+                          <div key={hour} className={`relative ${!isCurrent && i < hours.length - 1 ? "" : ""}`}>
+                            <div className="flex items-center justify-between text-[10px] font-bold uppercase mb-2">
+                              <span className="text-[#e1e2ec]/40">
+                                {hour} – {nextHour}
+                                {isCurrent && " (Current)"}
+                              </span>
+                              <span className={isCurrent ? "text-accent" : "text-status-green"}>
+                                Actual: {actual}
+                              </span>
+                            </div>
+                            <div className="w-full h-8 bg-surface-low rounded-sm overflow-hidden flex items-center px-1">
+                              <div
+                                className={`h-6 ${isCurrent ? "bg-accent/20 border-r-2 border-accent" : "bg-status-green/20 border-r-2 border-status-green"} flex items-center px-3 transition-all duration-500`}
+                                style={{ width: `${Math.max(pct, 5)}%` }}
+                              >
+                                <span className={`text-[10px] font-mono ${isCurrent ? "text-accent" : "text-status-green"}`}>
+                                  {isCurrent ? "IN PROGRESS" : "COMPLETE"}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      });
+                    })()}
+                  </div>
+
+                  {totalTarget > 0 && (
+                    <div className="mt-8 pt-6 border-t border-border/10">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-[10px] font-bold uppercase text-[#e1e2ec]/40">Target Progress</span>
+                        <span className="text-xs font-mono">{efficiency}%</span>
+                      </div>
+                      <div className="w-full h-1 bg-surface-low rounded-full overflow-hidden">
+                        <div
+                          className="h-full bg-status-green transition-all duration-500"
+                          style={{ width: `${Math.min(efficiency, 100)}%`, boxShadow: "0 0 10px rgba(34,197,94,0.5)" }}
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Simulation Info Card */}
+                <div className="glass-panel rounded-sm p-6 border border-white/5 relative overflow-hidden">
+                  <div className="absolute -right-4 -bottom-4 opacity-5">
+                    <span className="material-symbols-outlined text-[120px]">science</span>
+                  </div>
+                  <h4 className="font-['Space_Grotesk',sans-serif] font-bold text-sm uppercase tracking-widest mb-2">
+                    Simulation Details
+                  </h4>
+                  <p className="text-xs text-[#e1e2ec]/50 leading-relaxed mb-4">
+                    Running MES Simulation. Speed:{" "}
+                    <span className="text-accent font-mono">{speedLabel}</span>.{" "}
+                    {scheduledLines} line{scheduledLines !== 1 ? "s" : ""} with active schedules.
+                  </p>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="bg-black/20 p-3 rounded-sm">
+                      <p className="text-[9px] uppercase text-[#e1e2ec]/40 font-bold mb-1">Speed</p>
+                      <p className="text-sm font-mono">{speedDesc}</p>
+                    </div>
+                    <div className="bg-black/20 p-3 rounded-sm">
+                      <p className="text-[9px] uppercase text-[#e1e2ec]/40 font-bold mb-1">Tick Rate</p>
+                      <p className="text-sm font-mono">1 unit/s</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Quick link to Admin */}
+                <Link
+                  href="/admin"
+                  className="block bg-surface-low rounded-sm p-5 border border-border/10 hover:border-accent/20 transition-all group"
+                >
+                  <div className="flex items-center gap-3">
+                    <span className="material-symbols-outlined text-accent/40 group-hover:text-accent transition-colors">upload_file</span>
+                    <div>
+                      <p className="text-xs font-bold uppercase tracking-widest">Admin Panel</p>
+                      <p className="text-[10px] text-[#e1e2ec]/30">Upload run sheets & configure lines</p>
+                    </div>
+                    <span className="material-symbols-outlined text-[#e1e2ec]/20 ml-auto text-sm">arrow_forward</span>
+                  </div>
+                </Link>
+              </div>
+            </div>
+          )}
+        </main>
       </div>
     </div>
   );

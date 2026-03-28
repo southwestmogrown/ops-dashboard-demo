@@ -8,7 +8,7 @@ interface Props {
   data: EOSFormData;
   activeLines: EOSLineDescriptor[];
   streamName: string;
-  onBack: () => void;
+  onBack?: () => void;
 }
 
 export default function EOSEmailPreview({ data, activeLines, streamName, onBack }: Props) {
@@ -25,51 +25,77 @@ export default function EOSEmailPreview({ data, activeLines, streamName, onBack 
 
   return (
     <div>
-      <div className="flex justify-between items-center mb-5">
-        <div>
-          <div className="text-slate-200 font-semibold text-base">
-            EOS Email Draft — {streamName}
+      {/* Glass panel wrapper */}
+      <div className="glass-panel p-px rounded-sm">
+        <div className="bg-background p-6">
+          {/* Header */}
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center gap-2">
+              <span className="material-symbols-outlined text-accent">mail</span>
+              <h3 className="font-['Space_Grotesk',sans-serif] text-sm font-bold tracking-tight uppercase">
+                Email Draft Preview
+              </h3>
+            </div>
+            <span className="text-[10px] bg-accent/10 text-accent px-2 py-0.5 rounded-sm font-bold">
+              AUTO-GENERATED
+            </span>
           </div>
-          <div className="text-xs text-slate-500 mt-1">
-            Copy and paste into Outlook — attach the 4 downloaded reports
+
+          {/* Email fields */}
+          <div className="space-y-3 text-xs text-[#e1e2ec]/70">
+            <div className="border-b border-border/30 pb-2">
+              <span className="text-[#e1e2ec]/30 uppercase font-bold mr-2">To:</span>
+              ops-leads@kineticcommand.io
+            </div>
+            <div className="border-b border-border/30 pb-2">
+              <span className="text-[#e1e2ec]/30 uppercase font-bold mr-2">Subject:</span>
+              <span className="text-accent">{subject}</span>
+            </div>
           </div>
+
+          {/* Email body */}
+          <div className="mt-4 bg-surface p-4 rounded-sm border border-border/20 overflow-y-auto max-h-[400px] custom-scrollbar">
+            <pre
+              id="eos-email-body"
+              className="text-xs text-[#e1e2ec]/60 leading-relaxed whitespace-pre-wrap break-words m-0 font-mono"
+            >
+              {emailBody}
+            </pre>
+          </div>
+
+          {/* Copy button */}
+          <button
+            onClick={handleCopy}
+            className={[
+              "w-full mt-4 py-2.5 rounded-sm cursor-pointer font-bold text-xs tracking-widest uppercase transition-colors",
+              copied
+                ? "bg-status-green text-black"
+                : "bg-surface-highest text-[#e1e2ec] border border-border hover:bg-surface-high hover:border-accent/30",
+            ].join(" ")}
+          >
+            {copied ? "Copied!" : "Copy to Clipboard"}
+          </button>
         </div>
-        <button
-          onClick={handleCopy}
-          className={[
-            "border-none px-6 py-2.5 rounded cursor-pointer font-bold text-xs tracking-widest uppercase transition-colors",
-            copied ? "bg-status-green text-black" : "bg-accent text-black",
-          ].join(" ")}
-        >
-          {copied ? "Copied!" : "Copy to Clipboard"}
-        </button>
       </div>
 
-      {/* Subject */}
-      <div className="bg-surface border border-border rounded px-4 py-3 mb-3 text-sm">
-        <span className="text-slate-500 mr-2">SUBJECT:</span>
-        <span className="text-accent">{subject}</span>
+      {/* Info note */}
+      <div className="mt-6 p-4 bg-surface-high/40 rounded-sm border border-border/30">
+        <div className="flex items-start gap-3">
+          <span className="material-symbols-outlined text-vs2 mt-0.5 text-sm">info</span>
+          <p className="text-xs leading-relaxed text-[#e1e2ec]/40">
+            This report will be distributed to the executive operations group and logged in the
+            permanent record. Ensure all manual notes are accurate before sending.
+          </p>
+        </div>
       </div>
 
-      {/* Body */}
-      <pre className="bg-surface border border-border rounded-lg px-6 py-6 text-xs text-slate-400 leading-relaxed whitespace-pre-wrap break-words m-0 font-mono">
-        {emailBody}
-      </pre>
-
-      <div className="flex gap-3 mt-4">
-        <button
-          onClick={onBack}
-          className="bg-transparent text-slate-500 border border-border px-5 py-3 rounded cursor-pointer text-sm hover:border-slate-500 transition-colors"
-        >
-          ← Back to Entry
-        </button>
-        <button
-          onClick={() => downloadAllReports(data, activeLines)}
-          className="bg-accent text-black border-none px-6 py-3 rounded cursor-pointer font-bold text-xs tracking-widest uppercase"
-        >
-          ↓ Download All 4 Reports
-        </button>
-      </div>
+      {/* Download button */}
+      <button
+        onClick={() => downloadAllReports(data, activeLines)}
+        className="w-full mt-4 py-2.5 bg-accent text-black rounded-sm cursor-pointer font-bold text-xs tracking-widest uppercase hover:bg-orange-500 transition-colors active:scale-95"
+      >
+        Download All Reports
+      </button>
     </div>
   );
 }

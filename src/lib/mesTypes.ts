@@ -1,10 +1,22 @@
 // ── MES / Simulator Types ─────────────────────────────────────────────────────
 
+/** Hour → comment string, e.g. "07:00" → "Brief power outage, recovered by 07:20" */
+export type LineComments = Record<string, string>;
+
+/** Per-line admin configuration overrides */
+export interface AdminLineConfig {
+  target?:    number;
+  headcount?: number;
+  /** false = line not running today; hidden from dashboard */
+  isRunning?: boolean;
+}
+
 /** One work order on a run sheet */
 export interface RunSheetItem {
   model: string;     // part number, e.g. "449324TS"
   qty: number;       // total units ordered
   completed: number; // units finished so far (from scan log)
+  skipped?: boolean; // true = temporarily skipped (material shortage)
 }
 
 /** Full run sheet for one line, parsed from PDF */
@@ -47,4 +59,6 @@ export interface LineState {
   queue: LineSchedule[];
   /** units per hour bucket, key = "HH:00", e.g. "07:00" → 12 */
   hourlyOutput: Record<string, number>;
+  /** Orders skipped due to material shortage — can be re-activated */
+  skippedItems: RunSheetItem[];
 }

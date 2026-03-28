@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { tickLine, getAllLineStates } from "@/lib/mesStore";
+import { tickLine, getAllLineStates, advanceSimClock, getSimRunning } from "@/lib/mesStore";
 
 interface TickBody {
   /** Specific line to tick. Omit when all=true. */
@@ -11,6 +11,11 @@ interface TickBody {
 }
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
+  // Advance simulated clock if running (fires every real second)
+  if (getSimRunning()) {
+    advanceSimClock();
+  }
+
   const body = await request.json() as TickBody;
   const units = Math.max(1, Math.floor(body.units ?? 1));
 

@@ -9,6 +9,7 @@ A Next.js 16 (App Router) operations dashboard for a manufacturing floor. Displa
 - **Tailwind CSS 4** — utility classes only, no CSS modules
 - **Recharts 3** — all charts; must be dynamically imported (`ssr: false`)
 - **pdfjs-dist** — client-side PDF parsing for run sheets
+- **better-sqlite3** — SQLite persistence for all MES state; survives cold starts and hot reloads
 
 ## Routes
 | Route | Purpose |
@@ -16,13 +17,16 @@ A Next.js 16 (App Router) operations dashboard for a manufacturing floor. Displa
 | `/` | Main dashboard — KPIs, line table, output chart, line drawer |
 | `/eos` | End-of-shift report — CSV export + email draft |
 | `/admin` | Admin — schedule queue (PDF upload), daily target, headcount per line |
-| `/sim` | MES simulator — start/pause/reset, speed control, hourly table |
+| `/team-lead` | Team lead — line selector, per-line hourly table with comments |
+| `/sim` | MES simulator — start/pause/reset, speed control, line cards, hourly table |
 | `GET /api/metrics` | Returns `ShiftMetrics`; overlays admin target/headcount + MES scan output |
 | `GET /api/mes/state` | Returns `LineState[]` for all lines |
 | `POST /api/mes/schedule` | Load or queue a schedule (`mode: "replace" \| "queue"`) |
 | `POST /api/mes/tick` | Emit N scan events (`all: true` or `lineId`) |
 | `POST /api/mes/reset` | Clear all schedules and scan log |
 | `GET/POST /api/admin/config` | Per-line target and headcount overrides |
+| `GET/POST /api/line/comments` | Per-line per-hour comment text (hour key = "HH:00") |
+| `GET/POST /api/scrap` | Scrap/s rework entries: GET by lineId+shift, POST to log scrapped panel or kicked lid |
 
 ## Folder layout
 ```
@@ -34,6 +38,7 @@ src/
     eos/page.tsx          ← EOS report
     admin/page.tsx        ← admin config page
     sim/page.tsx          ← MES simulator control panel
+    team-lead/page.tsx   ← Team lead view — line selector + hourly table + comments
     api/
       metrics/route.ts    ← GET /api/metrics?shift=day|night
       mes/schedule/       ← POST
@@ -41,6 +46,7 @@ src/
       mes/state/          ← GET
       mes/reset/          ← POST
       admin/config/       ← GET + POST
+      scrap/route.ts     ← GET + POST
   components/
     Header.tsx            ← shift selector, timestamp, EOS + Admin nav links
     ShiftSelector.tsx
@@ -56,17 +62,26 @@ src/
     admin/
       AdminLineCard.tsx   ← PDF drop + pending preview + Replace/Queue buttons + target/HC inputs
     sim/
-      LineSimCard.tsx
-      SimControls.tsx
+      LineSimCard.tsx     ← (legacy; line cards now inline in sim/page.tsx)
       HourlyTable.tsx
+    team-lead/
+      LineSelector.tsx     ← (legacy; line selector now inline in team-lead/page.tsx sidebar)
+      LineDetailCard.tsx   ← KPI strip + order strip + hourly table + rework panel
+      HourlyTable.tsx     ← per-hour planned/actual/variance + comment inputs
+      ScrapForm.tsx        ← modal for logging scrapped panels and kicked lids
+      ReworkPanel.tsx      ← collapsible rework log with entry list
   lib/
     types.ts              ← ShiftName, Line, TimePoint, ShiftMetrics
-    generateMetrics.ts    ← seeded mock data (Mulberry32 RNG)
-    mesTypes.ts           ← RunSheetItem, LineSchedule, ScanEvent, LineState
-    mesStore.ts           ← server-side singleton (globalThis); schedule queue, scan log, admin config
+    generateMetrics.ts    ← seeded mock data (Mulberry32 RNG) + getDefaultTarget + getDefaultHeadcount
+    mesTypes.ts           ← RunSheetItem, LineSchedule, ScanEvent, LineState, LineComments, AdminLineConfig
+    mesStore.ts           ← server-side store; in-memory cache + write-through to SQLite via db.ts
+    db.ts                 ← SQLite persistence layer; all state persisted to data/ops.db
     pdfParser.ts          ← parseRunSheet(file, lineId) — handles VS1 and VS2 formats
+    shiftTime.ts          ← getShiftProgress, getShiftWindows, ShiftWindow, ShiftProgress
+    shiftBreaks.ts        ← getHourlyTargets, HourlyTargetRow — proportional planned targets accounting for breaks
     eosTypes.ts
     eosReports.ts
+    reworkTypes.ts        ← ScrapEntry (ScrappedPanel | KickedLid), ScrapStats, PANEL_OPTIONS, DAMAGE_TYPES
 ```
 
 ## Key types (`src/lib/types.ts`)
@@ -80,7 +95,7 @@ interface Line {
   output: number;
   target: number;
   fpy: number;         // first-pass yield %, e.g. 94.7
-  hpu: number;         // hours per unit, e.g. 0.42
+  hpu: number;          // hours per unit, derived: (headcount × elapsedHours) / output; 0 when no output
   headcount: number;
   changeovers: number;
 }
@@ -94,7 +109,7 @@ interface TimePoint {
 interface ShiftMetrics {
   shift: ShiftName;
   generatedAt: string; // ISO
-  lines: Line[];       // 5 lines total (3 × VS1, 2 × VS2)
+  lines: Line[];       // 6 lines (4 × VS1/folding, 2 × VS2/revolver); vs1-l4 added
   trend: TimePoint[];  // 16 half-hour points per shift
 }
 ```
@@ -114,15 +129,30 @@ interface LineState {
   completedOrders: number;         // → EOS changeovers field
   queuedCount: number;             // schedules waiting behind the active one
   hourlyOutput: Record<string, number>; // "07:00" → units that hour
+  skippedItems: RunSheetItem[];    // temporarily skipped orders (material shortage)
+  queue: LineSchedule[];           // queued schedules behind the active one
 }
+type LineComments = Record<string, string>; // hour → comment
 ```
 
 ## MES store (`src/lib/mesStore.ts`)
-- Module-level singleton via `globalThis` — survives Next.js hot reloads; resets on cold start
+- In-memory cache + write-through to SQLite via `db.ts` — survives cold starts and hot reloads
+- `ensureInit()` loads full state from `data/ops.db` on first use; all mutations persist immediately
 - `queues: Record<lineId, LineSchedule[]>` — head is active; auto-advances when head completes
 - `scanLog: ScanEvent[]` — append-only; 1 event = 1 finished unit
-- `adminConfig: Record<lineId, { target?, headcount? }>` — overrides seeded mock values
-- Key exports: `setSchedule`, `enqueueSchedule`, `tickLine`, `getLineState`, `getAllLineStates`, `getOutputForLine`, `setAdminConfig`, `getAllAdminConfig`, `resetAll`
+- `adminConfig: Record<lineId, AdminLineConfig>` — overrides seeded mock values; `isRunning=false` hides line from dashboard
+- `comments: Record<lineId, LineComments>` — per-line per-hour comment text
+- `scrapLog: ScrapEntry[]` — scrap/rework log; `ScrappedPanel` (no FPY impact, caught before Final Inspection) and `KickedLid` (reduces FPY)
+- Key exports: `setSchedule`, `enqueueSchedule`, `tickLine`, `getLineState`, `getAllLineStates`, `getOutputForLine`, `setAdminConfig`, `getAllAdminConfig`, `addScrapEntry`, `getScrapEntries`, `getScrapStats`, `getKickedLidsForLineShift`, `resetAll`
+- `getDefaultHeadcount(lineId)` from `generateMetrics.ts`: VS1/folding = 45, VS2/revolver = 40
+- `getDefaultTarget(lineId)` from `generateMetrics.ts`: VS1/folding = 225, VS2/revolver = 200
+
+## SQLite DB (`src/lib/db.ts`)
+- DB file: `./data/ops.db` (auto-created; `./data/` dir created on first import)
+- WAL journal mode; foreign keys enforced
+- Tables: `scan_events`, `line_queues`, `admin_config`, `line_comments`, `scrap_log`, `sim_clock`, `db_meta`
+- `dbResetAll()` clears all tables + resets serials; called by `mesStore.resetAll()`
+- `AdminLineConfig` type lives in `mesTypes.ts` (shared between `db.ts` and `mesStore.ts`)
 
 ## Run sheet PDF formats
 Two formats in use — `pdfParser.ts` handles both:
@@ -132,8 +162,10 @@ Two formats in use — `pdfParser.ts` handles both:
 
 ## Data flow
 1. `page.tsx` fetches `/api/metrics?shift=…` on mount and every **5 s** (silent — no loading flash).
-2. `/api/metrics` runs `generateMetrics` (seeded mock), then overlays admin target/headcount, then MES scan output.
-3. EOS page fetches both `/api/metrics` and `/api/mes/state` on mount and shift change — pre-fills output, headcount, orderAtPackout, remainingOnOrder, remainingOnRunSheet, changeovers.
+2. `/api/metrics` runs `generateMetrics` (seeded mock), then overlays default target by line type (VS1=225, VS2=200) and default headcount (VS1=45, VS2=40) via `getDefaultTarget`/`getDefaultHeadcount`, then admin overrides (nullish coalescing), then MES scan output, then derives FPY from scrap log and HPU from elapsed hours:
+   - **`FPY = ((output − kickedLids) / output) * 100`** — only `KickedLid` entries count against FPY. Scrapped panels caught before Final Inspection do not reduce FPY (per site quality policy).
+   - `HPU = (headcount × elapsedHours) / output` (falls back to `0` when output is 0)
+3. EOS page fetches both `/api/metrics` and `/api/mes/state` on mount and shift change — pre-fills output, headcount, orderAtPackout, remainingOnOrder, remainingOnRunSheet, changeovers. Lines without a MES schedule are automatically hidden.
 4. Admin page: drop PDF → parse client-side → preview → Replace or Queue → `POST /api/mes/schedule`.
 5. Sim page: Start → `setInterval` → `POST /api/mes/tick` every 1 s → polls `/api/mes/state` every 2 s.
 
@@ -142,8 +174,12 @@ Two formats in use — `pdfParser.ts` handles both:
 |---|---|---|
 | `--color-background` | `#0a0d14` | `bg-background` |
 | `--color-surface` | `#131720` | `bg-surface` |
+| `--color-surface-low` | `#0e1118` | `bg-surface-low` |
+| `--color-surface-high` | `#181e2d` | `bg-surface-high` |
+| `--color-surface-highest` | `#1c2235` | `bg-surface-highest` |
 | `--color-border` | `#1e2433` | `border-border` |
 | `--color-accent` | `#f97316` | `bg-accent` / `text-accent` |
+| `--color-accent-muted` | `#c45d0d` | `bg-accent-muted` |
 | `--color-vs1` | `#f97316` | orange |
 | `--color-vs2` | `#1d9e75` | teal-green |
 | `--color-status-green` | `#22c55e` | `text-status-green` |
@@ -154,14 +190,60 @@ Two formats in use — `pdfParser.ts` handles both:
 - **Output**: ≥ 90 % of target → green; ≥ 75 % → amber; < 75 % → red
 - **FPY**: ≥ 95 % → green; ≥ 90 % → amber; < 90 % → red
 - **HPU**: ≤ 0.35 → green; ≤ 0.45 → amber; > 0.45 → red
-- **At-risk row** (LineTable): FPY < 90 AND output < target → red left border
+- **At-risk row** (LineTable): status pill (ON TRACK / WATCH / CRITICAL / SCHEDULE NEEDED) replaces the old red left border indicator; no schedule → gray SCHEDULE NEEDED pill; dormant lines hidden via admin "Not Running" toggle
 
-## Card / panel styling convention
+## Design system — "Kinetic Command" (Stitch handoff)
+
+### Theme
+Dark industrial. Fonts: **Space Grotesk** (headings, large numerics) + **Inter** (body, labels, data).
+Icons: Material Symbols Outlined (loaded via Google Fonts CDN in `layout.tsx`).
+
+### Shared page shell (per-route, not in layout)
+Each page renders its own:
+1. **Top nav** — `KINETIC COMMAND` brand, horizontal route links (active = accent underline), shift/time info pill, dashboard link. Font: Space Grotesk.
+2. **Sidebar** (hidden < lg) — `OP-CENTER` header, 5 decorative nav items (Dashboard, Assembly Lines, Inventory, Quality Control, Maintenance), Emergency Stop placeholder, Support/Logs footer. Width: `w-64`.
+3. **Main content** — `flex-1 overflow-y-auto custom-scrollbar bg-background`.
+
+All three are inlined per page (not shared layout components) because each page has different active-nav state and header controls.
+
+### Card / panel styling convention
 ```tsx
-<div className="bg-surface border border-border rounded-lg p-5">
+// Standard card (surface)
+<div className="bg-surface hover:bg-surface-high transition-colors relative overflow-hidden">
+  <div className="absolute top-0 left-0 w-full h-[2px] bg-accent" /> {/* status bar */}
+  <div className="p-5">...</div>
+</div>
+
+// Section panel (surface-low with left accent border)
+<div className="bg-surface-low p-6 border-l-2 border-accent/30">...</div>
+
+// Glass panel (email preview, drawers)
+<div className="glass-panel p-px rounded-sm">
+  <div className="bg-background p-6">...</div>
+</div>
 ```
 
-## Recharts dark-theme tooltip convention
+### Typography patterns
+```tsx
+// Section heading
+<h3 className="font-['Space_Grotesk',sans-serif] text-lg font-bold tracking-tight uppercase">
+
+// Micro label
+<p className="text-[10px] text-[#e1e2ec]/40 uppercase font-bold tracking-widest">
+
+// Large metric
+<p className="font-['Space_Grotesk',sans-serif] text-2xl font-bold tabular-nums">
+
+// Status badge
+<span className="inline-flex items-center px-2 py-0.5 rounded-sm text-[9px] font-bold border uppercase">
+```
+
+### Input convention (forms)
+```tsx
+<input className="w-full bg-surface-highest border-none rounded-sm px-3.5 py-2.5 text-[#e1e2ec] text-sm outline-none font-mono focus:ring-1 focus:ring-accent/40 placeholder:text-[#e1e2ec]/20" />
+```
+
+### Recharts dark-theme tooltip convention
 ```tsx
 <Tooltip
   cursor={{ fill: "rgba(255,255,255,0.03)" }}
@@ -170,6 +252,44 @@ Two formats in use — `pdfParser.ts` handles both:
   itemStyle={{ color: "#e2e8f0" }}
 />
 ```
+
+## Route-specific design notes
+
+### `/` Dashboard (✅ Stitch redesign applied)
+- h-screen flex layout, sidebar + main
+- Top: 3 KPI cards (output, FPY, HPU) with left accent bars and progress indicators
+- Middle: OutputChart section with VS1/VS2 legend
+- Bottom: LineTable — grouped by value stream, rows with progress bars and status pills
+- LineDrawer: glass-panel slide-out, triggered by row click
+
+### `/eos` EOS Report (✅ Stitch redesign applied)
+- Page header: border-l-4 accent, title + dynamic meta display (date, shift, supervisor) + CSV/Email action buttons
+- Two-column layout: xl:grid-cols-12 (8 left / 4 right)
+- Left: EOSMetaForm (teal accent section) → Operational Summary textarea (accent border) → VS tabs → EOSLineCard grid
+- Right: EOSEmailPreview (glass panel, sticky, always visible — no toggle view)
+- EOSLineCard: top 2px status bar, 5-col summary grid, expandable edit fields below
+
+### `/admin` (✅ Stitch redesign applied)
+- Bento grid layout, AdminLineCard (2-col: dropzone+config | runsheet preview)
+- Master controls, toggle switch for Not Running
+- Per-line target/headcount inputs
+
+### `/team-lead` (✅ Stitch redesign applied)
+- Sidebar contains line selector (filter input + line list with status badges: RUNNING/BEHIND/STOPPED/IDLE)
+- Main: empty state when no line selected, LineDetailCard when selected
+- LineDetailCard: 12-col grid, KPI strip, order progress bar, Scrap & Quality panel, HourlyTable
+- HourlyTable: planned/actual/variance columns, break rows with diagonal stripes, comment inputs with 500ms debounce
+- ScrapForm modal: kind toggle (scrapped-panel / kicked-lid), panel grid selector, conditional fields
+- ReworkPanel: collapsible log with SC (red) / KL (amber) badges
+
+### `/sim` (✅ Stitch redesign applied)
+- Simulator Control Bar (left 7 cols): Start/Pause/Reset with Material icons, speed toggle buttons (1×/5×/15×), shift selector, sim clock display
+- Status Bento (right 5 cols): Efficiency % with progress bar, Total Output, active lines count
+- Assembly Line Cards: 2-col grid, progress bars, status indicators (Nominal/Behind/Complete), current order display
+- Hourly Output Summary: restyled HourlyTable with column/row totals, accent-colored grand total
+- Hourly Production Bars (right column): per-hour horizontal bars with completion labels
+- Simulation Info Card: glass panel with speed/tick details
+- Admin Panel quick-link card
 
 ## LineDrawer notes
 - Slide-out panel triggered by clicking a row in `LineTable`.
@@ -187,18 +307,21 @@ Two formats in use — `pdfParser.ts` handles both:
 Set `DEMO_SEED` env var to override for deterministic demos.
 
 ## Improvement backlog (prioritised)
+
+Full feature specs live in **`issues.md`**. Items marked ✅ are complete.
+
 ### High
-1. **Hour-by-hour in LineDrawer** — `hourlyOutput` from `LineState` is available but not shown in the drawer; add a bar chart or table below the existing trend charts
-2. **Pace indicator** — show whether each line is ahead/behind pace for its daily target: `(output / elapsed_shift_hours) * total_shift_hours`; surface in KPI cards and LineDrawer
-3. **Current order in LineDrawer** — show active model #, remaining on order, remaining on sheet when MES data exists
-4. **Admin queue visibility** — list queued schedules (not just count); allow removing individual items
+- **M8: Downtime / Line Stop logging** — structured stop events with reason codes, duration, units lost; feeds OEE; see `issues.md` M8
+- **M9: Real-Time Alerts** — proactive banner for stalls, FPY drops, pace alerts; see `issues.md` M9
+- **Supervisor status view** — ON TRACK / WATCH / CRITICAL pill per line in table; hover tooltip shows specific reasons (FPY low, behind pace, zero output, HC short, skipped orders); order ETA in LineDrawer
+- **Bought-in ERP integration** — `boughtIn` boolean on scrap entries; future route queries external ERP for model# lookup and auto-tags entries
 
 ### Medium
-5. **EOS "Refresh from MES" button** — re-pull MES state without changing shift
-6. **Shift time remaining** — clock in header showing elapsed/remaining shift time; feeds pace calc
-7. **At-risk pace highlighting** — lines behind pace turn amber/red in LineTable independent of static target %
+- **M10: OEE Tracking** — Availability × Performance × Quality per line; see `issues.md` M10
+- **M11: Shift Handoff** — structured outgoing/incoming supervisor handoff with issue list and acknowledgement; see `issues.md` M11
+- **M12: EOS Scrap Auto-Fill** — pull scrap counts from DB into EOS form automatically; see `issues.md` M12
 
 ### Lower
-8. **Sim page cleanup** — admin owns PDF upload now; trim `/sim` to controls + hourly table only
-9. **Admin queue management** — reorder or remove queued schedules
-10. **Basic admin auth** — PIN or env-variable password gate on `/admin`
+- **Admin queue reordering** — drag to reorder queued schedules
+- **Per-operator performance** — anonymous or named operator-level output visibility for coaching (sensitive — needs role guard)
+- **Historical trend view** — compare current shift pace to same point on prior shifts

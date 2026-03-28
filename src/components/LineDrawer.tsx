@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 import {
   BarChart,
   Bar,
@@ -16,6 +16,7 @@ import {
 import { Line as LineData, TimePoint } from "@/lib/types";
 import type { LineState } from "@/lib/mesTypes";
 import type { ShiftProgress } from "@/lib/shiftTime";
+import { getFpyColor, getHpuColor, getPaceColor } from "@/lib/status";
 
 interface LineDrawerProps {
   line: LineData | null;
@@ -23,6 +24,8 @@ interface LineDrawerProps {
   mesState: LineState | null;
   shiftProgress: ShiftProgress;
   onClose: () => void;
+  /** Override clock time (from sim clock); falls back to real time */
+  nowOverride?: Date | null;
 }
 
 // Mulberry32 seeded RNG — matches generateMetrics.ts so per-line data is stable
@@ -45,25 +48,6 @@ function hashSeed(str: string): number {
   return Math.abs(h);
 }
 
-function getFpyColor(fpy: number): string {
-  if (fpy >= 95) return "text-status-green";
-  if (fpy >= 90) return "text-status-amber";
-  return "text-status-red";
-}
-
-function getHpuColor(hpu: number): string {
-  if (hpu <= 0.35) return "text-status-green";
-  if (hpu <= 0.45) return "text-status-amber";
-  return "text-status-red";
-}
-
-function getPaceColor(projected: number, target: number): string {
-  const r = projected / target;
-  if (r >= 0.9) return "text-status-green";
-  if (r >= 0.75) return "text-status-amber";
-  return "text-status-red";
-}
-
 type ChartPoint = {
   time: string;
   output: number;
@@ -72,13 +56,10 @@ type ChartPoint = {
   isChangeover?: boolean;
 };
 
-// Derives per-line time-series from the VS-aggregate trend.
-// FPY and HPU oscillate around the line's current value for visual interest.
 function buildChartData(line: LineData, trend: TimePoint[]): ChartPoint[] {
   const rng = createRng(hashSeed(line.id));
   const linesInVs = line.valueStream === "VS1" ? 3 : 2;
 
-  // Spread changeovers evenly across the timeline
   const coIndices = new Set<number>();
   if (line.changeovers > 0) {
     const step = Math.floor(trend.length / (line.changeovers + 1));
@@ -96,17 +77,14 @@ function buildChartData(line: LineData, trend: TimePoint[]): ChartPoint[] {
     const intervalDelta = vsOutput - prevVsOutput;
     prevVsOutput = vsOutput;
 
-    // Scale down to per-line with ±15% random variation
     const variation = 0.85 + rng() * 0.3;
     const output = Math.max(0, Math.round((intervalDelta / linesInVs) * variation));
 
-    // FPY: ±2 percentage points around line's current value
     const fpyDelta = (rng() - 0.5) * 4;
     const fpy = parseFloat(
       Math.max(80, Math.min(100, line.fpy + fpyDelta)).toFixed(1)
     );
 
-    // HPU: ±0.05 around line's current value
     const hpuDelta = (rng() - 0.5) * 0.1;
     const hpu = parseFloat(
       Math.max(0.2, Math.min(0.7, line.hpu + hpuDelta)).toFixed(2)
@@ -116,7 +94,6 @@ function buildChartData(line: LineData, trend: TimePoint[]): ChartPoint[] {
   });
 }
 
-/** Convert MES hourlyOutput bucket map to sorted chart data. */
 function buildMesHourlyData(hourlyOutput: Record<string, number>) {
   return Object.entries(hourlyOutput)
     .sort(([a], [b]) => a.localeCompare(b))
@@ -125,13 +102,13 @@ function buildMesHourlyData(hourlyOutput: Record<string, number>) {
 
 const tooltipStyle = {
   contentStyle: {
-    backgroundColor: "#161c2a",
-    border: "1px solid #253044",
-    borderRadius: "6px",
+    backgroundColor: "#131720",
+    border: "1px solid #1e2433",
+    borderRadius: "4px",
     fontSize: "12px",
   },
-  labelStyle: { color: "#94a3b8" },
-  itemStyle: { color: "#edf2f8" },
+  labelStyle: { color: "#e1e2ec", opacity: 0.5 },
+  itemStyle: { color: "#e1e2ec" },
 };
 
 export default function LineDrawer({
@@ -140,6 +117,7 @@ export default function LineDrawer({
   mesState,
   shiftProgress,
   onClose,
+  nowOverride,
 }: LineDrawerProps) {
   const isOpen = line !== null;
 
@@ -155,35 +133,52 @@ export default function LineDrawer({
   const chartData = line && trend.length > 0 ? buildChartData(line, trend) : [];
   const changeoverTimes = chartData.filter((d) => d.isChangeover).map((d) => d.time);
 
-  // Use real MES hourly output when available; fall back to synthetic
   const hasMesHourly =
     mesState && Object.keys(mesState.hourlyOutput).length > 0;
   const hourlyBarData = hasMesHourly
     ? buildMesHourlyData(mesState!.hourlyOutput)
     : chartData.map(({ time, output }) => ({ time, output }));
 
-  // Pace for this line (only when schedule loaded and elapsed > 15 min)
   const linePace =
-    mesState?.schedule && shiftProgress.elapsedHours >= 0.25
+    shiftProgress.elapsedHours >= 0.25
       ? Math.round(
-          (mesState.totalOutput / shiftProgress.elapsedHours) * shiftProgress.totalHours
+          ((mesState?.schedule ? mesState.totalOutput : (line?.output ?? 0)) /
+            shiftProgress.elapsedHours) *
+            shiftProgress.totalHours
         )
       : null;
+
+  const etaInfo = (() => {
+    if (
+      !mesState ||
+      mesState.remainingOnOrder <= 0 ||
+      shiftProgress.elapsedHours < 0.25
+    )
+      return null;
+    const output = mesState.schedule ? mesState.totalOutput : (line?.output ?? 0);
+    if (output === 0) return null;
+    const uph = output / shiftProgress.elapsedHours;
+    if (uph === 0) return null;
+    const minutesLeft = Math.ceil((mesState.remainingOnOrder / uph) * 60);
+    const now = nowOverride ?? new Date();
+    const etaTime = new Date(now.getTime() + minutesLeft * 60_000);
+    return { etaTime, minutesLeft };
+  })();
 
   return (
     <>
       {/* Backdrop */}
       <div
-        className={`fixed inset-0 bg-black/50 z-40 transition-opacity duration-300 ${
+        className={`fixed inset-0 bg-black/60 z-40 transition-opacity duration-300 ${
           isOpen ? "opacity-100" : "opacity-0 pointer-events-none"
         }`}
         onClick={onClose}
         aria-hidden="true"
       />
 
-      {/* Slide-out panel */}
+      {/* Slide-out glass panel */}
       <aside
-        className={`fixed top-0 right-0 h-full w-[480px] bg-surface border-l border-border z-50 flex flex-col transform transition-transform duration-300 ease-in-out ${
+        className={`fixed top-0 right-0 h-full w-[480px] glass-panel z-50 flex flex-col transform transition-transform duration-300 ease-in-out ${
           isOpen ? "translate-x-0" : "translate-x-full"
         }`}
         role="dialog"
@@ -195,14 +190,19 @@ export default function LineDrawer({
             {/* Header */}
             <div className="flex items-center justify-between p-5 border-b border-border shrink-0">
               <div>
-                <p className="text-xs text-slate-400 uppercase tracking-wider">
+                <p className="text-[10px] text-[#e1e2ec]/40 uppercase tracking-widest font-bold">
                   {line.valueStream}
                 </p>
-                <h2 className="text-lg font-semibold text-white">{line.name}</h2>
+                <h2 className="text-xl font-bold font-['Space_Grotesk',sans-serif] uppercase text-accent">
+                  {line.valueStream} · {line.name}
+                </h2>
+                <p className="text-[10px] font-bold text-vs2 uppercase tracking-widest mt-0.5">
+                  Operational
+                </p>
               </div>
               <button
                 onClick={onClose}
-                className="text-slate-400 hover:text-white transition-colors p-1 rounded"
+                className="text-[#e1e2ec]/40 hover:text-[#e1e2ec] transition-colors p-1 rounded-sm"
                 aria-label="Close drawer"
               >
                 <svg
@@ -222,93 +222,118 @@ export default function LineDrawer({
               </button>
             </div>
 
-            {/* Metric summary row */}
+            {/* Metric summary strip */}
             <div className="grid grid-cols-5 gap-3 p-5 border-b border-border shrink-0">
               <div>
-                <p className="text-xs text-slate-400 uppercase tracking-wider mb-1">
+                <p className="text-[9px] text-[#e1e2ec]/40 uppercase tracking-widest mb-1 font-bold">
                   Output
                 </p>
-                <p className="text-xl font-semibold">{line.output}</p>
-                <p className="text-xs text-slate-400">/ {line.target}</p>
+                <p className="text-xl font-semibold font-['Space_Grotesk',sans-serif]">
+                  {line.output}
+                </p>
+                <p className="text-xs text-[#e1e2ec]/40">/ {line.target}</p>
               </div>
               <div>
-                <p className="text-xs text-slate-400 uppercase tracking-wider mb-1">
+                <p className="text-[9px] text-[#e1e2ec]/40 uppercase tracking-widest mb-1 font-bold">
                   FPY
                 </p>
-                <p className={`text-xl font-semibold ${getFpyColor(line.fpy)}`}>
+                <p className={`text-xl font-semibold font-['Space_Grotesk',sans-serif] ${getFpyColor(line.fpy)}`}>
                   {line.fpy.toFixed(1)}%
                 </p>
               </div>
               <div>
-                <p className="text-xs text-slate-400 uppercase tracking-wider mb-1">
+                <p className="text-[9px] text-[#e1e2ec]/40 uppercase tracking-widest mb-1 font-bold">
                   HPU
                 </p>
-                <p className={`text-xl font-semibold ${getHpuColor(line.hpu)}`}>
+                <p className={`text-xl font-semibold font-['Space_Grotesk',sans-serif] ${getHpuColor(line.hpu)}`}>
                   {line.hpu.toFixed(2)}
                 </p>
               </div>
               <div>
-                <p className="text-xs text-slate-400 uppercase tracking-wider mb-1">
+                <p className="text-[9px] text-[#e1e2ec]/40 uppercase tracking-widest mb-1 font-bold">
                   C/O
                 </p>
-                <p className="text-xl font-semibold">{line.changeovers}</p>
+                <p className="text-xl font-semibold font-['Space_Grotesk',sans-serif]">
+                  {line.changeovers}
+                </p>
               </div>
               <div>
-                <p className="text-xs text-slate-400 uppercase tracking-wider mb-1">
+                <p className="text-[9px] text-[#e1e2ec]/40 uppercase tracking-widest mb-1 font-bold">
                   Pace
                 </p>
                 {linePace !== null ? (
                   <>
-                    <p className={`text-xl font-semibold ${getPaceColor(linePace, line.target)}`}>
+                    <p className={`text-xl font-semibold font-['Space_Grotesk',sans-serif] ${getPaceColor(linePace, line.target)}`}>
                       {linePace}
                     </p>
-                    <p className="text-xs text-slate-400">proj.</p>
+                    <p className="text-xs text-[#e1e2ec]/40">proj.</p>
                   </>
                 ) : (
-                  <p className="text-xl font-semibold text-slate-600">—</p>
+                  <p className="text-xl font-semibold text-[#e1e2ec]/20">—</p>
                 )}
               </div>
             </div>
 
             {/* Active order strip — only when MES schedule is loaded */}
             {mesState?.schedule && (
-              <div className="grid grid-cols-3 gap-3 px-5 py-3 bg-background border-b border-border shrink-0">
+              <div className="grid grid-cols-4 gap-3 px-5 py-3 bg-background border-b border-border shrink-0">
                 <div>
-                  <p className="text-xs text-slate-500 uppercase tracking-wider mb-0.5">
+                  <p className="text-[9px] text-[#e1e2ec]/40 uppercase tracking-widest mb-0.5 font-bold">
                     Active Order
                   </p>
-                  <p className="text-sm font-mono text-white truncate">
+                  <p className="text-sm font-mono text-[#e1e2ec] truncate">
                     {mesState.currentOrder ?? (
                       <span className="text-status-green">All complete</span>
                     )}
                   </p>
                 </div>
                 <div>
-                  <p className="text-xs text-slate-500 uppercase tracking-wider mb-0.5">
+                  <p className="text-[9px] text-[#e1e2ec]/40 uppercase tracking-widest mb-0.5 font-bold">
                     Rem. on Order
                   </p>
-                  <p className="text-sm text-white">{mesState.remainingOnOrder}</p>
+                  <p className="text-sm text-[#e1e2ec]">
+                    {mesState.remainingOnOrder}
+                  </p>
                 </div>
                 <div>
-                  <p className="text-xs text-slate-500 uppercase tracking-wider mb-0.5">
+                  <p className="text-[9px] text-[#e1e2ec]/40 uppercase tracking-widest mb-0.5 font-bold">
+                    ETA
+                  </p>
+                  {etaInfo ? (
+                    <p className="text-sm text-[#e1e2ec] font-semibold">
+                      {etaInfo.etaTime.toLocaleTimeString([], {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })}
+                    </p>
+                  ) : (
+                    <p className="text-sm text-[#e1e2ec]/20">—</p>
+                  )}
+                </div>
+                <div>
+                  <p className="text-[9px] text-[#e1e2ec]/40 uppercase tracking-widest mb-0.5 font-bold">
                     Rem. on Sheet
                   </p>
-                  <p className="text-sm text-white">{mesState.remainingOnRunSheet}</p>
+                  <p className="text-sm text-[#e1e2ec]">
+                    {mesState.remainingOnRunSheet}
+                  </p>
                 </div>
               </div>
             )}
 
             {/* Charts */}
-            <div className="flex flex-col gap-6 p-5 overflow-y-auto">
-              {/* Hourly output — real MES data when available, else synthetic */}
+            <div className="flex flex-col gap-6 p-5 overflow-y-auto custom-scrollbar">
+              {/* Hourly output */}
               <div>
-                <p className="text-xs text-slate-400 uppercase tracking-wider mb-3">
+                <p className="text-[9px] font-black uppercase tracking-widest text-[#e1e2ec]/40 mb-3">
                   Hourly Output
                   {hasMesHourly ? (
-                    <span className="ml-2 text-accent/70 normal-case">· live MES</span>
+                    <span className="ml-2 text-accent/70 normal-case font-normal">
+                      · live MES
+                    </span>
                   ) : (
                     line.changeovers > 0 && (
-                      <span className="ml-2 text-status-amber normal-case">
+                      <span className="ml-2 text-status-amber normal-case font-normal">
                         · amber lines = changeovers
                       </span>
                     )
@@ -321,18 +346,18 @@ export default function LineDrawer({
                   >
                     <CartesianGrid
                       strokeDasharray="3 3"
-                      stroke="#253044"
+                      stroke="#1e2433"
                       vertical={false}
                     />
                     <XAxis
                       dataKey="time"
-                      tick={{ fill: "#94a3b8", fontSize: 10 }}
-                      axisLine={{ stroke: "#253044" }}
+                      tick={{ fill: "#e1e2ec", fillOpacity: 0.4, fontSize: 10 }}
+                      axisLine={{ stroke: "#1e2433" }}
                       tickLine={false}
                       interval={hasMesHourly ? 0 : 3}
                     />
                     <YAxis
-                      tick={{ fill: "#94a3b8", fontSize: 10 }}
+                      tick={{ fill: "#e1e2ec", fillOpacity: 0.4, fontSize: 10 }}
                       axisLine={false}
                       tickLine={false}
                       width={28}
@@ -341,7 +366,6 @@ export default function LineDrawer({
                       cursor={{ fill: "rgba(255,255,255,0.03)" }}
                       {...tooltipStyle}
                     />
-                    {/* Changeover markers only on synthetic data */}
                     {!hasMesHourly &&
                       changeoverTimes.map((t) => (
                         <ReferenceLine
@@ -355,8 +379,8 @@ export default function LineDrawer({
                     <Bar
                       dataKey="output"
                       name="Output"
-                      fill="#edb81a"
-                      radius={[3, 3, 0, 0]}
+                      fill="#f97316"
+                      radius={[2, 2, 0, 0]}
                     />
                   </BarChart>
                 </ResponsiveContainer>
@@ -364,7 +388,7 @@ export default function LineDrawer({
 
               {/* FPY trend */}
               <div>
-                <p className="text-xs text-slate-400 uppercase tracking-wider mb-3">
+                <p className="text-[9px] font-black uppercase tracking-widest text-[#e1e2ec]/40 mb-3">
                   FPY Trend
                 </p>
                 <ResponsiveContainer width="100%" height={140}>
@@ -374,18 +398,18 @@ export default function LineDrawer({
                   >
                     <CartesianGrid
                       strokeDasharray="3 3"
-                      stroke="#253044"
+                      stroke="#1e2433"
                       vertical={false}
                     />
                     <XAxis
                       dataKey="time"
-                      tick={{ fill: "#94a3b8", fontSize: 10 }}
-                      axisLine={{ stroke: "#253044" }}
+                      tick={{ fill: "#e1e2ec", fillOpacity: 0.4, fontSize: 10 }}
+                      axisLine={{ stroke: "#1e2433" }}
                       tickLine={false}
                       interval={3}
                     />
                     <YAxis
-                      tick={{ fill: "#94a3b8", fontSize: 10 }}
+                      tick={{ fill: "#e1e2ec", fillOpacity: 0.4, fontSize: 10 }}
                       axisLine={false}
                       tickLine={false}
                       width={36}
@@ -417,7 +441,7 @@ export default function LineDrawer({
 
               {/* HPU trend */}
               <div>
-                <p className="text-xs text-slate-400 uppercase tracking-wider mb-3">
+                <p className="text-[9px] font-black uppercase tracking-widest text-[#e1e2ec]/40 mb-3">
                   HPU Trend
                 </p>
                 <ResponsiveContainer width="100%" height={140}>
@@ -427,18 +451,18 @@ export default function LineDrawer({
                   >
                     <CartesianGrid
                       strokeDasharray="3 3"
-                      stroke="#253044"
+                      stroke="#1e2433"
                       vertical={false}
                     />
                     <XAxis
                       dataKey="time"
-                      tick={{ fill: "#94a3b8", fontSize: 10 }}
-                      axisLine={{ stroke: "#253044" }}
+                      tick={{ fill: "#e1e2ec", fillOpacity: 0.4, fontSize: 10 }}
+                      axisLine={{ stroke: "#1e2433" }}
                       tickLine={false}
                       interval={3}
                     />
                     <YAxis
-                      tick={{ fill: "#94a3b8", fontSize: 10 }}
+                      tick={{ fill: "#e1e2ec", fillOpacity: 0.4, fontSize: 10 }}
                       axisLine={false}
                       tickLine={false}
                       width={36}
