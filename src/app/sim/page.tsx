@@ -1,37 +1,23 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import dynamic from "next/dynamic";
+import { usePathname } from "next/navigation";
 import type { LineState } from "@/lib/mesTypes";
 import type { ShiftName } from "@/lib/types";
+import { LINES, LINE_LABELS, getDefaultTarget } from "@/lib/lines";
+import { getShiftWindows } from "@/lib/shiftTime";
 
 const HourlyTable = dynamic(() => import("@/components/sim/HourlyTable"), { ssr: false });
 
-// ── Config ────────────────────────────────────────────────────────────────────
-
-const LINES: { lineId: string; label: string; vs: string }[] = [
-  { lineId: "vs1-l1", label: "Line 1", vs: "VS1" },
-  { lineId: "vs1-l2", label: "Line 2", vs: "VS1" },
-  { lineId: "vs1-l3", label: "Line 3", vs: "VS1" },
-  { lineId: "vs1-l4", label: "Line 4", vs: "VS1" },
-  { lineId: "vs2-l1", label: "Line 1", vs: "VS2" },
-  { lineId: "vs2-l2", label: "Line 2", vs: "VS2" },
-];
-
-const LINE_LABELS: Record<string, string> = Object.fromEntries(
-  LINES.map(({ lineId, label, vs }) => [lineId, `${vs} · ${label}`])
-);
-
-const SHIFT_START_HOUR: Record<ShiftName, number> = { day: 6, night: 17 };
-
-const SIDE_NAV = [
-  { icon: "dashboard", label: "Dashboard" },
-  { icon: "factory", label: "Assembly Lines" },
+const SIDE_NAV: { icon: string; label: string; href?: string }[] = [
+  { icon: "dashboard", label: "Dashboard", href: "/" },
+  { icon: "factory", label: "Admin", href: "/admin" },
   { icon: "inventory_2", label: "Inventory" },
   { icon: "verified", label: "Quality Control" },
   { icon: "build", label: "Maintenance" },
-] as const;
+];
 
 const SPEED_OPTIONS = [
   { label: "1×", value: 60, desc: "Realtime" },
@@ -42,6 +28,7 @@ const SPEED_OPTIONS = [
 // ── Page ─────────────────────────────────────────────────────────────────────
 
 export default function SimPage() {
+  const pathname = usePathname();
   const [states, setStates] = useState<LineState[]>([]);
   const [running, setRunning] = useState(false);
   const [speed, setSpeed] = useState(60);
@@ -79,25 +66,25 @@ export default function SimPage() {
   }, [pollState]);
 
   // ── Simulation controls ─────────────────────────────────────────────────────
-  function getShiftStart(shiftName: ShiftName): Date {
-    const d = new Date();
-    d.setHours(SHIFT_START_HOUR[shiftName], 0, 0, 0);
-    return d;
-  }
-
   async function startSim() {
     if (tickInterval.current) return;
+    const shiftStart = new Date();
+    shiftStart.setHours(getShiftWindows(shift).startHour, 0, 0, 0);
     await fetch("/api/sim/clock", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ clock: getShiftStart(shift).toISOString(), running: true, speed }),
+      body: JSON.stringify({ clock: shiftStart.toISOString(), running: true, speed }),
     });
     setRunning(true);
     tickInterval.current = setInterval(async () => {
+      // Scale units with speed so production rate (units/line/hr) stays ~24-35
+      // regardless of how fast simulated time runs.
+      // 1 unit/line/tick at 1×, 5 at 5×, 15 at 15×.
+      const units = Math.max(1, Math.round(speed / 60));
       await fetch("/api/mes/tick", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ all: true, units: 1 }),
+        body: JSON.stringify({ all: true, units }),
       });
     }, 1000);
   }
@@ -119,7 +106,7 @@ export default function SimPage() {
       fetch("/api/sim/clock", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ clock: null, running: false, speed: 60 }),
+        body: JSON.stringify({ clock: null, running: false }),
       }),
     ]);
     setSimClock(null);
@@ -142,31 +129,52 @@ export default function SimPage() {
   }, []);
 
   // ── Derived data ────────────────────────────────────────────────────────────
-  const totalOutput = states.reduce((s, st) => s + st.totalOutput, 0);
-  const totalTarget = states.reduce((s, st) => s + (st.schedule?.totalTarget ?? 0), 0);
-  const scheduledLines = states.filter((s) => s.schedule !== null).length;
-  const efficiency = totalTarget > 0 ? Math.round((totalOutput / totalTarget) * 1000) / 10 : 0;
+  const { totalOutput, totalTarget, scheduledLines, efficiency } = useMemo(() => {
+    const totalOutput = states.reduce((s, st) => s + st.totalOutput, 0);
+    const totalTarget = states.reduce((s, st) => s + (st.schedule?.totalTarget ?? getDefaultTarget(st.lineId)), 0);
+    const scheduledLines = states.filter((s) => s.schedule !== null).length;
+    const efficiency = totalTarget > 0 ? Math.round((totalOutput / totalTarget) * 1000) / 10 : 0;
+    return { totalOutput, totalTarget, scheduledLines, efficiency };
+  }, [states]);
 
-  const stateMap = new Map(states.map((s) => [s.lineId, s]));
+  const stateMap = useMemo(() => new Map(states.map((s) => [s.lineId, s])), [states]);
 
-  // Collect recent scans for the live log (last 20 from hourlyOutput data)
-  // We'll derive a simple scan list from states
-  const recentScans = states
-    .filter((s) => s.schedule)
-    .flatMap((s) =>
-      Object.entries(s.hourlyOutput).map(([hour, count]) => ({
-        lineId: s.lineId,
-        hour,
-        count,
-        order: s.currentOrder ?? "—",
-      }))
-    )
-    .sort((a, b) => b.hour.localeCompare(a.hour))
-    .slice(0, 8);
+  const recentScans = useMemo(() =>
+    states
+      .filter((s) => s.schedule)
+      .flatMap((s) =>
+        Object.entries(s.hourlyOutput).map(([hour, count]) => ({
+          lineId: s.lineId,
+          hour,
+          count,
+          order: s.currentOrder ?? "—",
+        }))
+      )
+      .sort((a, b) => b.hour.localeCompare(a.hour))
+      .slice(0, 8),
+    [states]
+  );
 
-  // Speed label
-  const speedLabel = SPEED_OPTIONS.find((o) => o.value === speed)?.label ?? `${speed}`;
-  const speedDesc = SPEED_OPTIONS.find((o) => o.value === speed)?.desc ?? "";
+  const { speedLabel, speedDesc } = useMemo(
+    () => {
+      const opt = SPEED_OPTIONS.find((o) => o.value === speed);
+      return { speedLabel: opt?.label ?? `${speed}`, speedDesc: opt?.desc ?? "" };
+    },
+    [speed]
+  );
+
+  // ── Hourly production bars data (extracted from IIFE) ───────────────────────
+  const hourlyBars = useMemo(() => {
+    const hourMap: Record<string, number> = {};
+    for (const st of states) {
+      for (const [hour, count] of Object.entries(st.hourlyOutput)) {
+        hourMap[hour] = (hourMap[hour] ?? 0) + count;
+      }
+    }
+    const hours = Object.keys(hourMap).sort();
+    const maxHourly = Math.max(1, ...Object.values(hourMap));
+    return { hourMap, hours, maxHourly };
+  }, [states]);
 
   // ── Render ──────────────────────────────────────────────────────────────────
 
@@ -214,25 +222,48 @@ export default function SimPage() {
             </div>
           </div>
           <nav className="flex-1 py-4 text-sm font-medium uppercase tracking-widest overflow-y-auto">
-            {SIDE_NAV.map((item) => (
-              <a key={item.label} className="flex items-center space-x-3 text-[#e1e2ec]/50 px-4 py-3 hover:bg-surface-high/50 hover:text-accent transition-all cursor-default">
-                <span className="material-symbols-outlined">{item.icon}</span>
-                <span>{item.label}</span>
-              </a>
-            ))}
+            {SIDE_NAV.map((item) => {
+              const isActive = pathname === item.href;
+              return (
+                <Link
+                  key={item.label}
+                  href={item.href ?? "#"}
+                  title={item.href ? undefined : "Coming Soon"}
+                  className={`flex items-center space-x-3 px-4 py-3 ${
+                    isActive
+                      ? "text-accent bg-surface-high border-l-4 border-accent"
+                      : item.href
+                        ? "text-[#e1e2ec]/40 hover:bg-surface-high/50 hover:text-[#e1e2ec] border-l-4 border-transparent transition-colors"
+                        : "text-[#e1e2ec]/15 cursor-not-allowed select-none border-l-4 border-transparent"
+                  }`}
+                >
+                  <span className="material-symbols-outlined">{item.icon}</span>
+                  <span>{item.label}</span>
+                </Link>
+              );
+            })}
           </nav>
           <div className="p-4 border-t border-border/10">
-            <button className="w-full bg-status-red/80 text-white py-3 rounded-sm font-bold uppercase tracking-widest text-xs flex items-center justify-center gap-2 hover:brightness-110 active:scale-[0.98] transition-all cursor-pointer border-none">
+            <button
+              title="Coming Soon"
+              className="w-full bg-[#93000a]/60 text-[#ffdad6]/40 py-3 rounded-sm font-bold uppercase tracking-widest text-xs flex items-center justify-center gap-2 cursor-not-allowed pointer-events-none select-none border-none"
+            >
               <span className="material-symbols-outlined text-sm">emergency</span>
               Emergency Stop
             </button>
           </div>
           <div className="pb-6 px-4 space-y-1">
-            <a className="flex items-center space-x-3 text-[#e1e2ec]/30 px-4 py-2 hover:text-[#e1e2ec] text-[11px] cursor-default">
+            <a
+              title="Coming Soon"
+              className="flex items-center space-x-3 text-[#e1e2ec]/15 px-4 py-2 text-[11px] cursor-not-allowed select-none"
+            >
               <span className="material-symbols-outlined text-sm">help_center</span>
               <span>Support</span>
             </a>
-            <a className="flex items-center space-x-3 text-[#e1e2ec]/30 px-4 py-2 hover:text-[#e1e2ec] text-[11px] cursor-default">
+            <a
+              title="Coming Soon"
+              className="flex items-center space-x-3 text-[#e1e2ec]/15 px-4 py-2 text-[11px] cursor-not-allowed select-none"
+            >
               <span className="material-symbols-outlined text-sm">history_edu</span>
               <span>Logs</span>
             </a>
@@ -409,8 +440,8 @@ export default function SimPage() {
                     </span>
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {LINES.map(({ lineId, label, vs }) => {
-                      const st = stateMap.get(lineId);
+                    {LINES.map(({ id, name, valueStream }) => {
+                      const st = stateMap.get(id);
                       if (!st?.schedule) return null;
                       const pct = st.schedule.totalTarget > 0
                         ? Math.round((st.totalOutput / st.schedule.totalTarget) * 100)
@@ -422,12 +453,12 @@ export default function SimPage() {
                       const statusTextColor = isComplete ? "text-status-green" : isBehind ? "text-status-amber" : "text-accent";
 
                       return (
-                        <div key={lineId} className="bg-surface-low p-5 rounded-sm border border-border/5 hover:border-accent/20 transition-all group relative">
+                        <div key={id} className="bg-surface-low p-5 rounded-sm border border-border/5 hover:border-accent/20 transition-all group relative">
                           <div className={`absolute top-0 left-0 w-1 h-full ${statusColor}`} />
                           <div className="flex justify-between items-start mb-4">
                             <div>
                               <h4 className="font-['Space_Grotesk',sans-serif] font-bold leading-none mb-1">
-                                {vs} · {label}
+                                {valueStream} · {name}
                               </h4>
                               <p className="text-[10px] text-[#e1e2ec]/40 uppercase tracking-widest">
                                 Order: {st.currentOrder ?? "Complete"}
@@ -487,33 +518,19 @@ export default function SimPage() {
                     Hourly Production
                   </h3>
                   <div className="space-y-4">
-                    {(() => {
-                      // Aggregate all lines' hourly output
-                      const hourMap: Record<string, number> = {};
-                      for (const st of states) {
-                        for (const [hour, count] of Object.entries(st.hourlyOutput)) {
-                          hourMap[hour] = (hourMap[hour] ?? 0) + count;
-                        }
-                      }
-                      const hours = Object.keys(hourMap).sort();
-                      const maxHourly = Math.max(...Object.values(hourMap), 1);
-
-                      if (hours.length === 0) {
-                        return (
-                          <p className="text-[10px] text-[#e1e2ec]/30 text-center py-4">
-                            No output yet — start the simulation.
-                          </p>
-                        );
-                      }
-
-                      return hours.map((hour, i) => {
-                        const actual = hourMap[hour];
-                        const pct = Math.round((actual / maxHourly) * 100);
+                    {hourlyBars.hours.length === 0 ? (
+                      <p className="text-[10px] text-[#e1e2ec]/30 text-center py-4">
+                        No output yet — start the simulation.
+                      </p>
+                    ) : (
+                      hourlyBars.hours.map((hour, i) => {
+                        const actual = hourlyBars.hourMap[hour];
+                        const pct = Math.round((actual / hourlyBars.maxHourly) * 100);
                         const nextHour = String((parseInt(hour) + 1) % 24).padStart(2, "0") + ":00";
-                        const isCurrent = i === hours.length - 1 && running;
+                        const isCurrent = i === hourlyBars.hours.length - 1 && running;
 
                         return (
-                          <div key={hour} className={`relative ${!isCurrent && i < hours.length - 1 ? "" : ""}`}>
+                          <div key={hour} className="relative">
                             <div className="flex items-center justify-between text-[10px] font-bold uppercase mb-2">
                               <span className="text-[#e1e2ec]/40">
                                 {hour} – {nextHour}
@@ -535,8 +552,8 @@ export default function SimPage() {
                             </div>
                           </div>
                         );
-                      });
-                    })()}
+                      })
+                    )}
                   </div>
 
                   {totalTarget > 0 && (

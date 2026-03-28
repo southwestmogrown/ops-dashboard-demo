@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
-import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { usePathname, useRouter } from "next/navigation";
 import { ShiftMetrics, ShiftName } from "@/lib/types";
 import type { AdminLineConfig, LineState } from "@/lib/mesTypes";
 import { getShiftProgress } from "@/lib/shiftTime";
@@ -26,7 +27,6 @@ const LineDrawer = dynamic(() => import("@/components/LineDrawer"), {
 // ── Sidebar nav items ─────────────────────────────────────────────────────────
 
 const SIDE_NAV = [
-  { icon: "factory", label: "Assembly Lines" },
   { icon: "inventory_2", label: "Inventory" },
   { icon: "verified", label: "Quality Control" },
   { icon: "build", label: "Maintenance" },
@@ -87,6 +87,7 @@ function ErrorScreen({
 // ── Component ────────────────────────────────────────────────────────────────
 
 export default function Home() {
+  const pathname = usePathname();
   const { role } = useAuth();
   const router = useRouter();
   const [metrics, setMetrics] = useState<ShiftMetrics | null>(null);
@@ -229,19 +230,38 @@ export default function Home() {
           {/* Nav */}
           <nav className="flex-1 py-4">
             <div className="space-y-1">
-              {/* Dashboard — active */}
-              <div className="flex items-center space-x-3 bg-surface-high text-accent border-l-4 border-accent px-4 py-3 font-['Inter',sans-serif] text-sm font-medium uppercase tracking-widest">
-                <span className="material-symbols-outlined text-[18px]">
-                  dashboard
-                </span>
+              {/* Dashboard */}
+              <Link
+                href="/"
+                className={`flex items-center space-x-3 px-4 py-3 font-['Inter',sans-serif] text-sm font-medium uppercase tracking-widest transition-colors ${
+                  pathname === "/"
+                    ? "bg-surface-high text-accent border-l-4 border-accent"
+                    : "text-[#e1e2ec]/40 hover:bg-surface-high/50 hover:text-[#e1e2ec] border-l-4 border-transparent"
+                }`}
+              >
+                <span className="material-symbols-outlined text-[18px]">dashboard</span>
                 <span>Dashboard</span>
-              </div>
+              </Link>
+
+              {/* Admin */}
+              <Link
+                href="/admin"
+                className={`flex items-center space-x-3 px-4 py-3 font-['Inter',sans-serif] text-sm font-medium uppercase tracking-widest transition-colors ${
+                  pathname === "/admin"
+                    ? "bg-surface-high text-accent border-l-4 border-accent"
+                    : "text-[#e1e2ec]/40 hover:bg-surface-high/50 hover:text-[#e1e2ec] border-l-4 border-transparent"
+                }`}
+              >
+                <span className="material-symbols-outlined text-[18px]">factory</span>
+                <span>Admin</span>
+              </Link>
 
               {/* Decorative nav items */}
               {SIDE_NAV.map(({ icon, label }) => (
                 <div
                   key={label}
-                  className="flex items-center space-x-3 text-[#e1e2ec]/40 px-4 py-3 hover:bg-surface-high/50 font-['Inter',sans-serif] text-sm font-medium uppercase tracking-widest hover:text-accent transition-all cursor-default"
+                  title="Coming Soon"
+                  className="flex items-center space-x-3 text-[#e1e2ec]/15 px-4 py-3 font-['Inter',sans-serif] text-sm font-medium uppercase tracking-widest cursor-not-allowed select-none border-l-4 border-transparent"
                 >
                   <span className="material-symbols-outlined text-[18px]">
                     {icon}
@@ -261,7 +281,10 @@ export default function Home() {
               <span>Emergency Stop</span>
             </div>
             <div className="mt-4 grid grid-cols-2 gap-2">
-              <button className="flex flex-col items-center py-2 text-[#e1e2ec]/30 hover:text-[#e1e2ec]/60 transition-colors">
+              <button
+                title="Coming Soon"
+                className="flex flex-col items-center py-2 text-[#e1e2ec]/15 cursor-not-allowed"
+              >
                 <span className="material-symbols-outlined text-[18px]">
                   help_center
                 </span>
@@ -269,7 +292,10 @@ export default function Home() {
                   SUPPORT
                 </span>
               </button>
-              <button className="flex flex-col items-center py-2 text-[#e1e2ec]/30 hover:text-[#e1e2ec]/60 transition-colors">
+              <button
+                title="Coming Soon"
+                className="flex flex-col items-center py-2 text-[#e1e2ec]/15 cursor-not-allowed"
+              >
                 <span className="material-symbols-outlined text-[18px]">
                   history_edu
                 </span>
@@ -366,7 +392,6 @@ export default function Home() {
 
       <LineDrawer
         line={selectedLine}
-        trend={metrics!.trend}
         mesState={selectedLine ? (lineStateMap.get(selectedLine.id) ?? null) : null}
         shiftProgress={shiftProgress}
         onClose={closeDrawer}

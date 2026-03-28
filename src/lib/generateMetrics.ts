@@ -1,4 +1,5 @@
 import { Line, ShiftMetrics, ShiftName, TimePoint } from "./types";
+import { getShiftWindows } from "./shiftTime";
 
 // Mulberry32 — a fast, seedable pseudo-random number generator.
 // Returns a function that, when called, produces the next number
@@ -27,9 +28,11 @@ const SHIFT_SEEDS: Record<ShiftName, number> = {
   night: 3003,
 };
 
-// Line definitions. id is unique across the whole dashboard.
-// valueStream and name are for display only.
-const LINE_DEFINITIONS = [
+/**
+ * Full line roster in canonical shape (matches `Line` type fields).
+ * Exported so src/lib/lines.ts can re-export without circular deps.
+ */
+export const LINE_DEFS: Pick<Line, "id" | "name" | "valueStream">[] = [
   { id: "vs1-l1", name: "Line 1", valueStream: "VS1" },
   { id: "vs1-l2", name: "Line 2", valueStream: "VS1" },
   { id: "vs1-l3", name: "Line 3", valueStream: "VS1" },
@@ -37,6 +40,12 @@ const LINE_DEFINITIONS = [
   { id: "vs2-l1", name: "Line 1", valueStream: "VS2" },
   { id: "vs2-l2", name: "Line 2", valueStream: "VS2" },
 ];
+
+/**
+ * Re-exported at src/lib/lines.ts as the canonical `LINES` constant.
+ * Callers should import from `src/lib/lines.ts`, not here.
+ */
+export { LINE_DEFS as LINES };
 
 // Generates a full ShiftMetrics payload.
 // If overrideSeed is provided (from DEMO_SEED env var), it takes
@@ -49,7 +58,7 @@ export function generateMetrics(
   const rng = createRng(seed);
 
   // Generate per-line metrics
-  const lines: Line[] = LINE_DEFINITIONS.map((def) => {
+  const lines: Line[] = LINE_DEFS.map((def) => {
     const target = Math.round(randBetween(rng, 180, 240));
     const outputPct = randBetween(rng, 0.55, 0.95); // how far through the shift target
     const output = Math.round(target * outputPct);
@@ -71,22 +80,19 @@ export function generateMetrics(
   const INTERVALS = 16;
   const trend: TimePoint[] = [];
 
-  // Shift start hours for the x-axis labels
-  const startHour: Record<ShiftName, number> = {
-    day: 6,
-    night: 17,
-  };
+  // Shift start hour for the x-axis labels (canonical — from shiftTime.ts)
+  const startHour = getShiftWindows(shift).startHour;
 
   let vs1Cumulative = 0;
   let vs2Cumulative = 0;
 
   for (let i = 0; i < INTERVALS; i++) {
-    const totalMinutes = startHour[shift] * 60 + i * 30;
+    const totalMinutes = startHour * 60 + i * 30;
     const hours = Math.floor(totalMinutes / 60) % 24;
     const minutes = totalMinutes % 60;
     const time = `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
 
-    // VS1 has 3 lines, VS2 has 2 — scale the per-interval output accordingly
+    // VS1 has 4 lines, VS2 has 2 — scale the per-interval output accordingly
     vs1Cumulative += Math.round(randBetween(rng, 18, 32));
     vs2Cumulative += Math.round(randBetween(rng, 12, 22));
 

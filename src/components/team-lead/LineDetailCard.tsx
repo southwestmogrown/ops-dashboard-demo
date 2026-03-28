@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { Line, ShiftName } from "@/lib/types";
 import type { LineState } from "@/lib/mesTypes";
 import type { ShiftProgress } from "@/lib/shiftTime";
@@ -40,15 +40,17 @@ export default function LineDetailCard({
 }: LineDetailCardProps) {
   const [showScrapForm, setShowScrapForm] = useState(false);
 
-  const orderPct = mesState?.schedule
-    ? Math.min(100, Math.round(
-        (mesState.schedule.items.reduce((s, i) => s + i.completed, 0) / mesState.schedule.totalTarget) * 100
-      ))
-    : 0;
+  // Single pass over schedule items — avoids double-reduce over the same array
+  const { orderPct, completed } = useMemo(() => {
+    if (!mesState?.schedule) return { orderPct: 0, completed: 0 };
+    const completed = mesState.schedule.items.reduce((s, i) => s + i.completed, 0);
+    const orderPct = Math.min(100, Math.round((completed / mesState.schedule!.totalTarget) * 100));
+    return { orderPct, completed };
+  }, [mesState?.schedule]);
 
-  const completed = mesState?.schedule
-    ? mesState.schedule.items.reduce((s, i) => s + i.completed, 0)
-    : 0;
+  const handleScrapCreated = useCallback(() => {
+    onRefreshScrap();
+  }, [onRefreshScrap]);
 
   return (
     <div className="space-y-6">
@@ -210,9 +212,7 @@ export default function LineDetailCard({
           lineId={line.id}
           shift={shift}
           onClose={() => setShowScrapForm(false)}
-          onCreated={() => {
-            onRefreshScrap();
-          }}
+          onCreated={handleScrapCreated}
         />
       )}
     </div>

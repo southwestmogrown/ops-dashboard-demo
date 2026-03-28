@@ -242,7 +242,8 @@ export default function EOSPage() {
             {SIDE_NAV.map(({ icon, label }) => (
               <div
                 key={label}
-                className="flex items-center space-x-3 text-[#e1e2ec]/40 px-4 py-3 hover:bg-surface-high/50 font-['Inter',sans-serif] text-sm font-medium uppercase tracking-widest hover:text-accent transition-all cursor-default"
+                title="Coming Soon"
+                className="flex items-center space-x-3 text-[#e1e2ec]/15 px-4 py-3 font-['Inter',sans-serif] text-sm font-medium uppercase tracking-widest cursor-not-allowed select-none"
               >
                 <span className="material-symbols-outlined text-[18px]">{icon}</span>
                 <span>{label}</span>
@@ -258,11 +259,17 @@ export default function EOSPage() {
           </div>
 
           <div className="p-2 border-t border-border space-y-1">
-            <div className="flex items-center space-x-3 text-[#e1e2ec]/30 px-4 py-2 text-xs">
+            <div
+              title="Coming Soon"
+              className="flex items-center space-x-3 text-[#e1e2ec]/15 px-4 py-2 text-xs cursor-not-allowed select-none"
+            >
               <span className="material-symbols-outlined text-sm">help_center</span>
               <span>Support</span>
             </div>
-            <div className="flex items-center space-x-3 text-[#e1e2ec]/30 px-4 py-2 text-xs">
+            <div
+              title="Coming Soon"
+              className="flex items-center space-x-3 text-[#e1e2ec]/15 px-4 py-2 text-xs cursor-not-allowed select-none"
+            >
               <span className="material-symbols-outlined text-sm">history_edu</span>
               <span>Logs</span>
             </div>
@@ -309,10 +316,11 @@ export default function EOSPage() {
                     const body = document.querySelector("#eos-email-body")?.textContent ?? "";
                     navigator.clipboard.writeText(body);
                   }}
+                  title="Copies email body to clipboard"
                   className="px-6 py-2.5 bg-accent text-black rounded-sm hover:bg-orange-500 transition-colors flex items-center gap-2 text-xs font-bold uppercase tracking-wider active:scale-95"
                 >
-                  <span className="material-symbols-outlined text-sm">send</span>
-                  Send Email
+                  <span className="material-symbols-outlined text-sm">content_copy</span>
+                  Copy Email
                 </button>
               </div>
             </section>

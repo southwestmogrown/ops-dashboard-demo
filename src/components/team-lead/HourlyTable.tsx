@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useRef } from "react";
+import { memo, useCallback, useMemo, useRef } from "react";
 import type { HourlyTargetRow } from "@/lib/shiftBreaks";
 
 interface HourlyTableProps {
@@ -9,7 +9,7 @@ interface HourlyTableProps {
   onSaveComment: (hour: string, comment: string) => void;
 }
 
-function CommentInput({
+const CommentInput = memo(function CommentInput({
   hour,
   value,
   onSave,
@@ -32,19 +32,20 @@ function CommentInput({
 
   return (
     <input
-      defaultValue={value}
+      value={value}
       placeholder="Add comment..."
       onChange={handleChange}
       className="w-full bg-transparent border-none text-xs text-[#e1e2ec]/60 focus:ring-0 p-0 outline-none placeholder:text-[#e1e2ec]/20"
       type="text"
     />
   );
-}
+});
 
 export default function HourlyTable({ rows, comments, onSaveComment }: HourlyTableProps) {
-  const totalVariance = rows
-    .filter((r) => !r.isBreak && r.actual > 0)
-    .reduce((sum, r) => sum + r.variance, 0);
+  const totalVariance = useMemo(
+    () => rows.filter((r) => !r.isBreak && r.actual > 0).reduce((sum, r) => sum + r.variance, 0),
+    [rows]
+  );
 
   return (
     <div className="bg-surface-low border border-border/40 overflow-hidden">

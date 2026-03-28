@@ -12,7 +12,7 @@ interface AdminLineCardProps {
   savedHeadcount: number | undefined;
   savedIsRunning: boolean | undefined;
   skippedItems: RunSheetItem[];
-  onScheduleLoaded: (lineId: string, schedule: LineSchedule) => void;
+  onScheduleLoaded: (lineId: string, schedule: LineSchedule) => Promise<void>;
   onConfigSaved: (lineId: string, target: number | undefined, headcount: number | undefined, isRunning: boolean) => void;
   onRemoveQueued: (lineId: string, index: number) => void;
   onClearSchedule: (lineId: string) => void;
@@ -34,6 +34,8 @@ export default function AdminLineCard({
   const [loadedFlash, setLoadedFlash] = useState(false);
   const [queueOpen, setQueueOpen] = useState(false);
   const [skippedOpen, setSkippedOpen] = useState(false);
+  /** Schedule parsed from the latest PDF drop, shown immediately while the API round-trips */
+  const [pendingSchedule, setPendingSchedule] = useState<LineSchedule | null>(null);
 
   const [target, setTarget] = useState(savedTarget !== undefined ? String(savedTarget) : "");
   const [headcount, setHeadcount] = useState(savedHeadcount !== undefined ? String(savedHeadcount) : "");
@@ -48,9 +50,17 @@ export default function AdminLineCard({
       const { parseRunSheet } = await import("@/lib/pdfParser");
       const s = await parseRunSheet(file, lineId);
       if (s.items.length === 0) { setParseError("No orders found"); return; }
-      onScheduleLoaded(lineId, s);
+      // Show preview immediately — the API call is just persistence
+      setPendingSchedule(s);
       setLoadedFlash(true);
       setTimeout(() => setLoadedFlash(false), 1500);
+      // POST to API in the background; refresh() will pick up the canonical state
+      try {
+        await onScheduleLoaded(lineId, s);
+      } catch {
+        setParseError("Failed to save schedule — please retry");
+        setPendingSchedule(null);
+      }
     } catch (e) {
       setParseError(e instanceof Error ? e.message : "Parse failed");
     } finally {
@@ -73,14 +83,23 @@ export default function AdminLineCard({
     setTimeout(() => setSaved(false), 1500);
   }
 
-  const pct = schedule
+  // Prefer pending (just-parsed) over persisted schedule; clear pending once server confirms
+  const activeSchedule = pendingSchedule !== null ? pendingSchedule : schedule;
+
+  // Clear pending once the server-confirmed schedule catches up to what we're showing
+  const serverConfirmed = schedule !== null && pendingSchedule !== null &&
+    schedule.lineId === pendingSchedule.lineId &&
+    schedule.date === pendingSchedule.date;
+  if (serverConfirmed) setPendingSchedule(null);
+
+  const pct = activeSchedule
     ? Math.round(
-        (schedule.items.reduce((s, i) => s + i.completed, 0) / schedule.totalTarget) * 100
+        (activeSchedule.items.reduce((s, i) => s + i.completed, 0) / activeSchedule.totalTarget) * 100
       )
     : 0;
 
   const queuedCount = queuedSchedules.length;
-  const hasSchedule = schedule !== null;
+  const hasSchedule = activeSchedule !== null;
   const statusLabel = hasSchedule ? (queuedCount > 0 ? `QUEUED (${queuedCount})` : "ACTIVE") : "IDLE";
 
   return (
@@ -212,7 +231,7 @@ export default function AdminLineCard({
             <div className="flex items-center justify-between mb-4 pb-2 border-b border-border/40">
               <span className="text-[10px] uppercase font-black tracking-widest">RunSheet Preview</span>
               <span className="text-[10px] text-[#e1e2ec]/40">
-                {schedule.items.filter(i => !i.skipped).length} BATCHES PENDING
+                {activeSchedule.items.filter(i => !i.skipped).length} BATCHES PENDING
               </span>
             </div>
 
@@ -228,14 +247,14 @@ export default function AdminLineCard({
                 />
               </div>
               <div className="flex justify-between text-[10px] text-[#e1e2ec]/40">
-                <span>{schedule.totalTarget} units</span>
+                <span>{activeSchedule.totalTarget} units</span>
                 <span className="font-bold">{pct}%</span>
               </div>
             </div>
 
             {/* Items */}
             <div className="space-y-2 overflow-y-auto max-h-[160px] pr-1 flex-1">
-              {schedule.items
+              {activeSchedule.items
                 .filter((item) => !item.skipped)
                 .map((item) => {
                   const done = item.completed >= item.qty;
@@ -338,7 +357,7 @@ export default function AdminLineCard({
                 Load PDF
               </button>
               <button
-                onClick={() => onClearSchedule(lineId)}
+                onClick={() => { setPendingSchedule(null); onClearSchedule(lineId); }}
                 className="flex-1 text-[10px] text-status-red/60 hover:text-status-red bg-surface/30 hover:bg-status-red/10 transition-colors py-2 rounded-sm font-bold uppercase tracking-widest"
               >
                 Clear

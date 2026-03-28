@@ -7,7 +7,6 @@ import type { LineState } from "@/lib/mesTypes";
 import type { ScrapEntry, ScrapStats } from "@/lib/reworkTypes";
 import { getHourlyTargets } from "@/lib/shiftBreaks";
 import { getShiftProgress } from "@/lib/shiftTime";
-import { getOutputColor } from "@/lib/status";
 import LineDetailCard from "@/components/team-lead/LineDetailCard";
 
 export default function TeamLeadPage() {
@@ -31,9 +30,9 @@ export default function TeamLeadPage() {
     ]);
     if (metricsRes.ok) {
       const data: ShiftMetrics = await metricsRes.json();
-      const snapshot = JSON.stringify(data);
-      if (snapshot !== prevDataRef.current) {
-        prevDataRef.current = snapshot;
+      // Use generatedAt timestamp as a cheap change detector instead of JSON.stringify
+      if (data.generatedAt !== prevDataRef.current) {
+        prevDataRef.current = data.generatedAt;
         setMetrics(data);
       }
     }
@@ -79,18 +78,22 @@ export default function TeamLeadPage() {
     fetch(`/api/scrap?lineId=${selectedLineId}&shift=${shift}`)
       .then((r) => r.json())
       .then((data: ScrapEntry[]) => setScrapEntries(data));
-  }, [selectedLineId, shift]);
+  }, [selectedLineId]);
 
-  const scrapStats: ScrapStats = {
-    kickedLids: scrapEntries.filter((e) => e.kind === "kicked-lid").length,
-    scrappedPanels: scrapEntries.filter((e) => e.kind === "scrapped-panel").length,
-    totalBoughtIn: scrapEntries.filter((e) => e.boughtIn).length,
-  };
+  const scrapStats = useMemo<ScrapStats>(() => {
+    let kickedLids = 0, scrappedPanels = 0, totalBoughtIn = 0;
+    for (const e of scrapEntries) {
+      if (e.kind === "kicked-lid") kickedLids++;
+      else if (e.kind === "scrapped-panel") scrappedPanels++;
+      if (e.boughtIn) totalBoughtIn++;
+    }
+    return { kickedLids, scrappedPanels, totalBoughtIn };
+  }, [scrapEntries]);
 
   useEffect(() => {
     if (!selectedLineId) return;
     refreshScrap();
-  }, [selectedLineId, shift]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [selectedLineId, shift, refreshScrap]);
 
   const { lines, selectedLine, selectedMesState } = useMemo(() => {
     if (!metrics) return { lines: [], selectedLine: null, selectedMesState: null };
@@ -119,23 +122,18 @@ export default function TeamLeadPage() {
     [mesStates]
   );
 
-  if (isLoading || !metrics) {
-    return (
-      <div className="h-screen flex flex-col overflow-hidden bg-background text-[#e1e2ec]">
-        <div className="flex-1 flex items-center justify-center">
-          <div className="text-[#e1e2ec]/40 text-sm">Loading...</div>
-        </div>
-      </div>
-    );
-  }
-
   const shiftProgress = getShiftProgress(shift, simClock ?? new Date());
 
-  const filteredLines = lines.filter((l) => {
-    if (!filter) return true;
+  const filteredLines = useMemo(() => {
+    if (!filter) return lines;
     const q = filter.toLowerCase();
-    return l.name.toLowerCase().includes(q) || l.valueStream.toLowerCase().includes(q) || l.id.toLowerCase().includes(q);
-  });
+    return lines.filter(
+      (l) =>
+        l.name.toLowerCase().includes(q) ||
+        l.valueStream.toLowerCase().includes(q) ||
+        l.id.toLowerCase().includes(q)
+    );
+  }, [lines, filter]);
 
   function getLineStatus(lineId: string) {
     const state = stateMap.get(lineId);
@@ -148,6 +146,11 @@ export default function TeamLeadPage() {
 
   return (
     <div className="h-screen flex flex-col overflow-hidden bg-background text-[#e1e2ec]">
+      {isLoading && (
+        <div className="absolute inset-0 z-[100] flex items-center justify-center bg-background/80">
+          <div className="text-[#e1e2ec]/40 text-sm">Loading...</div>
+        </div>
+      )}
 
       {/* ── Top Nav ── */}
       <nav className="shrink-0 z-50 bg-background border-b border-border font-['Space_Grotesk',sans-serif] tracking-tight">

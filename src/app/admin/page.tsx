@@ -4,18 +4,10 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import type { AdminLineConfig, LineSchedule, LineState } from "@/lib/mesTypes";
+import { LINES, LINE_ADMIN_LABELS } from "@/lib/lines";
 import AdminLayout from "@/components/admin/AdminLayout";
 
 const AdminLineCard = dynamic(() => import("@/components/admin/AdminLineCard"), { ssr: false });
-
-const LINES: { lineId: string; label: string; vs: string }[] = [
-  { lineId: "vs1-l1", label: "LINE_01", vs: "vs1" },
-  { lineId: "vs1-l2", label: "LINE_02", vs: "vs1" },
-  { lineId: "vs1-l3", label: "LINE_03", vs: "vs1" },
-  { lineId: "vs1-l4", label: "LINE_04", vs: "vs1" },
-  { lineId: "vs2-l1", label: "LINE_05", vs: "vs2" },
-  { lineId: "vs2-l2", label: "LINE_06", vs: "vs2" },
-];
 
 const SIDE_NAV = [
   { icon: "inventory_2", label: "Inventory" },
@@ -184,7 +176,8 @@ function AdminPageContent() {
               {SIDE_NAV.map(({ icon, label }) => (
                 <div
                   key={label}
-                  className="flex items-center space-x-3 text-[#e1e2ec]/40 px-4 py-3 hover:bg-surface-high/50 font-['Inter',sans-serif] text-sm font-medium uppercase tracking-widest hover:text-accent transition-all cursor-default"
+                  title="Coming Soon"
+                  className="flex items-center space-x-3 text-[#e1e2ec]/15 px-4 py-3 font-['Inter',sans-serif] text-sm font-medium uppercase tracking-widest cursor-not-allowed select-none"
                 >
                   <span className="material-symbols-outlined text-[18px]">{icon}</span>
                   <span>{label}</span>
@@ -199,11 +192,17 @@ function AdminPageContent() {
               <span>Emergency Stop</span>
             </div>
             <div className="mt-4 grid grid-cols-2 gap-2">
-              <button className="flex flex-col items-center py-2 text-[#e1e2ec]/30 hover:text-[#e1e2ec]/60 transition-colors">
+              <button
+                title="Coming Soon"
+                className="flex flex-col items-center py-2 text-[#e1e2ec]/15 cursor-not-allowed"
+              >
                 <span className="material-symbols-outlined text-[18px]">help_center</span>
                 <span className="text-[9px] mt-1 font-bold tracking-widest">SUPPORT</span>
               </button>
-              <button className="flex flex-col items-center py-2 text-[#e1e2ec]/30 hover:text-[#e1e2ec]/60 transition-colors">
+              <button
+                title="Coming Soon"
+                className="flex flex-col items-center py-2 text-[#e1e2ec]/15 cursor-not-allowed"
+              >
                 <span className="material-symbols-outlined text-[18px]">history_edu</span>
                 <span className="text-[9px] mt-1 font-bold tracking-widest">LOGS</span>
               </button>
@@ -244,17 +243,17 @@ function AdminPageContent() {
 
           {/* Bento Grid */}
           <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 mb-8">
-            {LINES.map(({ lineId, label }) => (
+            {LINES.map(({ id, valueStream }) => (
               <AdminLineCard
-                key={lineId}
-                lineId={lineId}
-                label={label}
-                schedule={stateFor(lineId)?.schedule ?? null}
-                queuedSchedules={stateFor(lineId)?.queue ?? []}
-                savedTarget={adminConfig[lineId]?.target}
-                savedHeadcount={adminConfig[lineId]?.headcount}
-                savedIsRunning={adminConfig[lineId]?.isRunning}
-                skippedItems={stateFor(lineId)?.skippedItems ?? []}
+                key={id}
+                lineId={id}
+                label={LINE_ADMIN_LABELS[id] ?? id}
+                schedule={stateFor(id)?.schedule ?? null}
+                queuedSchedules={stateFor(id)?.queue ?? []}
+                savedTarget={adminConfig[id]?.target}
+                savedHeadcount={adminConfig[id]?.headcount}
+                savedIsRunning={adminConfig[id]?.isRunning}
+                skippedItems={stateFor(id)?.skippedItems ?? []}
                 onScheduleLoaded={handleScheduleLoaded}
                 onConfigSaved={handleConfigSaved}
                 onRemoveQueued={handleRemoveQueued}
@@ -274,8 +273,11 @@ function AdminPageContent() {
               </p>
             </div>
             <div className="flex flex-col sm:flex-row gap-4">
-              <button className="flex-1 bg-gradient-to-br from-accent to-accent-muted text-black font-black py-4 rounded-sm shadow-lg active:scale-95 transition-all text-xs uppercase tracking-[0.2em] hover:opacity-90">
-                Save All Config
+              <button
+                title="Coming Soon"
+                className="flex-1 bg-surface-highest text-[#e1e2ec]/30 font-black py-4 rounded-sm text-xs uppercase tracking-[0.2em] cursor-not-allowed pointer-events-none select-none"
+              >
+                Save All Config (Coming Soon)
               </button>
               <button
                 onClick={handleResetAll}

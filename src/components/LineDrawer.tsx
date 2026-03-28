@@ -4,94 +4,24 @@ import { useEffect, useMemo } from "react";
 import {
   BarChart,
   Bar,
-  LineChart,
-  Line as RechartsLine,
   XAxis,
   YAxis,
   CartesianGrid,
   Tooltip,
-  ReferenceLine,
   ResponsiveContainer,
 } from "recharts";
-import { Line as LineData, TimePoint } from "@/lib/types";
+import { Line as LineData } from "@/lib/types";
 import type { LineState } from "@/lib/mesTypes";
 import type { ShiftProgress } from "@/lib/shiftTime";
 import { getFpyColor, getHpuColor, getPaceColor } from "@/lib/status";
 
 interface LineDrawerProps {
   line: LineData | null;
-  trend: TimePoint[];
   mesState: LineState | null;
   shiftProgress: ShiftProgress;
   onClose: () => void;
   /** Override clock time (from sim clock); falls back to real time */
   nowOverride?: Date | null;
-}
-
-// Mulberry32 seeded RNG — matches generateMetrics.ts so per-line data is stable
-function createRng(seed: number) {
-  let s = seed;
-  return () => {
-    s |= 0;
-    s = (s + 0x6d2b79f5) | 0;
-    let t = Math.imul(s ^ (s >>> 15), 1 | s);
-    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
-
-function hashSeed(str: string): number {
-  let h = 0;
-  for (let i = 0; i < str.length; i++) {
-    h = (Math.imul(31, h) + str.charCodeAt(i)) | 0;
-  }
-  return Math.abs(h);
-}
-
-type ChartPoint = {
-  time: string;
-  output: number;
-  fpy: number;
-  hpu: number;
-  isChangeover?: boolean;
-};
-
-function buildChartData(line: LineData, trend: TimePoint[]): ChartPoint[] {
-  const rng = createRng(hashSeed(line.id));
-  const linesInVs = line.valueStream === "VS1" ? 3 : 2;
-
-  const coIndices = new Set<number>();
-  if (line.changeovers > 0) {
-    const step = Math.floor(trend.length / (line.changeovers + 1));
-    for (let i = 0; i < line.changeovers; i++) {
-      const jitter = Math.floor(rng() * 3) - 1;
-      const idx = step * (i + 1) + jitter;
-      coIndices.add(Math.max(0, Math.min(trend.length - 1, idx)));
-    }
-  }
-
-  let prevVsOutput = 0;
-  return trend.map((point, i) => {
-    const vsOutput =
-      line.valueStream === "VS1" ? point.vs1Output : point.vs2Output;
-    const intervalDelta = vsOutput - prevVsOutput;
-    prevVsOutput = vsOutput;
-
-    const variation = 0.85 + rng() * 0.3;
-    const output = Math.max(0, Math.round((intervalDelta / linesInVs) * variation));
-
-    const fpyDelta = (rng() - 0.5) * 4;
-    const fpy = parseFloat(
-      Math.max(80, Math.min(100, line.fpy + fpyDelta)).toFixed(1)
-    );
-
-    const hpuDelta = (rng() - 0.5) * 0.1;
-    const hpu = parseFloat(
-      Math.max(0.2, Math.min(0.7, line.hpu + hpuDelta)).toFixed(2)
-    );
-
-    return { time: point.time, output, fpy, hpu, isChangeover: coIndices.has(i) };
-  });
 }
 
 function buildMesHourlyData(hourlyOutput: Record<string, number>) {
@@ -113,7 +43,6 @@ const tooltipStyle = {
 
 export default function LineDrawer({
   line,
-  trend,
   mesState,
   shiftProgress,
   onClose,
@@ -130,14 +59,14 @@ export default function LineDrawer({
     return () => window.removeEventListener("keydown", handler);
   }, [isOpen, onClose]);
 
-  const chartData = line && trend.length > 0 ? buildChartData(line, trend) : [];
-  const changeoverTimes = chartData.filter((d) => d.isChangeover).map((d) => d.time);
-
+  // Only show charts when MES has actual data — no mock fallbacks
+  const hasMesData = mesState && mesState.schedule !== null;
   const hasMesHourly =
     mesState && Object.keys(mesState.hourlyOutput).length > 0;
-  const hourlyBarData = hasMesHourly
-    ? buildMesHourlyData(mesState!.hourlyOutput)
-    : chartData.map(({ time, output }) => ({ time, output }));
+  const hourlyBarData = useMemo(
+    () => hasMesHourly ? buildMesHourlyData(mesState!.hourlyOutput) : [],
+    [hasMesHourly, mesState?.hourlyOutput]
+  );
 
   const linePace =
     shiftProgress.elapsedHours >= 0.25
@@ -178,7 +107,7 @@ export default function LineDrawer({
 
       {/* Slide-out glass panel */}
       <aside
-        className={`fixed top-0 right-0 h-full w-[480px] glass-panel z-50 flex flex-col transform transition-transform duration-300 ease-in-out ${
+        className={`fixed top-0 right-0 h-full w-[480px] glass-panel overflow-hidden z-50 flex flex-col transform transition-transform duration-300 ease-in-out ${
           isOpen ? "translate-x-0" : "translate-x-full"
         }`}
         role="dialog"
@@ -321,176 +250,100 @@ export default function LineDrawer({
               </div>
             )}
 
-            {/* Charts */}
-            <div className="flex flex-col gap-6 p-5 overflow-y-auto custom-scrollbar">
-              {/* Hourly output */}
-              <div>
-                <p className="text-[9px] font-black uppercase tracking-widest text-[#e1e2ec]/40 mb-3">
-                  Hourly Output
-                  {hasMesHourly ? (
-                    <span className="ml-2 text-accent/70 normal-case font-normal">
-                      · live MES
-                    </span>
-                  ) : (
-                    line.changeovers > 0 && (
-                      <span className="ml-2 text-status-amber normal-case font-normal">
-                        · amber lines = changeovers
+            {/* Charts — only shown when MES has loaded a schedule */}
+            {hasMesData ? (
+              <div className="flex flex-col gap-6 p-5 overflow-y-auto custom-scrollbar">
+                {/* Hourly output */}
+                <div>
+                  <p className="text-[9px] font-black uppercase tracking-widest text-[#e1e2ec]/40 mb-3">
+                    Hourly Output
+                    {hasMesHourly ? (
+                      <span className="ml-2 text-accent/70 normal-case font-normal">
+                        · live MES
                       </span>
-                    )
-                  )}
-                </p>
-                <ResponsiveContainer width="100%" height={160}>
-                  <BarChart
-                    data={hourlyBarData}
-                    margin={{ top: 4, right: 8, left: 0, bottom: 0 }}
-                  >
-                    <CartesianGrid
-                      strokeDasharray="3 3"
-                      stroke="#1e2433"
-                      vertical={false}
-                    />
-                    <XAxis
-                      dataKey="time"
-                      tick={{ fill: "#e1e2ec", fillOpacity: 0.4, fontSize: 10 }}
-                      axisLine={{ stroke: "#1e2433" }}
-                      tickLine={false}
-                      interval={hasMesHourly ? 0 : 3}
-                    />
-                    <YAxis
-                      tick={{ fill: "#e1e2ec", fillOpacity: 0.4, fontSize: 10 }}
-                      axisLine={false}
-                      tickLine={false}
-                      width={28}
-                    />
-                    <Tooltip
-                      cursor={{ fill: "rgba(255,255,255,0.03)" }}
-                      {...tooltipStyle}
-                    />
-                    {!hasMesHourly &&
-                      changeoverTimes.map((t) => (
-                        <ReferenceLine
-                          key={t}
-                          x={t}
-                          stroke="#f59e0b"
-                          strokeDasharray="4 2"
-                          label={{ value: "C/O", fill: "#f59e0b", fontSize: 9 }}
+                    ) : (
+                      <span className="ml-2 text-[#e1e2ec]/20 normal-case font-normal">
+                        · waiting for output...
+                      </span>
+                    )}
+                  </p>
+                  {hourlyBarData.length > 0 ? (
+                    <ResponsiveContainer width="100%" height={160}>
+                      <BarChart
+                        data={hourlyBarData}
+                        margin={{ top: 4, right: 8, left: 0, bottom: 0 }}
+                      >
+                        <CartesianGrid
+                          strokeDasharray="3 3"
+                          stroke="#1e2433"
+                          vertical={false}
                         />
-                      ))}
-                    <Bar
-                      dataKey="output"
-                      name="Output"
-                      fill="#f97316"
-                      radius={[2, 2, 0, 0]}
-                    />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
+                        <XAxis
+                          dataKey="time"
+                          tick={{ fill: "#e1e2ec", fillOpacity: 0.4, fontSize: 10 }}
+                          axisLine={{ stroke: "#1e2433" }}
+                          tickLine={false}
+                          interval={0}
+                        />
+                        <YAxis
+                          tick={{ fill: "#e1e2ec", fillOpacity: 0.4, fontSize: 10 }}
+                          axisLine={false}
+                          tickLine={false}
+                          width={28}
+                        />
+                        <Tooltip
+                          cursor={{ fill: "rgba(255,255,255,0.03)" }}
+                          {...tooltipStyle}
+                        />
+                        <Bar
+                          dataKey="output"
+                          name="Output"
+                          fill="#f97316"
+                          radius={[2, 2, 0, 0]}
+                        />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  ) : (
+                    <div className="h-40 flex items-center justify-center text-[#e1e2ec]/20 text-xs italic">
+                      No hourly output recorded yet
+                    </div>
+                  )}
+                </div>
 
-              {/* FPY trend */}
-              <div>
-                <p className="text-[9px] font-black uppercase tracking-widest text-[#e1e2ec]/40 mb-3">
-                  FPY Trend
-                </p>
-                <ResponsiveContainer width="100%" height={140}>
-                  <LineChart
-                    data={chartData}
-                    margin={{ top: 4, right: 8, left: 0, bottom: 0 }}
-                  >
-                    <CartesianGrid
-                      strokeDasharray="3 3"
-                      stroke="#1e2433"
-                      vertical={false}
-                    />
-                    <XAxis
-                      dataKey="time"
-                      tick={{ fill: "#e1e2ec", fillOpacity: 0.4, fontSize: 10 }}
-                      axisLine={{ stroke: "#1e2433" }}
-                      tickLine={false}
-                      interval={3}
-                    />
-                    <YAxis
-                      tick={{ fill: "#e1e2ec", fillOpacity: 0.4, fontSize: 10 }}
-                      axisLine={false}
-                      tickLine={false}
-                      width={36}
-                      domain={["auto", "auto"]}
-                      tickFormatter={(v: number) => `${v}%`}
-                    />
-                    <Tooltip
-                      {...tooltipStyle}
-                      formatter={(v) => [`${(v as number).toFixed(1)}%`, "FPY"]}
-                    />
-                    {changeoverTimes.map((t) => (
-                      <ReferenceLine
-                        key={t}
-                        x={t}
-                        stroke="#f59e0b"
-                        strokeDasharray="4 2"
-                      />
-                    ))}
-                    <RechartsLine
-                      type="monotone"
-                      dataKey="fpy"
-                      stroke="#22c55e"
-                      dot={false}
-                      strokeWidth={2}
-                    />
-                  </LineChart>
-                </ResponsiveContainer>
-              </div>
+                {/* FPY trend */}
+                <div>
+                  <p className="text-[9px] font-black uppercase tracking-widest text-[#e1e2ec]/40 mb-3">
+                    FPY Trend
+                    <span className="ml-2 text-vs2/60 normal-case font-normal">
+                      · from scan log
+                    </span>
+                  </p>
+                  <div className="h-8 flex items-center justify-center text-[#e1e2ec]/20 text-xs italic">
+                    Trend tracking — coming soon
+                  </div>
+                </div>
 
-              {/* HPU trend */}
-              <div>
-                <p className="text-[9px] font-black uppercase tracking-widest text-[#e1e2ec]/40 mb-3">
-                  HPU Trend
-                </p>
-                <ResponsiveContainer width="100%" height={140}>
-                  <LineChart
-                    data={chartData}
-                    margin={{ top: 4, right: 8, left: 0, bottom: 0 }}
-                  >
-                    <CartesianGrid
-                      strokeDasharray="3 3"
-                      stroke="#1e2433"
-                      vertical={false}
-                    />
-                    <XAxis
-                      dataKey="time"
-                      tick={{ fill: "#e1e2ec", fillOpacity: 0.4, fontSize: 10 }}
-                      axisLine={{ stroke: "#1e2433" }}
-                      tickLine={false}
-                      interval={3}
-                    />
-                    <YAxis
-                      tick={{ fill: "#e1e2ec", fillOpacity: 0.4, fontSize: 10 }}
-                      axisLine={false}
-                      tickLine={false}
-                      width={36}
-                      domain={["auto", "auto"]}
-                    />
-                    <Tooltip
-                      {...tooltipStyle}
-                      formatter={(v) => [(v as number).toFixed(2), "HPU"]}
-                    />
-                    {changeoverTimes.map((t) => (
-                      <ReferenceLine
-                        key={t}
-                        x={t}
-                        stroke="#f59e0b"
-                        strokeDasharray="4 2"
-                      />
-                    ))}
-                    <RechartsLine
-                      type="monotone"
-                      dataKey="hpu"
-                      stroke="#1d9e75"
-                      dot={false}
-                      strokeWidth={2}
-                    />
-                  </LineChart>
-                </ResponsiveContainer>
+                {/* HPU trend */}
+                <div>
+                  <p className="text-[9px] font-black uppercase tracking-widest text-[#e1e2ec]/40 mb-3">
+                    HPU Trend
+                    <span className="ml-2 text-vs2/60 normal-case font-normal">
+                      · from scan log
+                    </span>
+                  </p>
+                  <div className="h-8 flex items-center justify-center text-[#e1e2ec]/20 text-xs italic">
+                    Trend tracking — coming soon
+                  </div>
+                </div>
               </div>
-            </div>
+            ) : (
+              <div className="flex flex-col gap-3 p-8 items-center justify-center text-center">
+                <span className="material-symbols-outlined text-[#e1e2ec]/10 text-5xl">radio_button_unchecked</span>
+                <p className="text-sm text-[#e1e2ec]/30 max-w-xs">
+                  No MES schedule loaded. Start the simulator to see live production data.
+                </p>
+              </div>
+            )}
           </>
         )}
       </aside>

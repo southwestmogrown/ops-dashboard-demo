@@ -36,6 +36,27 @@ On mount/shift change, `refreshFromMes` now checks each line's MES state. If `!s
 
 ---
 
+### Milestone Status
+
+| Milestone | Status | Notes |
+|---|---|---|
+| M1: Auth Foundation | ✅ Done | PIN gate, role-based routing, middleware guards |
+| M2: Shift Breaks + Hourly Targets | ✅ Done | Correct shift windows, getHourlyTargets, editable breaks config |
+| M3: Comments Backend | ✅ Done | mesStore helpers, LineComments type, comments API route |
+| M4: Team Lead Page + HourlyTable | ✅ Done | LineDetailCard, HourlyTable with comments, polling page |
+| M5: Integration | ✅ Done | PinGate in layout, conditional nav, auth wired throughout |
+| M6: Scrap + Rework Logging | ✅ Done | Types, store helpers, scrap API, ScrapForm, ReworkPanel |
+| M7: SQLite Persistence | ✅ Done | better-sqlite3, db.ts layer, write-through persistence |
+| M8: Downtime / Line Stop Logging | 🔨 In Progress | Issues 8.1–8.3 done (types, DB helpers, API route). Issues 8.4–8.7 pending (DowntimePanel, DowntimeForm, wiring) |
+| M9: Real-Time Alerts | 🔲 Backlog | Not started |
+| M10: OEE Tracking | 🔲 Backlog | Not started |
+| M11: Shift Handoff | 🔲 Backlog | Not started |
+| M12: EOS Scrap Auto-Fill | 🔲 Backlog | Not started |
+
+---
+
+---
+
 Two features: (1) role-based access separating supervisors/managers (full admin) from team leads (single-line view), and (2) an hour-by-hour breakdown on the team lead view with per-hour comments for explaining misses.
 
 **Shift schedules:**
