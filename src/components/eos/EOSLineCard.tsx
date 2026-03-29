@@ -27,9 +27,9 @@ export default function EOSLineCard({ lineKey, vsId, line, vsName, data, onChang
   const hasOutput = Boolean(data.output);
   const outputNum = Number(data.output) || 0;
 
-  // Status bar color
+  // Status bar color — "LIVE" when line produced output, "STOPPED" otherwise
   const statusBarColor = hasOutput ? "bg-vs2" : "bg-border";
-  const statusLabel = hasOutput ? "Active" : "No Data";
+  const statusLabel = hasOutput ? "Live" : "Stopped";
   const statusCls = hasOutput
     ? "bg-vs2/10 text-vs2 border-vs2/20"
     : "bg-border/20 text-[#e1e2ec]/30 border-border";

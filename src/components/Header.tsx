@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Line, ShiftName } from "@/lib/types";
 import { useAuth } from "@/hooks/useAuth";
 import ExportButton from "./ExportButton";
+import { getShiftWindows, getShiftProgress, formatShiftTime } from "@/lib/shiftTime";
 
 interface HeaderProps {
   shift: ShiftName;
@@ -22,7 +23,6 @@ export default function Header({
   const { role, logout } = useAuth();
   const [simClock, setSimClock] = useState<Date | null>(null);
   const [now, setNow] = useState(new Date());
-  const simClockRef = useRef<Date | null>(null);
 
   // Poll sim clock every 5 s
   useEffect(() => {
@@ -32,7 +32,6 @@ export default function Header({
         if (res.ok) {
           const { clock } = await res.json();
           const parsed = clock ? new Date(clock) : null;
-          simClockRef.current = parsed;
           setSimClock(parsed);
         }
       } catch {
@@ -51,6 +50,29 @@ export default function Header({
   }, []);
 
   const displayTime = simClock ?? now;
+
+  // Shift clock derived from `now` (already ticking every second)
+  const win = getShiftWindows(shift);
+  const progress = getShiftProgress(shift, displayTime);
+
+  // Shift end clock time
+  const endHour = win.endHour;
+  const endH = endHour % 24;
+  const shiftEndTime = `${String(Math.floor(endH)).padStart(2, "0")}:${String(Math.round((endH % 1) * 60)).padStart(2, "0")}`;
+
+  // Break proximity — find next break start (in decimal hours from midnight)
+  function nextBreakHours(n: Date): number | null {
+    const cur = n.getHours() + n.getMinutes() / 60 + n.getSeconds() / 3600;
+    for (const b of win.breakWindows) {
+      if (b.start > cur) return b.start;
+    }
+    return null; // no more breaks
+  }
+
+  const nextBreak = nextBreakHours(displayTime);
+  const minutesToNextBreak = nextBreak != null ? Math.round((nextBreak - (displayTime.getHours() + displayTime.getMinutes() / 60 + displayTime.getSeconds() / 3600)) * 60) : null;
+  const isNearBreak = minutesToNextBreak != null && minutesToNextBreak <= 30 && minutesToNextBreak > 0;
+  const isNearEnd = progress.remainingHours <= 0.25;
 
   return (
     <header className="shrink-0 z-50 bg-background border-b border-border font-['Space_Grotesk',sans-serif] tracking-tight">
@@ -97,6 +119,27 @@ export default function Header({
               SIM
             </span>
           )}
+
+          {/* Shift clock */}
+          <div className="flex items-center space-x-2 px-3 py-1.5 bg-surface border border-border rounded-sm">
+            <div className="flex flex-col items-end">
+              <span className="text-[9px] uppercase tracking-widest text-[#e1e2ec]/40 font-bold leading-none">
+                Remaining
+              </span>
+              <span className={`text-sm font-medium font-mono leading-tight ${isNearEnd || isNearBreak ? 'text-status-amber animate-pulse' : 'text-[#e1e2ec]'}`}>
+                {formatShiftTime(progress.remainingHours)}
+              </span>
+            </div>
+            <div className="w-px h-8 bg-border" />
+            <div className="flex flex-col">
+              <span className="text-[9px] uppercase tracking-widest text-[#e1e2ec]/40 font-bold leading-none">
+                End
+              </span>
+              <span className={`text-sm font-medium font-mono leading-tight ${isNearEnd || isNearBreak ? 'text-status-amber animate-pulse' : 'text-[#e1e2ec]'}`}>
+                {shiftEndTime}
+              </span>
+            </div>
+          </div>
 
           {/* Shift + time pill */}
           <div className="flex items-center space-x-3 px-3 py-1.5 bg-surface border border-border rounded-sm">

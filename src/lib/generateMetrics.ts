@@ -73,6 +73,11 @@ export function generateMetrics(
       hpu: 0.0,
       headcount: Math.round(randBetween(rng, 6, 14)),
       changeovers: Math.round(randBetween(rng, 0, 3)),
+      // OEE fields populated by metrics API; defaults here for type completeness
+      oee: 0,
+      availability: 100,
+      performance: 100,
+      quality: 100,
     };
   });
 

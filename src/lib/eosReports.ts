@@ -8,9 +8,8 @@ export function calculateHPU(output: string, headcount: string, hoursWorked: str
   return ((h * w) / o).toFixed(2);
 }
 
-export function generateCSV(
+function generateEOSCSV(
   data: EOSFormData,
-  title: string,
   activeLines: EOSLineDescriptor[],
 ): string {
   const headers = [
@@ -27,11 +26,71 @@ export function generateCSV(
     ].join(",");
   });
   const meta = [
-    title,
+    "End of Shift Report",
     `Supervisor:,${data.supervisor}`,
     `Date:,${data.date}`,
     `Shift:,${data.shift}`,
-    `Notes:,${data.notes}`,
+    `Top Issue Today:,${data.notes.topIssueToday}`,
+    `Resolved During Shift:,${data.notes.resolvedDuringShift}`,
+    `Open Items Next Shift:,${data.notes.openItemsNextShift}`,
+    `Equipment Concerns:,${data.notes.equipmentConcerns}`,
+    `General Notes:,${data.notes.generalNotes}`,
+    "",
+  ];
+  return [...meta, headers.join(","), ...rows].join("\n");
+}
+
+function generateLineStatusCSV(
+  data: EOSFormData,
+  activeLines: EOSLineDescriptor[],
+): string {
+  const headers = ["Line", "Value Stream", "Output", "Target", "HPU", "Headcount", "Hours Worked", "Changeovers"];
+  const rows = activeLines.map(({ vsId, vsName, lineKey, line }) => {
+    const l = data.lines[lineKey];
+    const output = Number(l.output) || 0;
+    const target = vsId === "vs1" ? 225 : 200;
+    const pct = target > 0 ? Math.round((output / target) * 100) : 0;
+    return [
+      line, vsName, l.output || "—", target, l.hpu || "0",
+      l.headcount || "—", l.hoursWorked || "8", l.changeovers || "0",
+      `${pct}%`,
+    ].join(",");
+  });
+  const meta = [
+    "Line Status Summary",
+    `Date:,${data.date}`,
+    `Shift:,${data.shift}`,
+    "",
+  ];
+  return [...meta, headers.join(","), ...rows].join("\n");
+}
+
+function generateLocalCSV(
+  data: EOSFormData,
+  activeLines: EOSLineDescriptor[],
+): string {
+  // Same as EOS for now
+  return generateEOSCSV(data, activeLines);
+}
+
+function generatePrePostCSV(
+  data: EOSFormData,
+  activeLines: EOSLineDescriptor[],
+): string {
+  const headers = ["Line", "Output", "HPU", "Hours Worked", "Headcount", "Changeovers", "Remaining on Order", "Remaining on Run Sheet"];
+  const rows = activeLines.map(({ lineKey, line }) => {
+    const l = data.lines[lineKey];
+    return [
+      line, l.output || "—", l.hpu || "0", l.hoursWorked || "8",
+      l.headcount || "—", l.changeovers || "0",
+      l.remainingOnOrder || "—", l.remainingOnRunSheet || "—",
+    ].join(",");
+  });
+  const meta = [
+    "Pre-Post Shift Summary",
+    `Date:,${data.date}`,
+    `Shift:,${data.shift}`,
+    `Supervisor:,${data.supervisor}`,
     "",
   ];
   return [...meta, headers.join(","), ...rows].join("\n");
@@ -48,16 +107,10 @@ export function downloadCSV(content: string, filename: string): void {
 }
 
 export function downloadAllReports(data: EOSFormData, activeLines: EOSLineDescriptor[]): void {
-  const reports = [
-    { title: "End of Shift Report",   suffix: "EOS" },
-    { title: "Line Status Report",    suffix: "LineStatus" },
-    { title: "Local Report",          suffix: "Local" },
-    { title: "Pre-Post Shift Report", suffix: "PrePost" },
-  ];
-  reports.forEach(({ title, suffix }) => {
-    const csv = generateCSV(data, title, activeLines);
-    downloadCSV(csv, `BAK_${suffix}_${data.date}_${data.shift}.csv`);
-  });
+  downloadCSV(generateEOSCSV(data, activeLines), `BAK_EOS_${data.date}_${data.shift}.csv`);
+  downloadCSV(generateLineStatusCSV(data, activeLines), `BAK_LineStatus_${data.date}_${data.shift}.csv`);
+  downloadCSV(generateLocalCSV(data, activeLines), `BAK_Local_${data.date}_${data.shift}.csv`);
+  downloadCSV(generatePrePostCSV(data, activeLines), `BAK_PrePost_${data.date}_${data.shift}.csv`);
 }
 
 export function generateEmailBody(
@@ -70,10 +123,20 @@ export function generateEmailBody(
       const l = data.lines[lineKey];
       return `  ${line} (${vsName})
     Output: ${l.output || "—"}  |  HPU: ${l.hpu || "0"}
-    Headcount: ${l.headcount || "—"}  |  Hours Worked: ${l.hoursWorked || "10"}  |  Changeovers: ${l.changeovers || "—"}
+    Headcount: ${l.headcount || "—"}  |  Hours Worked: ${l.hoursWorked || "8"}  |  Changeovers: ${l.changeovers || "—"}
     Order @ Packout: ${l.orderAtPackout || "—"}  |  Remaining on Order: ${l.remainingOnOrder || "—"}  |  Remaining on Run Sheet: ${l.remainingOnRunSheet || "—"}`;
     })
     .join("\n\n");
+
+  const { topIssueToday, resolvedDuringShift, openItemsNextShift, equipmentConcerns, generalNotes } = data.notes;
+
+  const notesSections = [
+    topIssueToday ? `• Top Issue Today: ${topIssueToday}` : null,
+    resolvedDuringShift ? `• Resolved During Shift: ${resolvedDuringShift}` : null,
+    openItemsNextShift ? `• Open Items for Next Shift: ${openItemsNextShift}` : null,
+    equipmentConcerns ? `• Equipment Concerns: ${equipmentConcerns}` : null,
+    generalNotes ? `• General Notes: ${generalNotes}` : null,
+  ].filter(Boolean);
 
   const divider = "─".repeat(60);
   return `End of Shift Report (${streamName}) — ${data.shift} Shift | ${data.date}
@@ -85,8 +148,8 @@ LINE STATUS SUMMARY
 ${lineRows}
 
 ${divider}
-NOTES:
-${data.notes || "None"}
+OPERATIONAL SUMMARY
+${notesSections.length > 0 ? notesSections.join("\n") : "(no notes entered)"}
 
 ${divider}
 Reports attached: EOS Report | Line Status | Local Report | Pre/Post Shift

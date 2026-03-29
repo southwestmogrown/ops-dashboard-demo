@@ -6,12 +6,13 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { ShiftMetrics, ShiftName } from "@/lib/types";
 import type { AdminLineConfig, LineState } from "@/lib/mesTypes";
+import type { DowntimeEntry } from "@/lib/downtimeTypes";
 import { getShiftProgress } from "@/lib/shiftTime";
 import Header from "@/components/Header";
 import { useAuth } from "@/hooks/useAuth";
 import KpiCard from "@/components/KpiCard";
 import LineTable from "@/components/LineTable";
-import { getOutputColor, getFpyColor, getHpuColor, getPaceColor } from "@/lib/status";
+import { getOutputColor, getFpyColor, getHpuColor, getOeeColor } from "@/lib/status";
 
 const OutputChart = dynamic(() => import("@/components/OutputChart"), {
   ssr: false,
@@ -25,12 +26,6 @@ const LineDrawer = dynamic(() => import("@/components/LineDrawer"), {
 });
 
 // ── Sidebar nav items ─────────────────────────────────────────────────────────
-
-const SIDE_NAV = [
-  { icon: "inventory_2", label: "Inventory" },
-  { icon: "verified", label: "Quality Control" },
-  { icon: "build", label: "Maintenance" },
-] as const;
 
 // ── Loading skeleton ──────────────────────────────────────────────────────────
 
@@ -108,31 +103,47 @@ export default function Home() {
   const [adminConfig, setAdminConfig] = useState<Record<string, AdminLineConfig>>({});
   const [simClock, setSimClock] = useState<Date | null>(null);
   const lastOutputRef = useRef<Record<string, number>>({});
+  const [openDowntimeByLine, setOpenDowntimeByLine] = useState<Record<string, boolean>>({});
 
-  const { totalOutput, totalTarget, avgFpy, avgHpu, totalHeadcount, activeLines } =
-    useMemo(() => {
-      if (!metrics)
-        return {
-          totalOutput: 0,
-          totalTarget: 0,
-          avgFpy: 0,
-          avgHpu: 0,
-          totalHeadcount: 0,
-          activeLines: [],
-        };
-      const allLines = metrics.lines;
-      const active = allLines.filter(
-        (l) => adminConfig[l.id]?.isRunning !== false
-      );
+  const {
+    totalOutput,
+    totalTarget,
+    avgFpy,
+    avgHpu,
+    avgOee,
+    avgAvailability,
+    avgPerformance,
+    totalHeadcount,
+    activeLines,
+  } = useMemo(() => {
+    if (!metrics)
       return {
-        totalOutput: active.reduce((sum, l) => sum + l.output, 0),
-        totalTarget: active.reduce((sum, l) => sum + l.target, 0),
-        avgFpy: active.reduce((sum, l) => sum + l.fpy, 0) / (active.length || 1),
-        avgHpu: active.reduce((sum, l) => sum + l.hpu, 0) / (active.length || 1),
-        totalHeadcount: active.reduce((sum, l) => sum + l.headcount, 0),
-        activeLines: active,
+        totalOutput: 0,
+        totalTarget: 0,
+        avgFpy: 0,
+        avgHpu: 0,
+        avgOee: 0,
+        avgAvailability: 0,
+        avgPerformance: 0,
+        totalHeadcount: 0,
+        activeLines: [],
       };
-    }, [metrics, adminConfig]);
+    const allLines = metrics.lines;
+    const active = allLines.filter(
+      (l) => adminConfig[l.id]?.isRunning !== false
+    );
+    return {
+      totalOutput: active.reduce((sum, l) => sum + l.output, 0),
+      totalTarget: active.reduce((sum, l) => sum + l.target, 0),
+      avgFpy:         active.reduce((sum, l) => sum + l.fpy,         0) / (active.length || 1),
+      avgHpu:         active.reduce((sum, l) => sum + l.hpu,         0) / (active.length || 1),
+      avgOee:         active.reduce((sum, l) => sum + l.oee,         0) / (active.length || 1),
+      avgAvailability: active.reduce((sum, l) => sum + l.availability, 0) / (active.length || 1),
+      avgPerformance:  active.reduce((sum, l) => sum + l.performance, 0) / (active.length || 1),
+      totalHeadcount: active.reduce((sum, l) => sum + l.headcount, 0),
+      activeLines: active,
+    };
+  }, [metrics, adminConfig]);
 
   const lineStateMap = useMemo(
     () => new Map(mesStates.map((s) => [s.lineId, s])),
@@ -141,11 +152,12 @@ export default function Home() {
 
   const fetchMetrics = async () => {
     try {
-      const [metricsRes, mesRes, configRes, clockRes] = await Promise.all([
+      const [metricsRes, mesRes, configRes, clockRes, downtimeRes] = await Promise.all([
         fetch(`/api/metrics?shift=${shift}`),
         fetch("/api/mes/state"),
         fetch("/api/admin/config"),
         fetch("/api/sim/clock"),
+        fetch(`/api/downtime?shift=${shift}`),
       ]);
       if (!metricsRes.ok) throw new Error(`HTTP ${metricsRes.status}`);
       const data: ShiftMetrics = await metricsRes.json();
@@ -161,6 +173,14 @@ export default function Home() {
       if (clockRes.ok) {
         const { clock } = await clockRes.json();
         setSimClock(clock ? new Date(clock) : null);
+      }
+      if (downtimeRes.ok) {
+        const allEntries: DowntimeEntry[] = await downtimeRes.json();
+        const openMap: Record<string, boolean> = {};
+        for (const e of allEntries) {
+          if (e.endTime === null) openMap[e.lineId] = true;
+        }
+        setOpenDowntimeByLine(openMap);
       }
       setLastUpdated(new Date());
       setFetchError(null);
@@ -222,9 +242,6 @@ export default function Home() {
                 OP-CENTER
               </span>
             </div>
-            <p className="text-[10px] uppercase tracking-widest text-[#e1e2ec]/40 font-bold">
-              Station 04 Active
-            </p>
           </div>
 
           {/* Nav */}
@@ -256,55 +273,8 @@ export default function Home() {
                 <span>Admin</span>
               </Link>
 
-              {/* Decorative nav items */}
-              {SIDE_NAV.map(({ icon, label }) => (
-                <div
-                  key={label}
-                  title="Coming Soon"
-                  className="flex items-center space-x-3 text-[#e1e2ec]/15 px-4 py-3 font-['Inter',sans-serif] text-sm font-medium uppercase tracking-widest cursor-not-allowed select-none border-l-4 border-transparent"
-                >
-                  <span className="material-symbols-outlined text-[18px]">
-                    {icon}
-                  </span>
-                  <span>{label}</span>
-                </div>
-              ))}
             </div>
           </nav>
-
-          {/* Bottom actions */}
-          <div className="p-4 bg-surface border-t border-border">
-            <div className="w-full bg-[#93000a]/80 text-[#ffdad6]/60 py-3 rounded-sm font-bold uppercase tracking-tighter text-sm flex items-center justify-center space-x-2 select-none cursor-not-allowed">
-              <span className="material-symbols-outlined text-[18px]">
-                dangerous
-              </span>
-              <span>Emergency Stop</span>
-            </div>
-            <div className="mt-4 grid grid-cols-2 gap-2">
-              <button
-                title="Coming Soon"
-                className="flex flex-col items-center py-2 text-[#e1e2ec]/15 cursor-not-allowed"
-              >
-                <span className="material-symbols-outlined text-[18px]">
-                  help_center
-                </span>
-                <span className="text-[9px] mt-1 font-bold tracking-widest">
-                  SUPPORT
-                </span>
-              </button>
-              <button
-                title="Coming Soon"
-                className="flex flex-col items-center py-2 text-[#e1e2ec]/15 cursor-not-allowed"
-              >
-                <span className="material-symbols-outlined text-[18px]">
-                  history_edu
-                </span>
-                <span className="text-[9px] mt-1 font-bold tracking-widest">
-                  LOGS
-                </span>
-              </button>
-            </div>
-          </div>
         </aside>
 
         {/* ── Main content ── */}
@@ -343,6 +313,27 @@ export default function Home() {
               unit="Hrs/Unit"
               valueColor={getHpuColor(avgHpu)}
               accentClass="bg-status-red"
+              tooltip={
+                <div>
+                  <p className="font-bold text-[#e1e2ec] mb-1.5 uppercase tracking-widest text-[9px]">
+                    Hours Per Unit
+                  </p>
+                  <p className="mb-2 text-[#e1e2ec]/60">
+                    How many operator-hours per finished unit. Lower is better.
+                  </p>
+                  <div className="bg-surface-low rounded-sm px-2 py-1.5 font-mono text-[9px] text-[#e1e2ec]/80 leading-relaxed">
+                    <div>HPU = (HC × hrs) / output</div>
+                    <div className="mt-1 text-[#e1e2ec]/40">
+                      = ({totalHeadcount} × {shiftProgress.elapsedHours.toFixed(1)}) / {totalOutput}
+                    </div>
+                    {totalOutput > 0 && (
+                      <div className="mt-1 text-accent">
+                        = {(totalHeadcount * shiftProgress.elapsedHours / totalOutput).toFixed(2)}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              }
             />
             <KpiCard
               label="Total Headcount"
@@ -351,28 +342,50 @@ export default function Home() {
               accentClass="bg-border"
             />
             <KpiCard
-              label="Shift Pace"
-              value={pacedOutput ?? "—"}
-              unit={pacedOutput !== null ? "proj." : ""}
+              label="Avg OEE"
+              value={avgOee.toFixed(1)}
+              unit="%"
               subtext={
-                pacedOutput !== null
-                  ? `Target ${totalTarget.toLocaleString()} · ${
-                      pacedOutput >= totalTarget ? "On track" : "Behind"
-                    }`
-                  : "Load a schedule to track pace"
+                avgOee >= 85
+                  ? "World-class"
+                  : avgOee >= 70
+                  ? "Typical plant avg"
+                  : "Below target"
               }
-              valueColor={
-                pacedOutput !== null
-                  ? getPaceColor(pacedOutput, totalTarget)
-                  : "text-[#e1e2ec]/20"
+              valueColor={getOeeColor(avgOee)}
+              accentClass="bg-vs2"
+              tooltip={
+                <div>
+                  <p className="font-bold text-[#e1e2ec] mb-1.5 uppercase tracking-widest text-[9px]">
+                    Overall Equipment Effectiveness
+                  </p>
+                  <p className="mb-2 text-[#e1e2ec]/60">
+                    Availability × Performance × Quality. Target: 85%+ (world-class).
+                  </p>
+                  <div className="bg-surface-low rounded-sm px-2 py-1.5 font-mono text-[9px] text-[#e1e2ec]/80 leading-relaxed">
+                    <div className="text-[#e1e2ec]/40 mb-0.5">Formula</div>
+                    <div>OEE = A × P × Q</div>
+                    <div className="mt-1.5 text-[#e1e2ec]/40 mb-0.5">Live values</div>
+                    <div>
+                      = {avgAvailability.toFixed(1)}% × {avgPerformance.toFixed(1)}% × {avgFpy.toFixed(1)}%
+                    </div>
+                    <div className="mt-1 text-accent">
+                      = {avgOee.toFixed(1)}%
+                    </div>
+                  </div>
+                  <div className="mt-2 space-y-0.5 text-[9px] text-[#e1e2ec]/50 leading-relaxed">
+                    <div><span className="text-[#e1e2ec]/70 font-medium">A</span> — uptime vs planned shift</div>
+                    <div><span className="text-[#e1e2ec]/70 font-medium">P</span> — actual vs standard UPH</div>
+                    <div><span className="text-[#e1e2ec]/70 font-medium">Q</span> — first-pass yield</div>
+                  </div>
+                </div>
               }
-              accentClass="bg-border"
             />
           </section>
 
           {/* Output chart */}
           <section className="mb-6">
-            <OutputChart lines={activeLines} />
+            <OutputChart lines={activeLines} trend={metrics?.trend} totalTarget={totalTarget} />
           </section>
 
           {/* Line table */}
@@ -385,6 +398,7 @@ export default function Home() {
               selectedLineId={selectedLineId}
               adminConfig={adminConfig}
               lastOutputRef={lastOutputRef}
+              openDowntimeByLine={openDowntimeByLine}
             />
           </section>
         </main>
@@ -396,6 +410,8 @@ export default function Home() {
         shiftProgress={shiftProgress}
         onClose={closeDrawer}
         nowOverride={simClock}
+        adminConfig={adminConfig}
+        shift={shift}
       />
     </div>
   );

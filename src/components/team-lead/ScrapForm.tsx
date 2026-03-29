@@ -20,6 +20,7 @@ export default function ScrapForm({
   onClose,
   onCreated,
 }: ScrapFormProps) {
+  const [quickMode, setQuickMode] = useState(true);
   const [kind, setKind] = useState<FormKind>("scrapped-panel");
   const [model, setModel] = useState("");
   const [panel, setPanel] = useState<(typeof PANEL_OPTIONS)[number]>("A");
@@ -33,16 +34,41 @@ export default function ScrapForm({
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Quick mode: panel issue → scrapped-panel, lid issue → kicked-lid
+  const [quickType, setQuickType] = useState<"panel-issue" | "lid-issue">("panel-issue");
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setSubmitting(true);
     setError(null);
     try {
-      const base = { kind, lineId, shift, model, panel, damageType };
+      const resolvedKind: FormKind = quickMode
+        ? quickType === "panel-issue" ? "scrapped-panel" : "kicked-lid"
+        : kind;
+
+      const base = {
+        kind: resolvedKind,
+        lineId,
+        shift,
+        model,
+        panel,
+        damageType: quickMode
+          ? (quickType === "panel-issue" ? "Damaged Panel" : "Other")
+          : damageType,
+      };
+
       const body =
-        kind === "scrapped-panel"
-          ? { ...base, stationFound, howDamaged }
-          : { ...base, affectedArea, auditorInitials: auditorInitials.toUpperCase().trim() };
+        resolvedKind === "scrapped-panel"
+          ? {
+              ...base,
+              stationFound: quickMode ? "Unknown" : stationFound,
+              howDamaged: quickMode ? "Quick log" : howDamaged,
+            }
+          : {
+              ...base,
+              affectedArea: quickMode ? "panel" : affectedArea,
+              auditorInitials: (quickMode ? "TL" : auditorInitials).toUpperCase().trim(),
+            };
 
       const res = await fetch("/api/scrap", {
         method: "POST",
@@ -81,8 +107,108 @@ export default function ScrapForm({
         </div>
 
         <form onSubmit={handleSubmit} className="p-5 flex flex-col gap-4">
-          {/* Kind toggle */}
-          <div className="flex gap-2">
+          {/* Mode toggle */}
+          <div className="flex gap-2 p-0.5 bg-surface-low rounded-sm">
+            {(["Quick Log", "Full Details"] as const).map((mode) => (
+              <button
+                key={mode}
+                type="button"
+                onClick={() => setQuickMode(mode === "Quick Log")}
+                className={`flex-1 py-2 rounded-sm text-xs font-bold uppercase tracking-widest border transition-colors cursor-pointer ${
+                  quickMode === (mode === "Quick Log")
+                    ? "bg-accent text-black border-accent"
+                    : "bg-transparent text-[#e1e2ec]/40 border-transparent hover:text-[#e1e2ec]/70"
+                }`}
+              >
+                {mode}
+              </button>
+            ))}
+          </div>
+
+          {/* ── Quick Log Mode ── */}
+          {quickMode && (
+            <div className="flex flex-col gap-4">
+              {/* Model */}
+              <div>
+                <label className={labelClass}>Model#</label>
+                <input
+                  value={model}
+                  onChange={(e) => setModel(e.target.value)}
+                  required
+                  placeholder="e.g. 449324TS"
+                  className={inputClass}
+                  list="recent-models"
+                />
+                <datalist id="recent-models">
+                  <option value="449324TS" />
+                  <option value="80120" />
+                  <option value="449325TS" />
+                  <option value="449322TS" />
+                  <option value="80121" />
+                </datalist>
+              </div>
+
+              {/* Panel */}
+              <div>
+                <label className={labelClass}>Panel</label>
+                <div className="flex gap-2">
+                  {PANEL_OPTIONS.map((p) => (
+                    <button
+                      key={p}
+                      type="button"
+                      onClick={() => setPanel(p)}
+                      className={`flex-1 h-11 rounded-sm text-base font-bold border transition-colors cursor-pointer ${
+                        panel === p
+                          ? "bg-accent text-black border-accent"
+                          : "bg-transparent text-[#e1e2ec]/50 border-border hover:border-[#e1e2ec]/30"
+                      }`}
+                    >
+                      {p}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Type toggle */}
+              <div>
+                <label className={labelClass}>Type</label>
+                <div className="flex gap-2">
+                  {(["panel-issue", "lid-issue"] as const).map((t) => (
+                    <button
+                      key={t}
+                      type="button"
+                      onClick={() => setQuickType(t)}
+                      className={`flex-1 py-3 rounded-sm text-xs font-bold uppercase tracking-widest border transition-colors cursor-pointer ${
+                        quickType === t
+                          ? t === "panel-issue"
+                            ? "bg-status-red/15 text-status-red border-status-red/30"
+                            : "bg-status-amber/15 text-status-amber border-status-amber/30"
+                          : "bg-transparent text-[#e1e2ec]/40 border-border hover:border-[#e1e2ec]/30"
+                      }`}
+                    >
+                      {t === "panel-issue" ? "Panel Issue" : "Lid Issue"}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {error && <p className="text-status-red text-xs">{error}</p>}
+
+              <button
+                type="submit"
+                disabled={submitting}
+                className="w-full bg-accent hover:opacity-90 disabled:opacity-50 text-black font-black text-xs uppercase tracking-[0.2em] py-3 rounded-sm transition-all active:scale-95 cursor-pointer border-none"
+              >
+                {submitting ? "Saving..." : "Log Entry"}
+              </button>
+            </div>
+          )}
+
+          {/* ── Full Details Mode ── */}
+          {!quickMode && (
+            <>
+              {/* Kind toggle */}
+              <div className="flex gap-2">
             {(["scrapped-panel", "kicked-lid"] as FormKind[]).map((k) => (
               <button
                 key={k}
@@ -220,6 +346,8 @@ export default function ScrapForm({
           >
             {submitting ? "Saving..." : "Log Entry"}
           </button>
+            </>
+          )}
         </form>
       </div>
     </div>

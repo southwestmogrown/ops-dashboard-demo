@@ -26,11 +26,20 @@ export interface EOSLineEntry {
   changeovers: string;
 }
 
+// Structured notes fields for the Operational Summary section
+export interface EOSStructuredNotes {
+  topIssueToday: string;                // required
+  resolvedDuringShift: string;           // visible only when checked (checkbox + text)
+  openItemsNextShift: string;            // visible only when checked (checkbox + text)
+  equipmentConcerns: string;             // visible only when checked (checkbox + text)
+  generalNotes: string;                  // optional multi-line
+}
+
 // Top-level form state
 export interface EOSFormData {
   supervisor: string;
   date: string;           // ISO date string, e.g. "2026-03-26"
   shift: EOSShift;
-  notes: string;
+  notes: EOSStructuredNotes;
   lines: Record<string, EOSLineEntry>; // keyed by lineKey
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useCallback, useContext, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useState } from "react";
 import { UserRole, AUTH_PIN } from "@/lib/authTypes";
 
 interface AuthState {
@@ -28,7 +28,15 @@ function readStorage(): AuthState {
 }
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [auth, setAuth] = useState<AuthState>(() => readStorage());
+  // Start null to avoid hydration mismatch — server always renders with no auth,
+  // client reads localStorage after mount via useEffect.
+  const [auth, setAuth] = useState<AuthState>({ role: null, isAuthenticated: false });
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setAuth(readStorage());
+    setMounted(true);
+  }, []);
 
   const login = useCallback((pin: string, role: UserRole): boolean => {
     if (pin !== AUTH_PIN) return false;
@@ -44,6 +52,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     document.cookie = "ops-role=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
     setAuth({ role: null, isAuthenticated: false });
   }, []);
+
+  // Suppress children until mounted — prevents flash of PinGate for authenticated users
+  if (!mounted) return <AuthContext.Provider value={{ role: null, isAuthenticated: false, login, logout }}>{null}</AuthContext.Provider>;
 
   return (
     <AuthContext.Provider value={{ ...auth, login, logout }}>

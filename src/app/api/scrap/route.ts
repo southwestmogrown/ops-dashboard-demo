@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import {
   addScrapEntry,
   getScrapEntries,
+  getAllScrapEntries,
+  voidScrapEntry,
+  updateScrapEntry,
 } from "@/lib/mesStore";
 import type { ScrapEntry, ScrappedPanel, KickedLid } from "@/lib/reworkTypes";
 import type { ShiftName } from "@/lib/types";
@@ -11,9 +14,9 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   const lineId = searchParams.get("lineId");
   const shift = searchParams.get("shift") as ShiftName | null;
 
-  if (!lineId || !shift) {
+  if (!shift) {
     return NextResponse.json(
-      { error: "lineId and shift query params are required" },
+      { error: "shift query param is required" },
       { status: 400 }
     );
   }
@@ -24,7 +27,18 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     );
   }
 
-  const entries = getScrapEntries(lineId, shift);
+  let entries: ScrapEntry[];
+  if (lineId === "all") {
+    // Return all entries for the shift (used by FloorOverview)
+    entries = getAllScrapEntries(shift);
+  } else if (!lineId) {
+    return NextResponse.json(
+      { error: "lineId query param is required (or use lineId=all for all lines)" },
+      { status: 400 }
+    );
+  } else {
+    entries = getScrapEntries(lineId, shift);
+  }
   return NextResponse.json(entries);
 }
 
@@ -77,4 +91,40 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         } as Omit<ScrapEntry, "id" | "timestamp">));
 
   return NextResponse.json(entry, { status: 201 });
+}
+
+/** PATCH — void or update a scrap entry. */
+export async function PATCH(request: NextRequest): Promise<NextResponse> {
+  let body: Record<string, unknown>;
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+  }
+
+  const { id, void: shouldVoid, voidReason, updates } = body;
+
+  if (!id || typeof id !== "string") {
+    return NextResponse.json({ error: "id is required" }, { status: 400 });
+  }
+
+  if (shouldVoid === true) {
+    if (!voidReason || typeof voidReason !== "string" || voidReason.trim() === "") {
+      return NextResponse.json({ error: "voidReason is required when voiding" }, { status: 400 });
+    }
+    const ok = voidScrapEntry(id, voidReason.trim());
+    if (!ok) return NextResponse.json({ error: "Scrap entry not found" }, { status: 404 });
+    return NextResponse.json({ id, voidReason: voidReason.trim() });
+  }
+
+  if (shouldVoid === false && updates) {
+    const updated = updateScrapEntry(id, updates as Parameters<typeof updateScrapEntry>[1]);
+    if (!updated) return NextResponse.json({ error: "Scrap entry not found" }, { status: 404 });
+    return NextResponse.json(updated);
+  }
+
+  return NextResponse.json(
+    { error: "Provide either void:true with voidReason, or void:false with updates" },
+    { status: 400 }
+  );
 }

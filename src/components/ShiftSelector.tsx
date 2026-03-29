@@ -18,7 +18,12 @@ export default function ShiftSelector({ value, onChange }: ShiftSelectorProps) {
       {SHIFTS.map((shift) => (
         <button
           key={shift}
-          onClick={() => onChange(shift)}
+          onClick={() => {
+            if (shift === value) return;
+            if (window.confirm("Switch shift? Unsaved data will be lost.")) {
+              onChange(shift);
+            }
+          }}
           className={`
             px-4 py-1.5 rounded-full text-sm font-medium
             border transition-colors cursor-pointer ${

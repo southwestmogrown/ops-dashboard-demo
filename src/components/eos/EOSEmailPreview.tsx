@@ -8,10 +8,10 @@ interface Props {
   data: EOSFormData;
   activeLines: EOSLineDescriptor[];
   streamName: string;
-  onBack?: () => void;
+  emailRecipient?: string;
 }
 
-export default function EOSEmailPreview({ data, activeLines, streamName, onBack }: Props) {
+export default function EOSEmailPreview({ data, activeLines, streamName, emailRecipient = "ops-leads@kineticcommand.io" }: Props) {
   const [copied, setCopied] = useState(false);
 
   const emailBody = generateEmailBody(data, activeLines, streamName);
@@ -36,8 +36,8 @@ export default function EOSEmailPreview({ data, activeLines, streamName, onBack 
                 Email Draft Preview
               </h3>
             </div>
-            <span className="text-[10px] bg-accent/10 text-accent px-2 py-0.5 rounded-sm font-bold">
-              AUTO-GENERATED
+            <span className="text-[10px] bg-vs2/10 text-vs2 px-2 py-0.5 rounded-sm font-bold">
+              MES-SYNCED
             </span>
           </div>
 
@@ -45,7 +45,7 @@ export default function EOSEmailPreview({ data, activeLines, streamName, onBack 
           <div className="space-y-3 text-xs text-[#e1e2ec]/70">
             <div className="border-b border-border/30 pb-2">
               <span className="text-[#e1e2ec]/30 uppercase font-bold mr-2">To:</span>
-              ops-leads@kineticcommand.io
+              <span className="text-accent">{emailRecipient}</span>
             </div>
             <div className="border-b border-border/30 pb-2">
               <span className="text-[#e1e2ec]/30 uppercase font-bold mr-2">Subject:</span>

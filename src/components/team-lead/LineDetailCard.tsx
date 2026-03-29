@@ -7,8 +7,11 @@ import type { ShiftProgress } from "@/lib/shiftTime";
 import HourlyTable from "./HourlyTable";
 import ReworkPanel from "./ReworkPanel";
 import ScrapForm from "./ScrapForm";
+import DowntimePanel from "./DowntimePanel";
+import DowntimeForm from "./DowntimeForm";
 import type { HourlyTargetRow } from "@/lib/shiftBreaks";
 import type { ScrapEntry, ScrapStats } from "@/lib/reworkTypes";
+import type { DowntimeEntry } from "@/lib/downtimeTypes";
 import { getFpyColor, getHpuColor, getOutputColor } from "@/lib/status";
 
 interface LineDetailCardProps {
@@ -18,11 +21,13 @@ interface LineDetailCardProps {
   shiftProgress: ShiftProgress;
   hourlyTargets: HourlyTargetRow[];
   comments: Record<string, string>;
-  onSaveComment: (hour: string, comment: string) => void;
+  onSaveComment: (hour: string, comment: string) => Promise<void>;
   onBack: () => void;
   scrapEntries: ScrapEntry[];
   scrapStats: ScrapStats;
   onRefreshScrap: () => void;
+  downtimeEntries: DowntimeEntry[];
+  onRefreshDowntime: () => void;
 }
 
 export default function LineDetailCard({
@@ -37,8 +42,12 @@ export default function LineDetailCard({
   scrapEntries,
   scrapStats,
   onRefreshScrap,
+  downtimeEntries,
+  onRefreshDowntime,
 }: LineDetailCardProps) {
   const [showScrapForm, setShowScrapForm] = useState(false);
+  const [showDowntimeForm, setShowDowntimeForm] = useState(false);
+  const [resolveDowntime, setResolveDowntime] = useState<DowntimeEntry | null>(null);
 
   // Single pass over schedule items — avoids double-reduce over the same array
   const { orderPct, completed } = useMemo(() => {
@@ -191,8 +200,33 @@ export default function LineDetailCard({
                   entries={scrapEntries}
                   kickedLids={scrapStats.kickedLids}
                   scrappedPanels={scrapStats.scrappedPanels}
+                  onEntryChange={onRefreshScrap}
                 />
               )}
+            </div>
+          </div>
+
+          {/* Downtime Panel */}
+          <div className="bg-surface-low border border-border/40">
+            <div className="p-4 border-b border-border/40 flex justify-between items-center">
+              <h3 className="text-xs font-bold uppercase tracking-widest flex items-center gap-2">
+                <span className="material-symbols-outlined text-[18px] text-status-red">flag</span>
+                Line Downtime
+              </h3>
+              <button
+                onClick={() => setShowDowntimeForm(true)}
+                className="bg-accent text-black px-3 py-1 text-[10px] font-bold rounded-sm hover:opacity-90 active:scale-95 transition-all cursor-pointer border-none"
+              >
+                + LOG STOP
+              </button>
+            </div>
+            <div className="p-4">
+              <DowntimePanel
+                entries={downtimeEntries}
+                onRefresh={onRefreshDowntime}
+                onLogStop={() => setShowDowntimeForm(true)}
+                onResolve={(entry) => setResolveDowntime(entry)}
+              />
             </div>
           </div>
         </div>
@@ -213,6 +247,26 @@ export default function LineDetailCard({
           shift={shift}
           onClose={() => setShowScrapForm(false)}
           onCreated={handleScrapCreated}
+        />
+      )}
+
+      {showDowntimeForm && (
+        <DowntimeForm
+          lineId={line.id}
+          shift={shift}
+          onClose={() => setShowDowntimeForm(false)}
+          onRefresh={onRefreshDowntime}
+        />
+      )}
+
+      {resolveDowntime && (
+        <DowntimeForm
+          lineId={line.id}
+          shift={shift}
+          existingEntryId={resolveDowntime.id}
+          existingStartTime={resolveDowntime.startTime}
+          onClose={() => setResolveDowntime(null)}
+          onRefresh={onRefreshDowntime}
         />
       )}
     </div>

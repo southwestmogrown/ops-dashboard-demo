@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { forwardRef, useImperativeHandle, useRef, useState } from "react";
 import type { LineSchedule, RunSheetItem } from "@/lib/mesTypes";
 
 interface AdminLineCardProps {
@@ -11,21 +11,24 @@ interface AdminLineCardProps {
   savedTarget: number | undefined;
   savedHeadcount: number | undefined;
   savedIsRunning: boolean | undefined;
+  savedOperatorName: string | undefined;
+  savedTeamLeadContact: string | undefined;
   skippedItems: RunSheetItem[];
   onScheduleLoaded: (lineId: string, schedule: LineSchedule) => Promise<void>;
-  onConfigSaved: (lineId: string, target: number | undefined, headcount: number | undefined, isRunning: boolean) => void;
+  onConfigSaved: (lineId: string, target: number | undefined, headcount: number | undefined, isRunning: boolean, operatorName: string, teamLeadContact: string) => void;
   onRemoveQueued: (lineId: string, index: number) => void;
   onClearSchedule: (lineId: string) => void;
   onSkipOrder: (lineId: string, model: string) => void;
   onUnskipOrder: (lineId: string, model: string) => void;
 }
 
-export default function AdminLineCard({
+const AdminLineCardInner = forwardRef(function AdminLineCardInner({
   lineId, label, schedule, queuedSchedules,
-  savedTarget, savedHeadcount, savedIsRunning, skippedItems,
+  savedTarget, savedHeadcount, savedIsRunning,
+  savedOperatorName, savedTeamLeadContact, skippedItems,
   onScheduleLoaded, onConfigSaved, onRemoveQueued, onClearSchedule,
   onSkipOrder, onUnskipOrder,
-}: AdminLineCardProps) {
+}: AdminLineCardProps, ref) {
   const inputRef = useRef<HTMLInputElement>(null);
 
   const [parsing, setParsing] = useState(false);
@@ -40,7 +43,20 @@ export default function AdminLineCard({
   const [target, setTarget] = useState(savedTarget !== undefined ? String(savedTarget) : "");
   const [headcount, setHeadcount] = useState(savedHeadcount !== undefined ? String(savedHeadcount) : "");
   const [isRunning, setIsRunning] = useState(savedIsRunning !== undefined ? savedIsRunning : true);
+  const [operatorName, setOperatorName] = useState(savedOperatorName ?? "");
+  const [teamLeadContact, setTeamLeadContact] = useState(savedTeamLeadContact ?? "");
   const [saved, setSaved] = useState(false);
+
+  // Expose a save() method so the parent can trigger save-all
+  useImperativeHandle(ref, () => ({
+    save: async () => {
+      const t = target !== "" ? Number(target) : undefined;
+      const hc = headcount !== "" ? Number(headcount) : undefined;
+      await onConfigSaved(lineId, t, hc, isRunning, operatorName, teamLeadContact);
+      setSaved(true);
+      setTimeout(() => setSaved(false), 1500);
+    },
+  }), [target, headcount, isRunning, operatorName, teamLeadContact, lineId, onConfigSaved]);
 
   async function handleFile(file: File) {
     if (!file.name.endsWith(".pdf")) { setParseError("Must be a PDF"); return; }
@@ -78,7 +94,7 @@ export default function AdminLineCard({
   async function handleSave() {
     const t = target !== "" ? Number(target) : undefined;
     const hc = headcount !== "" ? Number(headcount) : undefined;
-    onConfigSaved(lineId, t, hc, isRunning);
+    onConfigSaved(lineId, t, hc, isRunning, operatorName, teamLeadContact);
     setSaved(true);
     setTimeout(() => setSaved(false), 1500);
   }
@@ -120,12 +136,12 @@ export default function AdminLineCard({
         </div>
         <label className="flex items-center gap-2 cursor-pointer group">
           <span className="text-[10px] font-bold tracking-widest text-[#e1e2ec]/40 group-hover:text-[#e1e2ec] transition-colors uppercase">
-            Not Running
+            Running
           </span>
           <div className="relative inline-flex items-center h-5 w-9">
             <input
               type="checkbox"
-              checked={!isRunning}
+              checked={isRunning}
               onChange={async () => {
                 const next = !isRunning;
                 setIsRunning(next);
@@ -134,18 +150,18 @@ export default function AdminLineCard({
                   headers: { "Content-Type": "application/json" },
                   body: JSON.stringify({ lineId, isRunning: next }),
                 });
-                onConfigSaved(lineId, undefined, undefined, next);
+                onConfigSaved(lineId, undefined, undefined, next, operatorName, teamLeadContact);
               }}
               className="sr-only peer"
             />
-            <div className="w-full h-full bg-surface-highest border border-border rounded-full peer peer-checked:bg-accent/15" />
-            <div className="absolute left-1 top-1 w-3 h-3 bg-[#e1e2ec]/30 rounded-full transition-all peer-checked:translate-x-4 peer-checked:bg-accent" />
+            <div className="w-full h-full bg-surface-highest border border-border rounded-full peer peer-checked:bg-status-green/20" />
+            <div className="absolute left-1 top-1 w-3 h-3 bg-[#e1e2ec]/30 rounded-full transition-all peer-checked:translate-x-4 peer-checked:bg-status-green" />
           </div>
         </label>
       </div>
 
       {/* Content Grid */}
-      <div className={`p-6 grid grid-cols-1 md:grid-cols-2 gap-8 ${!isRunning ? "opacity-60 grayscale-[0.5]" : ""}`}>
+      <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-8">
 
         {/* Left: Upload & Config */}
         <div className="space-y-6">
@@ -211,6 +227,32 @@ export default function AdminLineCard({
             </div>
           </div>
 
+          {/* Operator & Team Lead Contact */}
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-1">
+              <label className="text-[10px] uppercase font-black text-[#e1e2ec]/40 tracking-widest">Operator</label>
+              <input
+                type="text"
+                disabled={!isRunning}
+                value={operatorName}
+                onChange={(e) => setOperatorName(e.target.value)}
+                placeholder="Name"
+                className="w-full bg-surface-highest border-0 border-l-2 border-vs2/50 rounded-sm px-3 py-2.5 text-sm font-['Space_Grotesk',sans-serif] font-bold outline-none focus:ring-1 focus:ring-vs2/30 disabled:opacity-50 disabled:cursor-not-allowed placeholder:text-[#e1e2ec]/20"
+              />
+            </div>
+            <div className="space-y-1">
+              <label className="text-[10px] uppercase font-black text-[#e1e2ec]/40 tracking-widest">Team Lead</label>
+              <input
+                type="text"
+                disabled={!isRunning}
+                value={teamLeadContact}
+                onChange={(e) => setTeamLeadContact(e.target.value)}
+                placeholder="Name or phone"
+                className="w-full bg-surface-highest border-0 border-l-2 border-vs2/50 rounded-sm px-3 py-2.5 text-sm font-['Space_Grotesk',sans-serif] font-bold outline-none focus:ring-1 focus:ring-vs2/30 disabled:opacity-50 disabled:cursor-not-allowed placeholder:text-[#e1e2ec]/20"
+              />
+            </div>
+          </div>
+
           {/* Save Button */}
           <button
             onClick={handleSave}
@@ -227,7 +269,7 @@ export default function AdminLineCard({
 
         {/* Right: RunSheet Preview */}
         {hasSchedule ? (
-          <div className="bg-background p-4 border border-border/40 rounded-sm flex flex-col">
+          <div className={`bg-background p-4 border border-border/40 rounded-sm flex flex-col ${!isRunning ? "opacity-40 grayscale" : ""}`}>
             <div className="flex items-center justify-between mb-4 pb-2 border-b border-border/40">
               <span className="text-[10px] uppercase font-black tracking-widest">RunSheet Preview</span>
               <span className="text-[10px] text-[#e1e2ec]/40">
@@ -365,7 +407,7 @@ export default function AdminLineCard({
             </div>
           </div>
         ) : (
-          <div className="bg-background p-4 border border-border/40 rounded-sm flex flex-col items-center justify-center min-h-[200px]">
+          <div className={`bg-background p-4 border border-border/40 rounded-sm flex flex-col items-center justify-center min-h-[200px] ${!isRunning ? "opacity-40 grayscale" : ""}`}>
             <span className="material-symbols-outlined text-[#e1e2ec]/10 text-5xl">inventory</span>
             <p className="text-[10px] uppercase font-black tracking-widest text-[#e1e2ec]/20 mt-2">No Active RunSheet</p>
           </div>
@@ -373,4 +415,6 @@ export default function AdminLineCard({
       </div>
     </section>
   );
-}
+});
+
+export default AdminLineCardInner;

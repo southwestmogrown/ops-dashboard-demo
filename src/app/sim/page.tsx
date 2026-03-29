@@ -14,9 +14,6 @@ const HourlyTable = dynamic(() => import("@/components/sim/HourlyTable"), { ssr:
 const SIDE_NAV: { icon: string; label: string; href?: string }[] = [
   { icon: "dashboard", label: "Dashboard", href: "/" },
   { icon: "factory", label: "Admin", href: "/admin" },
-  { icon: "inventory_2", label: "Inventory" },
-  { icon: "verified", label: "Quality Control" },
-  { icon: "build", label: "Maintenance" },
 ];
 
 const SPEED_OPTIONS = [
@@ -32,6 +29,7 @@ export default function SimPage() {
   const [states, setStates] = useState<LineState[]>([]);
   const [running, setRunning] = useState(false);
   const [speed, setSpeed] = useState(60);
+  const speedRef = useRef(speed); // always mirrors speed; used in interval closures
   const [shift, setShift] = useState<ShiftName>("day");
   const [simClock, setSimClock] = useState<Date | null>(null);
   const [now, setNow] = useState(new Date());
@@ -55,6 +53,7 @@ export default function SimPage() {
       const c = await clockRes.json();
       setRunning(c.running);
       setSpeed(c.speed);
+      speedRef.current = c.speed; // keep ref in sync so interval uses latest speed
       setSimClock(c.clock ? new Date(c.clock) : null);
     }
   }, []);
@@ -73,20 +72,20 @@ export default function SimPage() {
     await fetch("/api/sim/clock", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ clock: shiftStart.toISOString(), running: true, speed }),
+      body: JSON.stringify({ clock: shiftStart.toISOString(), running: true, speed: speedRef.current }),
     });
     setRunning(true);
     tickInterval.current = setInterval(async () => {
       // Scale units with speed so production rate (units/line/hr) stays ~24-35
       // regardless of how fast simulated time runs.
       // 1 unit/line/tick at 1×, 5 at 5×, 15 at 15×.
-      const units = Math.max(1, Math.round(speed / 60));
+      const units = Math.max(1, Math.round(speedRef.current / 60));
       await fetch("/api/mes/tick", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ all: true, units }),
       });
-    }, 1000);
+    }, 108000); // 108 sec/tick — sim completes ~350 ticks over a 10.5-hr shift
   }
 
   async function pauseSim() {
@@ -112,10 +111,12 @@ export default function SimPage() {
     setSimClock(null);
     setRunning(false);
     setSpeed(60);
+    speedRef.current = 60;
     await pollState();
   }
 
   async function handleSpeedChange(newSpeed: number) {
+    speedRef.current = newSpeed;
     setSpeed(newSpeed);
     await fetch("/api/sim/clock", {
       method: "POST",
@@ -196,7 +197,6 @@ export default function SimPage() {
         </div>
         <div className="flex items-center gap-6">
           <div className="flex flex-col items-end">
-            <span className="text-[10px] uppercase tracking-widest text-[#e1e2ec]/40">Environment</span>
             <span className="text-accent text-sm font-bold">Shift: {shift === "day" ? "Day" : "Night"}</span>
           </div>
           <div className="h-8 w-px bg-border/30" />
@@ -228,13 +228,10 @@ export default function SimPage() {
                 <Link
                   key={item.label}
                   href={item.href ?? "#"}
-                  title={item.href ? undefined : "Coming Soon"}
                   className={`flex items-center space-x-3 px-4 py-3 ${
                     isActive
                       ? "text-accent bg-surface-high border-l-4 border-accent"
-                      : item.href
-                        ? "text-[#e1e2ec]/40 hover:bg-surface-high/50 hover:text-[#e1e2ec] border-l-4 border-transparent transition-colors"
-                        : "text-[#e1e2ec]/15 cursor-not-allowed select-none border-l-4 border-transparent"
+                      : "text-[#e1e2ec]/40 hover:bg-surface-high/50 hover:text-[#e1e2ec] border-l-4 border-transparent transition-colors"
                   }`}
                 >
                   <span className="material-symbols-outlined">{item.icon}</span>
@@ -243,31 +240,6 @@ export default function SimPage() {
               );
             })}
           </nav>
-          <div className="p-4 border-t border-border/10">
-            <button
-              title="Coming Soon"
-              className="w-full bg-[#93000a]/60 text-[#ffdad6]/40 py-3 rounded-sm font-bold uppercase tracking-widest text-xs flex items-center justify-center gap-2 cursor-not-allowed pointer-events-none select-none border-none"
-            >
-              <span className="material-symbols-outlined text-sm">emergency</span>
-              Emergency Stop
-            </button>
-          </div>
-          <div className="pb-6 px-4 space-y-1">
-            <a
-              title="Coming Soon"
-              className="flex items-center space-x-3 text-[#e1e2ec]/15 px-4 py-2 text-[11px] cursor-not-allowed select-none"
-            >
-              <span className="material-symbols-outlined text-sm">help_center</span>
-              <span>Support</span>
-            </a>
-            <a
-              title="Coming Soon"
-              className="flex items-center space-x-3 text-[#e1e2ec]/15 px-4 py-2 text-[11px] cursor-not-allowed select-none"
-            >
-              <span className="material-symbols-outlined text-sm">history_edu</span>
-              <span>Logs</span>
-            </a>
-          </div>
         </aside>
 
         {/* ── Main content ───────────────────────────────────────────────────── */}
@@ -375,7 +347,7 @@ export default function SimPage() {
             {/* Status Bento — right 5 cols */}
             <div className="col-span-12 lg:col-span-5 grid grid-cols-2 gap-4">
               <div className="bg-surface p-4 rounded-sm flex flex-col justify-between border-t-2 border-status-green">
-                <span className="text-[10px] font-bold uppercase tracking-widest text-status-green">Efficiency</span>
+                <span className="text-[10px] font-bold uppercase tracking-widest text-status-green">Output %</span>
                 <span className="font-['Space_Grotesk',sans-serif] text-4xl font-light tabular-nums">
                   {efficiency}<span className="text-lg opacity-40">%</span>
                 </span>
@@ -559,7 +531,7 @@ export default function SimPage() {
                   {totalTarget > 0 && (
                     <div className="mt-8 pt-6 border-t border-border/10">
                       <div className="flex items-center justify-between mb-2">
-                        <span className="text-[10px] font-bold uppercase text-[#e1e2ec]/40">Target Progress</span>
+                        <span className="text-[10px] font-bold uppercase text-[#e1e2ec]/40">Output vs Target</span>
                         <span className="text-xs font-mono">{efficiency}%</span>
                       </div>
                       <div className="w-full h-1 bg-surface-low rounded-full overflow-hidden">
@@ -592,7 +564,7 @@ export default function SimPage() {
                     </div>
                     <div className="bg-black/20 p-3 rounded-sm">
                       <p className="text-[9px] uppercase text-[#e1e2ec]/40 font-bold mb-1">Tick Rate</p>
-                      <p className="text-sm font-mono">1 unit/s</p>
+                      <p className="text-sm font-mono">{Math.max(1, Math.round(speed / 60))} unit{Math.max(1, Math.round(speed / 60)) !== 1 ? "s" : ""}/tick</p>
                     </div>
                   </div>
                 </div>

@@ -3,11 +3,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { ShiftMetrics, ShiftName } from "@/lib/types";
-import type { LineState } from "@/lib/mesTypes";
+import type { AdminLineConfig, LineState } from "@/lib/mesTypes";
 import type { ScrapEntry, ScrapStats } from "@/lib/reworkTypes";
+import type { DowntimeEntry } from "@/lib/downtimeTypes";
 import { getHourlyTargets } from "@/lib/shiftBreaks";
 import { getShiftProgress } from "@/lib/shiftTime";
 import LineDetailCard from "@/components/team-lead/LineDetailCard";
+import FloorOverview from "@/components/team-lead/FloorOverview";
+import FloorAlertStrip from "@/components/team-lead/FloorAlertStrip";
 
 export default function TeamLeadPage() {
   const [shift, setShift] = useState<ShiftName>("day");
@@ -16,17 +19,23 @@ export default function TeamLeadPage() {
   const [selectedLineId, setSelectedLineId] = useState<string | null>(null);
   const [comments, setComments] = useState<Record<string, Record<string, string>>>({});
   const [scrapEntries, setScrapEntries] = useState<ScrapEntry[]>([]);
+  const [allScrapEntries, setAllScrapEntries] = useState<ScrapEntry[]>([]);
+  const [downtimeEntries, setDowntimeEntries] = useState<DowntimeEntry[]>([]);
+  const [adminConfig, setAdminConfig] = useState<Record<string, AdminLineConfig>>({});
   const [simClock, setSimClock] = useState<Date | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [now, setNow] = useState<Date>(new Date());
   const [filter, setFilter] = useState("");
+  const [viewMode, setViewMode] = useState<"floor" | "detail">("floor");
   const prevDataRef = useRef<string>("");
 
   const fetchData = useCallback(async () => {
-    const [metricsRes, mesRes, clockRes] = await Promise.all([
+    const [metricsRes, mesRes, clockRes, allScrapRes, configRes] = await Promise.all([
       fetch(`/api/metrics?shift=${shift}`),
       fetch("/api/mes/state"),
       fetch("/api/sim/clock"),
+      fetch(`/api/scrap?lineId=all&shift=${shift}`),
+      fetch("/api/admin/config"),
     ]);
     if (metricsRes.ok) {
       const data: ShiftMetrics = await metricsRes.json();
@@ -41,6 +50,8 @@ export default function TeamLeadPage() {
       const { clock } = await clockRes.json();
       setSimClock(clock ? new Date(clock) : null);
     }
+    if (allScrapRes.ok) setAllScrapEntries(await allScrapRes.json());
+    if (configRes.ok) setAdminConfig(await configRes.json());
     setIsLoading(false);
   }, [shift]);
 
@@ -74,11 +85,25 @@ export default function TeamLeadPage() {
   }, [selectedLineId]);
 
   const refreshScrap = useCallback(() => {
-    if (!selectedLineId) return;
-    fetch(`/api/scrap?lineId=${selectedLineId}&shift=${shift}`)
-      .then((r) => r.json())
-      .then((data: ScrapEntry[]) => setScrapEntries(data));
-  }, [selectedLineId]);
+    if (selectedLineId) {
+      fetch(`/api/scrap?lineId=${selectedLineId}&shift=${shift}`)
+        .then((r) => r.json())
+        .then((data: ScrapEntry[]) => setScrapEntries(data));
+    } else {
+      // No line selected — FloorOverview shows all lines; skip per-line scrap state
+      setScrapEntries([]);
+    }
+  }, [selectedLineId, shift]);
+
+  const refreshDowntime = useCallback(() => {
+    if (selectedLineId) {
+      fetch(`/api/downtime?lineId=${selectedLineId}&shift=${shift}`)
+        .then((r) => r.json())
+        .then((data: DowntimeEntry[]) => setDowntimeEntries(data));
+    } else {
+      setDowntimeEntries([]);
+    }
+  }, [selectedLineId, shift]);
 
   const scrapStats = useMemo<ScrapStats>(() => {
     let kickedLids = 0, scrappedPanels = 0, totalBoughtIn = 0;
@@ -93,7 +118,8 @@ export default function TeamLeadPage() {
   useEffect(() => {
     if (!selectedLineId) return;
     refreshScrap();
-  }, [selectedLineId, shift, refreshScrap]);
+    refreshDowntime();
+  }, [selectedLineId, shift, refreshScrap, refreshDowntime]);
 
   const { lines, selectedLine, selectedMesState } = useMemo(() => {
     if (!metrics) return { lines: [], selectedLine: null, selectedMesState: null };
@@ -129,9 +155,9 @@ export default function TeamLeadPage() {
     const q = filter.toLowerCase();
     return lines.filter(
       (l) =>
-        l.name.toLowerCase().includes(q) ||
-        l.valueStream.toLowerCase().includes(q) ||
-        l.id.toLowerCase().includes(q)
+        l.name.toLowerCase().startsWith(q) ||
+        l.valueStream.toLowerCase().startsWith(q) ||
+        l.id.toLowerCase().startsWith(q)
     );
   }, [lines, filter]);
 
@@ -205,7 +231,6 @@ export default function TeamLeadPage() {
             <div className="flex items-center justify-between mb-4">
               <div>
                 <h2 className="font-black text-lg text-accent font-['Space_Grotesk',sans-serif]">OP-CENTER</h2>
-                <p className="text-[10px] font-medium uppercase tracking-[0.2em] text-[#e1e2ec]/40">Station 04 Active</p>
               </div>
               <span className="material-symbols-outlined text-accent">factory</span>
             </div>
@@ -229,7 +254,10 @@ export default function TeamLeadPage() {
               return (
                 <button
                   key={line.id}
-                  onClick={() => setSelectedLineId(line.id)}
+                  onClick={() => {
+                    setSelectedLineId(line.id);
+                    setViewMode("detail");
+                  }}
                   className={`w-full flex items-center justify-between p-3 transition-all cursor-pointer text-left ${
                     isSelected
                       ? "bg-surface-high border-l-4 border-accent"
@@ -253,17 +281,36 @@ export default function TeamLeadPage() {
             })}
           </div>
 
-          <div className="p-4 border-t border-border bg-surface">
-            <div className="w-full bg-[#93000a]/80 text-[#ffdad6]/60 py-3 rounded-sm font-bold uppercase tracking-tighter text-sm flex items-center justify-center space-x-2 select-none cursor-not-allowed">
-              <span className="material-symbols-outlined text-[18px]">dangerous</span>
-              <span>Emergency Stop</span>
-            </div>
-          </div>
         </aside>
 
         {/* ── Main Content ── */}
         <main className="flex-1 overflow-y-auto custom-scrollbar p-6 bg-background">
-          {selectedLine ? (
+          {/* Tab toggle */}
+          <div className="flex items-center gap-1 mb-6 p-1 bg-surface-low rounded-sm w-fit">
+            <button
+              onClick={() => setViewMode("floor")}
+              className={`px-4 py-2 rounded-sm text-xs font-bold tracking-wider transition-colors ${
+                viewMode === "floor"
+                  ? "bg-accent text-background"
+                  : "text-[#e1e2ec]/40 hover:text-[#e1e2ec]"
+              }`}
+            >
+              FLOOR OVERVIEW
+            </button>
+            <button
+              onClick={() => setViewMode("detail")}
+              className={`px-4 py-2 rounded-sm text-xs font-bold tracking-wider transition-colors ${
+                viewMode === "detail"
+                  ? "bg-accent text-background"
+                  : "text-[#e1e2ec]/40 hover:text-[#e1e2ec]"
+              }`}
+            >
+              LINE DETAIL
+            </button>
+          </div>
+
+          {/* View content */}
+          {viewMode === "detail" && selectedLine ? (
             <LineDetailCard
               line={selectedLine}
               mesState={selectedMesState}
@@ -272,18 +319,57 @@ export default function TeamLeadPage() {
               hourlyTargets={hourlyTargets}
               comments={selectedLineId ? (comments[selectedLineId] ?? {}) : {}}
               onSaveComment={saveComment}
-              onBack={() => setSelectedLineId(null)}
+              onBack={() => {
+                setSelectedLineId(null);
+                setViewMode("floor");
+              }}
               scrapEntries={scrapEntries}
               scrapStats={scrapStats}
               onRefreshScrap={refreshScrap}
+              downtimeEntries={downtimeEntries}
+              onRefreshDowntime={refreshDowntime}
             />
+          ) : viewMode === "detail" ? (
+            <div className="h-full flex flex-col items-center justify-center text-center">
+              <span className="material-symbols-outlined text-[#e1e2ec]/10 text-7xl mb-4">factory</span>
+              <h2 className="font-['Space_Grotesk',sans-serif] text-2xl font-bold text-[#e1e2ec]/20 mb-2">
+                No Line Selected
+              </h2>
+              <p className="text-[#e1e2ec]/30 text-sm max-w-sm mb-6">
+                Choose an assembly line from the sidebar, or switch to Floor Overview to see all lines at a glance.
+              </p>
+              <button
+                onClick={() => setViewMode("floor")}
+                className="px-4 py-2 bg-accent/15 text-accent border border-accent/30 rounded-sm text-xs font-bold tracking-wider hover:bg-accent/25 transition-colors"
+              >
+                FLOOR OVERVIEW
+              </button>
+            </div>
+          ) : metrics ? (
+            <>
+              <FloorAlertStrip
+                lines={metrics.lines}
+                mesStates={mesStates}
+                adminConfig={adminConfig}
+              />
+              <FloorOverview
+                metrics={metrics}
+                mesStates={mesStates}
+                scrapEntries={allScrapEntries}
+                shiftProgress={shiftProgress}
+                adminConfig={adminConfig}
+                onSelectLine={(lineId) => {
+                  setSelectedLineId(lineId);
+                  setViewMode("detail");
+                }}
+              />
+            </>
           ) : (
             <div className="h-full flex flex-col items-center justify-center text-center">
               <span className="material-symbols-outlined text-[#e1e2ec]/10 text-7xl mb-4">factory</span>
-              <h2 className="font-['Space_Grotesk',sans-serif] text-2xl font-bold text-[#e1e2ec]/20 mb-2">Select a Line</h2>
-              <p className="text-[#e1e2ec]/30 text-sm max-w-sm">
-                Choose an assembly line from the sidebar to view live production telemetry, hourly logs, and scrap data.
-              </p>
+              <h2 className="font-['Space_Grotesk',sans-serif] text-2xl font-bold text-[#e1e2ec]/20 mb-2">
+                Loading...
+              </h2>
             </div>
           )}
         </main>

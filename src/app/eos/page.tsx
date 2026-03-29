@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import type { ShiftMetrics } from "@/lib/types";
 import type { LineState } from "@/lib/mesTypes";
 import type { EOSFormData, EOSLineDescriptor, EOSLineEntry, EOSValueStream } from "@/lib/eosTypes";
@@ -9,6 +10,46 @@ import { calculateHPU, downloadAllReports } from "@/lib/eosReports";
 import EOSLineCard from "@/components/eos/EOSLineCard";
 import EOSMetaForm from "@/components/eos/EOSMetaForm";
 import EOSEmailPreview from "@/components/eos/EOSEmailPreview";
+import NoteCheckboxField from "@/components/eos/NoteCheckboxField";
+
+// ── Draft types ────────────────────────────────────────────────────────────────
+
+interface EosDraftPayload {
+  savedAt: string;        // ISO timestamp
+  formData: EOSFormData;
+  hiddenLines: string[];
+  activeStream: string;
+}
+
+// ── Draft helpers ─────────────────────────────────────────────────────────────
+
+const DRAFT_TTL_MS = 48 * 60 * 60 * 1000; // 48 hours
+
+function draftKey(shift: string, date: string): string {
+  return `eos-draft-${shift.toLowerCase()}-${date}`;
+}
+
+function loadDraft(shift: string, date: string): EosDraftPayload | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = localStorage.getItem(draftKey(shift, date));
+    if (!raw) return null;
+    const payload: EosDraftPayload = JSON.parse(raw);
+    const age = Date.now() - new Date(payload.savedAt).getTime();
+    if (age > DRAFT_TTL_MS) {
+      localStorage.removeItem(draftKey(shift, date));
+      return null;
+    }
+    return payload;
+  } catch {
+    return null;
+  }
+}
+
+function clearDraft(shift: string, date: string): void {
+  if (typeof window === "undefined") return;
+  localStorage.removeItem(draftKey(shift, date));
+}
 
 // ── Config ────────────────────────────────────────────────────────────────────
 
@@ -29,7 +70,7 @@ const ALL_LINES: EOSLineDescriptor[] = VALUE_STREAMS.flatMap((vs) =>
 const EMPTY_LINE: EOSLineEntry = {
   output: "",
   hpu: "0",
-  hoursWorked: "10",
+  hoursWorked: "8",
   headcount: "",
   orderAtPackout: "",
   remainingOnOrder: "",
@@ -44,26 +85,39 @@ function emptyFormData(): EOSFormData {
     supervisor: "",
     date: new Date().toISOString().split("T")[0],
     shift: "Day",
-    notes: "",
+    notes: {
+      topIssueToday: "",
+      resolvedDuringShift: "",
+      openItemsNextShift: "",
+      equipmentConcerns: "",
+      generalNotes: "",
+    },
     lines,
   };
 }
 
-const SIDE_NAV = [
-  { icon: "dashboard", label: "Dashboard" },
-  { icon: "factory", label: "Assembly Lines" },
-  { icon: "inventory_2", label: "Inventory" },
-  { icon: "verified", label: "Quality Control" },
-  { icon: "build", label: "Maintenance" },
-] as const;
-
 // ── Page ─────────────────────────────────────────────────────────────────────
 
 export default function EOSPage() {
-  const [formData, setFormData]       = useState<EOSFormData>(emptyFormData());
-  const [hiddenLines, setHiddenLines] = useState<Set<string>>(new Set());
-  const [activeStream, setActiveStream] = useState("vs1");
+  const pathname = usePathname();
+  const [formData, setFormData]           = useState<EOSFormData>(emptyFormData());
+  const [hiddenLines, setHiddenLines]     = useState<Set<string>>(new Set());
+  const [activeStream, setActiveStream]   = useState("vs1");
   const [mesRefreshing, setMesRefreshing] = useState(false);
+  const [emailRecipient, setEmailRecipient] = useState("ops-leads@kineticcommand.io");
+  const [notesValidation, setNotesValidation] = useState(false);
+
+  // Draft restore banner
+  const [draftInfo, setDraftInfo] = useState<{ savedAt: string } | null>(null);
+
+  // ── Draft: restore on mount ─────────────────────────────────────────────────
+  useEffect(() => {
+    const saved = loadDraft(formData.shift, formData.date);
+    if (saved) {
+      setDraftInfo({ savedAt: saved.savedAt });
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // run once on mount
 
   async function refreshFromMes(shift: string, autoHide: (keys: string[]) => void) {
     setMesRefreshing(true);
@@ -123,10 +177,34 @@ export default function EOSPage() {
     );
   }, [formData.shift]);
 
+  // ── Draft: persist on every form change ───────────────────────────────────
+  const saveDraft = useCallback(() => {
+    if (typeof window === "undefined") return;
+    const payload: EosDraftPayload = {
+      savedAt: new Date().toISOString(),
+      formData,
+      hiddenLines: [...hiddenLines],
+      activeStream,
+    };
+    try {
+      localStorage.setItem(draftKey(formData.shift, formData.date), JSON.stringify(payload));
+    } catch {
+      // quota exceeded or private mode — silently ignore
+    }
+  }, [formData, hiddenLines, activeStream]);
+
+  // Persist whenever form state changes (no deps array — reads latest via closures)
+  useEffect(() => {
+    saveDraft();
+  }, [saveDraft]);
+
   // ── Handlers ────────────────────────────────────────────────────────────────
 
   const handleMeta = (key: keyof Omit<EOSFormData, "lines">, value: string) =>
     setFormData((p) => ({ ...p, [key]: value }));
+
+  const handleNotes = (field: keyof EOSFormData["notes"], value: string) =>
+    setFormData((p) => ({ ...p, notes: { ...p.notes, [field]: value } }));
 
   const handleLine = (lineKey: string, field: keyof EOSLineEntry, value: string) =>
     setFormData((p) => {
@@ -151,7 +229,23 @@ export default function EOSPage() {
     if (window.confirm("Reset all fields?")) {
       setFormData(emptyFormData());
       setHiddenLines(new Set());
+      clearDraft(formData.shift, formData.date);
+      setDraftInfo(null);
     }
+  };
+
+  const resumeDraft = () => {
+    const saved = loadDraft(formData.shift, formData.date);
+    if (!saved) return;
+    setFormData(saved.formData);
+    setHiddenLines(new Set(saved.hiddenLines));
+    setActiveStream(saved.activeStream);
+    setDraftInfo(null);
+  };
+
+  const discardDraft = () => {
+    clearDraft(formData.shift, formData.date);
+    setDraftInfo(null);
   };
 
   // ── Derived state ────────────────────────────────────────────────────────────
@@ -233,52 +327,69 @@ export default function EOSPage() {
                 OP-CENTER
               </span>
             </div>
-            <p className="text-[10px] uppercase tracking-widest text-[#e1e2ec]/40 font-bold">
-              Station 04 Active
-            </p>
           </div>
 
-          <nav className="flex-1 py-4 space-y-1">
-            {SIDE_NAV.map(({ icon, label }) => (
-              <div
-                key={label}
-                title="Coming Soon"
-                className="flex items-center space-x-3 text-[#e1e2ec]/15 px-4 py-3 font-['Inter',sans-serif] text-sm font-medium uppercase tracking-widest cursor-not-allowed select-none"
+          <nav className="flex-1 py-4">
+            <div className="space-y-1">
+              {/* Dashboard */}
+              <Link
+                href="/"
+                className={`flex items-center space-x-3 px-4 py-3 font-['Inter',sans-serif] text-sm font-medium uppercase tracking-widest transition-colors ${
+                  pathname === "/"
+                    ? "bg-surface-high text-accent border-l-4 border-accent"
+                    : "text-[#e1e2ec]/40 hover:bg-surface-high/50 hover:text-[#e1e2ec] border-l-4 border-transparent"
+                }`}
               >
-                <span className="material-symbols-outlined text-[18px]">{icon}</span>
-                <span>{label}</span>
-              </div>
-            ))}
+                <span className="material-symbols-outlined text-[18px]">dashboard</span>
+                <span>Dashboard</span>
+              </Link>
+
+              {/* Admin */}
+              <Link
+                href="/admin"
+                className={`flex items-center space-x-3 px-4 py-3 font-['Inter',sans-serif] text-sm font-medium uppercase tracking-widest transition-colors ${
+                  pathname === "/admin"
+                    ? "bg-surface-high text-accent border-l-4 border-accent"
+                    : "text-[#e1e2ec]/40 hover:bg-surface-high/50 hover:text-[#e1e2ec] border-l-4 border-transparent"
+                }`}
+              >
+                <span className="material-symbols-outlined text-[18px]">factory</span>
+                <span>Admin</span>
+              </Link>
+
+            </div>
           </nav>
-
-          <div className="p-4 bg-surface border-t border-border">
-            <div className="w-full bg-[#93000a]/80 text-[#ffdad6]/60 py-3 rounded-sm font-bold uppercase tracking-tighter text-sm flex items-center justify-center space-x-2 select-none cursor-not-allowed">
-              <span className="material-symbols-outlined text-[18px]">dangerous</span>
-              <span>Emergency Stop</span>
-            </div>
-          </div>
-
-          <div className="p-2 border-t border-border space-y-1">
-            <div
-              title="Coming Soon"
-              className="flex items-center space-x-3 text-[#e1e2ec]/15 px-4 py-2 text-xs cursor-not-allowed select-none"
-            >
-              <span className="material-symbols-outlined text-sm">help_center</span>
-              <span>Support</span>
-            </div>
-            <div
-              title="Coming Soon"
-              className="flex items-center space-x-3 text-[#e1e2ec]/15 px-4 py-2 text-xs cursor-not-allowed select-none"
-            >
-              <span className="material-symbols-outlined text-sm">history_edu</span>
-              <span>Logs</span>
-            </div>
-          </div>
         </aside>
 
         {/* ── Main Content ── */}
         <main className="flex-1 overflow-y-auto custom-scrollbar bg-background">
           <div className="p-6 md:p-10 max-w-[1400px] mx-auto space-y-8">
+
+            {/* Draft restore banner */}
+            {draftInfo && (
+              <div className="flex items-center gap-4 px-5 py-3 bg-vs2/10 border border-vs2/30 rounded-sm">
+                <span className="material-symbols-outlined text-vs2 text-sm">restore</span>
+                <p className="text-sm text-[#e1e2ec] flex-1">
+                  Resume draft from{" "}
+                  <span className="font-mono text-vs2">
+                    {new Date(draftInfo.savedAt).toLocaleString()}
+                  </span>
+                  ?
+                </p>
+                <button
+                  onClick={resumeDraft}
+                  className="px-4 py-1.5 bg-vs2 text-black rounded-sm text-xs font-bold uppercase tracking-wider hover:bg-vs2/80 transition-colors cursor-pointer"
+                >
+                  Resume
+                </button>
+                <button
+                  onClick={discardDraft}
+                  className="px-4 py-1.5 bg-transparent text-[#e1e2ec]/50 border border-border rounded-sm text-xs font-bold uppercase tracking-wider hover:border-status-red hover:text-status-red transition-colors cursor-pointer"
+                >
+                  Discard
+                </button>
+              </div>
+            )}
 
             {/* Page header */}
             <section className="flex flex-col md:flex-row md:items-end justify-between gap-6 border-l-4 border-accent pl-6 py-2">
@@ -301,6 +412,16 @@ export default function EOSPage() {
                       <span>Shift Lead: {formData.supervisor}</span>
                     </div>
                   )}
+                  <div className="flex items-center gap-2">
+                    <span className="material-symbols-outlined text-accent text-sm">mail</span>
+                    <input
+                      type="email"
+                      value={emailRecipient}
+                      onChange={(e) => setEmailRecipient(e.target.value)}
+                      className="bg-transparent border-b border-border/40 text-[#e1e2ec]/60 text-sm outline-none focus:border-accent w-52 px-0.5 placeholder:text-[#e1e2ec]/20"
+                      placeholder="ops-leads@kineticcommand.io"
+                    />
+                  </div>
                 </div>
               </div>
               <div className="flex gap-3 shrink-0">
@@ -317,10 +438,27 @@ export default function EOSPage() {
                     navigator.clipboard.writeText(body);
                   }}
                   title="Copies email body to clipboard"
-                  className="px-6 py-2.5 bg-accent text-black rounded-sm hover:bg-orange-500 transition-colors flex items-center gap-2 text-xs font-bold uppercase tracking-wider active:scale-95"
+                  className="px-6 py-2.5 bg-surface-highest text-[#e1e2ec] border border-border rounded-sm hover:bg-surface-high transition-colors flex items-center gap-2 text-xs font-bold uppercase tracking-wider"
                 >
                   <span className="material-symbols-outlined text-sm">content_copy</span>
                   Copy Email
+                </button>
+                <button
+                  onClick={() => {
+                    setNotesValidation(true);
+                    if (!formData.notes.topIssueToday.trim()) return;
+                    const body = document.querySelector("#eos-email-body")?.textContent ?? "";
+                    navigator.clipboard.writeText(
+                      `To: ${emailRecipient}\n\n${body}`,
+                    );
+                    clearDraft(formData.shift, formData.date);
+                    setDraftInfo(null);
+                  }}
+                  title="Validate and copy email body to clipboard"
+                  className="px-6 py-2.5 bg-accent text-black rounded-sm hover:bg-orange-500 transition-colors flex items-center gap-2 text-xs font-bold uppercase tracking-wider active:scale-95"
+                >
+                  <span className="material-symbols-outlined text-sm">send</span>
+                  Submit &amp; Send
                 </button>
               </div>
             </section>
@@ -334,23 +472,78 @@ export default function EOSPage() {
                 {/* Meta form + Operational Summary */}
                 <EOSMetaForm data={formData} onChangeMeta={handleMeta} />
 
-                {/* Notes */}
+                {/* Structured Notes */}
                 <div className="bg-surface-low p-6 border-l-2 border-accent/30">
-                  <div className="flex items-center gap-2 mb-4">
+                  <div className="flex items-center gap-2 mb-5">
                     <span className="material-symbols-outlined text-accent">notes</span>
                     <h3 className="font-['Space_Grotesk',sans-serif] text-lg font-bold tracking-tight uppercase">
                       Operational Summary
                     </h3>
                   </div>
-                  <div className="relative">
-                    <div className="absolute left-0 top-0 bottom-0 w-[2px] bg-accent" />
-                    <textarea
-                      value={formData.notes}
-                      onChange={(e) => handleMeta("notes", e.target.value)}
-                      rows={4}
-                      placeholder="Enter shift-wide notes, safety incidents, or overall production roadblocks..."
-                      className="w-full bg-surface-highest border-none text-[#e1e2ec] p-4 min-h-[120px] text-sm leading-relaxed resize-y placeholder:text-[#e1e2ec]/20 outline-none focus:ring-1 focus:ring-accent/40"
+                  <div className="space-y-5">
+                    {/* Top Issue Today — required */}
+                    <div>
+                      <label className="flex items-center gap-1.5 text-[10px] text-[#e1e2ec]/40 mb-1.5 tracking-widest uppercase font-bold">
+                        <span>Top Issue Today</span>
+                        <span className="text-status-red">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        value={formData.notes.topIssueToday}
+                        onChange={(e) => handleNotes("topIssueToday", e.target.value)}
+                        onBlur={() => setNotesValidation(true)}
+                        placeholder="Primary issue impacting production this shift"
+                        className={[
+                          "w-full bg-surface-highest rounded-sm px-3.5 py-2.5 text-[#e1e2ec] text-sm outline-none font-mono focus:ring-1 focus:ring-accent/40 placeholder:text-[#e1e2ec]/20",
+                          notesValidation && !formData.notes.topIssueToday.trim()
+                            ? "ring-1 ring-status-red/60"
+                            : "",
+                        ].join(" ")}
+                      />
+                      {notesValidation && !formData.notes.topIssueToday.trim() && (
+                        <p className="mt-1 text-[10px] text-status-red font-bold tracking-widest uppercase">
+                          Required — enter the primary issue for this shift
+                        </p>
+                      )}
+                    </div>
+
+                    {/* Resolved During Shift */}
+                    <NoteCheckboxField
+                      label="Resolved During Shift"
+                      value={formData.notes.resolvedDuringShift}
+                      onChange={(v) => handleNotes("resolvedDuringShift", v)}
                     />
+
+                    {/* Open Items Next Shift */}
+                    <NoteCheckboxField
+                      label="Open Items for Next Shift"
+                      value={formData.notes.openItemsNextShift}
+                      onChange={(v) => handleNotes("openItemsNextShift", v)}
+                    />
+
+                    {/* Equipment Concerns */}
+                    <NoteCheckboxField
+                      label="Equipment Concerns"
+                      value={formData.notes.equipmentConcerns}
+                      onChange={(v) => handleNotes("equipmentConcerns", v)}
+                    />
+
+                    {/* General Notes */}
+                    <div>
+                      <label className="block text-[10px] text-[#e1e2ec]/40 mb-1.5 tracking-widest uppercase font-bold">
+                        General Notes
+                        <span className="ml-2 text-[#e1e2ec]/20 normal-case tracking-normal font-normal">
+                          (optional)
+                        </span>
+                      </label>
+                      <textarea
+                        value={formData.notes.generalNotes}
+                        onChange={(e) => handleNotes("generalNotes", e.target.value)}
+                        rows={3}
+                        placeholder="Any additional observations, safety incidents, or production notes..."
+                        className="w-full bg-surface-highest border-none rounded-sm px-3.5 py-2.5 text-[#e1e2ec] text-sm leading-relaxed resize-y placeholder:text-[#e1e2ec]/20 outline-none focus:ring-1 focus:ring-accent/40 font-mono"
+                      />
+                    </div>
                   </div>
                 </div>
 
@@ -455,6 +648,7 @@ export default function EOSPage() {
                   data={formData}
                   activeLines={activeLines}
                   streamName={currentStream.name}
+                  emailRecipient={emailRecipient}
                 />
               </div>
             </div>

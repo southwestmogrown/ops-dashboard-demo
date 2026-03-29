@@ -12,6 +12,11 @@ export interface Line {
   hpu: number;          // hours per unit, e.g. 0.42
   headcount: number;    // active operators right now
   changeovers: number;  // number of changeovers this shift
+  // OEE components (0–100 scale, OEE = A × P × Q)
+  oee: number;          // overall equipment effectiveness as a decimal (0–1), e.g. 0.783
+  availability: number; // uptime ratio, e.g. 90.0
+  performance: number; // speed ratio vs standard, e.g. 92.0
+  quality: number;      // FPY as a 0–100 scale, e.g. 94.7
 }
 
 // A single data point in a time-series chart

@@ -1,47 +1,91 @@
 "use client";
 
-import { memo, useCallback, useMemo, useRef } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { HourlyTargetRow } from "@/lib/shiftBreaks";
+
+type SaveStatus = "idle" | "saving" | "saved" | "error";
 
 interface HourlyTableProps {
   rows: HourlyTargetRow[];
   comments: Record<string, string>;
-  onSaveComment: (hour: string, comment: string) => void;
+  onSaveComment: (hour: string, comment: string) => Promise<void>;
 }
 
 const CommentInput = memo(function CommentInput({
   hour,
   value,
+  saveStatus,
   onSave,
 }: {
   hour: string;
   value: string;
+  saveStatus: SaveStatus;
   onSave: (hour: string, comment: string) => void;
 }) {
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [localValue, setLocalValue] = useState(value);
+
+  // Sync local state when the prop changes (e.g., after save completes)
+  useEffect(() => {
+    setLocalValue(value);
+  }, [value]);
 
   const handleChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
+      setLocalValue(e.target.value);
       if (timerRef.current) clearTimeout(timerRef.current);
       timerRef.current = setTimeout(() => {
         onSave(hour, e.target.value);
-      }, 500);
+      }, 2000);
     },
     [hour, onSave]
   );
 
   return (
-    <input
-      value={value}
-      placeholder="Add comment..."
-      onChange={handleChange}
-      className="w-full bg-transparent border-none text-xs text-[#e1e2ec]/60 focus:ring-0 p-0 outline-none placeholder:text-[#e1e2ec]/20"
-      type="text"
-    />
+    <div className="flex items-center gap-2 min-w-0">
+      <input
+        value={localValue}
+        placeholder="Add comment..."
+        onChange={handleChange}
+        className="min-w-0 flex-1 bg-transparent border-none text-xs text-[#e1e2ec]/60 focus:ring-0 p-0 outline-none placeholder:text-[#e1e2ec]/20"
+        type="text"
+      />
+      {saveStatus === "saving" && (
+        <span className="text-[#e1e2ec]/30 text-[10px] shrink-0 animate-pulse">…</span>
+      )}
+      {saveStatus === "saved" && (
+        <span className="text-status-green text-[10px] shrink-0" title="Saved">
+          &#10003;
+        </span>
+      )}
+      {saveStatus === "error" && (
+        <span className="text-status-red text-[10px] shrink-0" title="Save failed">
+          &#10007;
+        </span>
+      )}
+    </div>
   );
 });
 
 export default function HourlyTable({ rows, comments, onSaveComment }: HourlyTableProps) {
+  const [saveStatus, setSaveStatus] = useState<Record<string, SaveStatus>>({});
+
+  const handleSave = useCallback(
+    async (hour: string, comment: string) => {
+      setSaveStatus((prev) => ({ ...prev, [hour]: "saving" }));
+      try {
+        await onSaveComment(hour, comment);
+        setSaveStatus((prev) => ({ ...prev, [hour]: "saved" }));
+        setTimeout(() => {
+          setSaveStatus((prev) => ({ ...prev, [hour]: "idle" }));
+        }, 2000);
+      } catch {
+        setSaveStatus((prev) => ({ ...prev, [hour]: "error" }));
+      }
+    },
+    [onSaveComment]
+  );
+
   const totalVariance = useMemo(
     () => rows.filter((r) => !r.isBreak && r.actual > 0).reduce((sum, r) => sum + r.variance, 0),
     [rows]
@@ -80,6 +124,7 @@ export default function HourlyTable({ rows, comments, onSaveComment }: HourlyTab
               const isFuture = !isBreak && row.actual === 0 && row.planned > 0;
               const hasNegVar = !isBreak && !isFuture && row.variance < 0;
               const comment = comments[row.hour] ?? "";
+              const status = saveStatus[row.hour] ?? "idle";
 
               return (
                 <tr
@@ -119,13 +164,20 @@ export default function HourlyTable({ rows, comments, onSaveComment }: HourlyTab
                       <span className="text-[10px] text-[#e1e2ec]/20 italic uppercase">Break</span>
                     ) : isFuture ? (
                       <span className="text-[10px] text-[#e1e2ec]/20 italic uppercase">Upcoming</span>
-                    ) : hasNegVar && comment ? (
-                      <div className="flex items-center gap-2">
-                        <span className="w-1 h-4 bg-accent shrink-0" />
-                        <CommentInput hour={row.hour} value={comment} onSave={onSaveComment} />
-                      </div>
                     ) : (
-                      <CommentInput hour={row.hour} value={comment} onSave={onSaveComment} />
+                      <div className="flex flex-col gap-0.5">
+                        {hasNegVar && comment ? (
+                          <div className="flex items-center gap-2">
+                            <span className="w-1 h-4 bg-accent shrink-0" />
+                            <CommentInput hour={row.hour} value={comment} saveStatus={status} onSave={handleSave} />
+                          </div>
+                        ) : (
+                          <CommentInput hour={row.hour} value={comment} saveStatus={status} onSave={handleSave} />
+                        )}
+                        {status === "error" && (
+                          <p className="text-[9px] text-status-red pl-3">Save failed — retry</p>
+                        )}
+                      </div>
                     )}
                   </td>
                 </tr>

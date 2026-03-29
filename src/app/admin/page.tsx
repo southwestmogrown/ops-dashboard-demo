@@ -1,24 +1,27 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import dynamic from "next/dynamic";
 import type { AdminLineConfig, LineSchedule, LineState } from "@/lib/mesTypes";
+import type { ShiftName } from "@/lib/types";
 import { LINES, LINE_ADMIN_LABELS } from "@/lib/lines";
 import AdminLayout from "@/components/admin/AdminLayout";
 
 const AdminLineCard = dynamic(() => import("@/components/admin/AdminLineCard"), { ssr: false });
 
-const SIDE_NAV = [
-  { icon: "inventory_2", label: "Inventory" },
-  { icon: "verified", label: "Quality Control" },
-  { icon: "build", label: "Maintenance" },
-] as const;
-
 function AdminPageContent() {
+  const pathname = usePathname();
   const [mesStates, setMesStates] = useState<LineState[]>([]);
   const [adminConfig, setAdminConfig] = useState<Record<string, AdminLineConfig>>({});
   const [now, setNow] = useState<Date>(new Date());
+  const [savingAll, setSavingAll] = useState(false);
+  const [shift, setShift] = useState<ShiftName>("day");
+  const [lastSync, setLastSync] = useState<Date | null>(null);
+
+  // Refs for each line card — allows Save All to trigger each card's save
+  const cardRefs = useRef<Record<string, { save: () => Promise<void> } | null>>({});
 
   const refresh = useCallback(async () => {
     const [stateRes, configRes] = await Promise.all([
@@ -27,6 +30,7 @@ function AdminPageContent() {
     ]);
     if (stateRes.ok) setMesStates(await stateRes.json());
     if (configRes.ok) setAdminConfig(await configRes.json());
+    setLastSync(new Date());
   }, []);
 
   useEffect(() => {
@@ -62,12 +66,14 @@ function AdminPageContent() {
     lineId: string,
     target: number | undefined,
     headcount: number | undefined,
-    isRunning: boolean
+    isRunning: boolean,
+    operatorName: string,
+    teamLeadContact: string
   ) {
     await fetch("/api/admin/config", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ lineId, target, headcount, isRunning }),
+      body: JSON.stringify({ lineId, target, headcount, isRunning, operatorName, teamLeadContact }),
     });
     await refresh();
   }
@@ -107,6 +113,15 @@ function AdminPageContent() {
     }
   }
 
+  async function handleSaveAll() {
+    setSavingAll(true);
+    await Promise.all(
+      LINES.map(({ id }) => cardRefs.current[id]?.save())
+    );
+    await refresh();
+    setSavingAll(false);
+  }
+
   const totalTarget = Object.values(adminConfig).reduce((sum, cfg) => sum + (cfg.target || 0), 0);
   const totalHeadcount = Object.values(adminConfig).reduce((sum, cfg) => sum + (cfg.headcount || 0), 0);
 
@@ -137,7 +152,13 @@ function AdminPageContent() {
           </div>
           <div className="flex items-center gap-6">
             <div className="flex flex-col items-end">
-              <span className="text-xs text-[#e1e2ec]/60 font-medium">Shift: Day</span>
+              <button
+                onClick={() => setShift(s => s === "day" ? "night" : "day")}
+                className="text-xs text-accent font-bold hover:text-orange-300 transition-colors bg-transparent border-none p-0 cursor-pointer text-right leading-tight"
+                title="Click to toggle shift"
+              >
+                Shift: {shift === "day" ? "Day" : "Night"}
+              </button>
               <span className="text-[10px] text-[#e1e2ec]/40 tabular-nums">{now.toLocaleTimeString("en-GB")} UTC</span>
             </div>
           </div>
@@ -155,59 +176,38 @@ function AdminPageContent() {
                 OP-CENTER
               </span>
             </div>
-            <p className="text-[10px] uppercase tracking-widest text-[#e1e2ec]/40 font-bold">
-              Station 04 Active
-            </p>
           </div>
 
           <nav className="flex-1 py-4">
             <div className="space-y-1">
+              {/* Dashboard */}
               <Link
                 href="/"
-                className="flex items-center space-x-3 text-[#e1e2ec]/40 px-4 py-3 hover:bg-surface-high/50 font-['Inter',sans-serif] text-sm font-medium uppercase tracking-widest hover:text-accent transition-all"
+                className={`flex items-center space-x-3 px-4 py-3 font-['Inter',sans-serif] text-sm font-medium uppercase tracking-widest transition-colors ${
+                  pathname === "/"
+                    ? "bg-surface-high text-accent border-l-4 border-accent"
+                    : "text-[#e1e2ec]/40 hover:bg-surface-high/50 hover:text-[#e1e2ec] border-l-4 border-transparent"
+                }`}
               >
                 <span className="material-symbols-outlined text-[18px]">dashboard</span>
                 <span>Dashboard</span>
               </Link>
-              <div className="flex items-center space-x-3 bg-surface-high text-accent border-l-4 border-accent px-4 py-3 font-['Inter',sans-serif] text-sm font-medium uppercase tracking-widest">
+
+              {/* Admin */}
+              <Link
+                href="/admin"
+                className={`flex items-center space-x-3 px-4 py-3 font-['Inter',sans-serif] text-sm font-medium uppercase tracking-widest transition-colors ${
+                  pathname === "/admin"
+                    ? "bg-surface-high text-accent border-l-4 border-accent"
+                    : "text-[#e1e2ec]/40 hover:bg-surface-high/50 hover:text-[#e1e2ec] border-l-4 border-transparent"
+                }`}
+              >
                 <span className="material-symbols-outlined text-[18px]">factory</span>
-                <span>Assembly Lines</span>
-              </div>
-              {SIDE_NAV.map(({ icon, label }) => (
-                <div
-                  key={label}
-                  title="Coming Soon"
-                  className="flex items-center space-x-3 text-[#e1e2ec]/15 px-4 py-3 font-['Inter',sans-serif] text-sm font-medium uppercase tracking-widest cursor-not-allowed select-none"
-                >
-                  <span className="material-symbols-outlined text-[18px]">{icon}</span>
-                  <span>{label}</span>
-                </div>
-              ))}
+                <span>Admin</span>
+              </Link>
+
             </div>
           </nav>
-
-          <div className="p-4 bg-surface border-t border-border">
-            <div className="w-full bg-[#93000a]/80 text-[#ffdad6]/60 py-3 rounded-sm font-bold uppercase tracking-tighter text-sm flex items-center justify-center space-x-2 select-none cursor-not-allowed">
-              <span className="material-symbols-outlined text-[18px]">dangerous</span>
-              <span>Emergency Stop</span>
-            </div>
-            <div className="mt-4 grid grid-cols-2 gap-2">
-              <button
-                title="Coming Soon"
-                className="flex flex-col items-center py-2 text-[#e1e2ec]/15 cursor-not-allowed"
-              >
-                <span className="material-symbols-outlined text-[18px]">help_center</span>
-                <span className="text-[9px] mt-1 font-bold tracking-widest">SUPPORT</span>
-              </button>
-              <button
-                title="Coming Soon"
-                className="flex flex-col items-center py-2 text-[#e1e2ec]/15 cursor-not-allowed"
-              >
-                <span className="material-symbols-outlined text-[18px]">history_edu</span>
-                <span className="text-[9px] mt-1 font-bold tracking-widest">LOGS</span>
-              </button>
-            </div>
-          </div>
         </aside>
 
         {/* ── Main Content ── */}
@@ -217,10 +217,10 @@ function AdminPageContent() {
           <header className="flex flex-col lg:flex-row lg:items-end justify-between gap-6 mb-10">
             <div>
               <h1 className="font-['Space_Grotesk',sans-serif] text-4xl font-bold tracking-tight mb-2">
-                Configuration <span className="text-accent/50 text-2xl font-light">v4.2.0</span>
+                Configuration
               </h1>
               <p className="text-[#e1e2ec]/60 max-w-xl text-sm leading-relaxed">
-                System-wide parameters for assembly floor synchronization. Ensure all shift targets align with the ERP master schedule before committing changes.
+                Daily target and headcount per production line.
               </p>
             </div>
             <div className="flex gap-4 items-center bg-surface-low p-4 rounded-sm border-l-2 border-accent">
@@ -246,6 +246,7 @@ function AdminPageContent() {
             {LINES.map(({ id, valueStream }) => (
               <AdminLineCard
                 key={id}
+                ref={(el: { save: () => Promise<void> } | null) => { cardRefs.current[id] = el; }}
                 lineId={id}
                 label={LINE_ADMIN_LABELS[id] ?? id}
                 schedule={stateFor(id)?.schedule ?? null}
@@ -253,6 +254,8 @@ function AdminPageContent() {
                 savedTarget={adminConfig[id]?.target}
                 savedHeadcount={adminConfig[id]?.headcount}
                 savedIsRunning={adminConfig[id]?.isRunning}
+                savedOperatorName={adminConfig[id]?.operatorName}
+                savedTeamLeadContact={adminConfig[id]?.teamLeadContact}
                 skippedItems={stateFor(id)?.skippedItems ?? []}
                 onScheduleLoaded={handleScheduleLoaded}
                 onConfigSaved={handleConfigSaved}
@@ -274,10 +277,11 @@ function AdminPageContent() {
             </div>
             <div className="flex flex-col sm:flex-row gap-4">
               <button
-                title="Coming Soon"
-                className="flex-1 bg-surface-highest text-[#e1e2ec]/30 font-black py-4 rounded-sm text-xs uppercase tracking-[0.2em] cursor-not-allowed pointer-events-none select-none"
+                onClick={handleSaveAll}
+                disabled={savingAll}
+                className="flex-1 bg-accent text-black font-black py-4 rounded-sm text-xs uppercase tracking-[0.2em] hover:opacity-90 transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                Save All Config (Coming Soon)
+                {savingAll ? "Saving…" : "Save All Config"}
               </button>
               <button
                 onClick={handleResetAll}
@@ -290,7 +294,11 @@ function AdminPageContent() {
               <span className="material-symbols-outlined text-accent/60">info</span>
               <div>
                 <p className="text-[10px] font-bold text-[#e1e2ec]/60 uppercase mb-1">Last Configuration Sync</p>
-                <p className="text-xs text-[#e1e2ec]/40 tabular-nums">2026-03-28 09:12:44 - User: ADMIN_01</p>
+                <p className="text-xs text-[#e1e2ec]/40 tabular-nums">
+                  {lastSync
+                    ? `${lastSync.toLocaleDateString("en-GB")} ${lastSync.toLocaleTimeString("en-GB")}`
+                    : "Never"}
+                </p>
               </div>
             </div>
           </section>

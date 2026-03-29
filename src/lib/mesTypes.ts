@@ -5,10 +5,12 @@ export type LineComments = Record<string, string>;
 
 /** Per-line admin configuration overrides */
 export interface AdminLineConfig {
-  target?:    number;
-  headcount?: number;
+  target?:           number;
+  headcount?:       number;
   /** false = line not running today; hidden from dashboard */
-  isRunning?: boolean;
+  isRunning?:       boolean;
+  operatorName?:    string;
+  teamLeadContact?: string; // name, phone, or both
 }
 
 /** One work order on a run sheet */
@@ -61,4 +63,8 @@ export interface LineState {
   hourlyOutput: Record<string, number>;
   /** Orders skipped due to material shortage — can be re-activated */
   skippedItems: RunSheetItem[];
+  /** M17.2 — simulated changeover minutes remaining before next order starts */
+  changeoverRemaining: number;
+  /** M17.7 — equipment repair minutes remaining; line is down during this */
+  repairRemaining: number;
 }

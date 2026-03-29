@@ -167,7 +167,7 @@ Two formats in use — `pdfParser.ts` handles both:
    - `HPU = (headcount × elapsedHours) / output` (falls back to `0` when output is 0)
 3. EOS page fetches both `/api/metrics` and `/api/mes/state` on mount and shift change — pre-fills output, headcount, orderAtPackout, remainingOnOrder, remainingOnRunSheet, changeovers. Lines without a MES schedule are automatically hidden.
 4. Admin page: drop PDF → parse client-side → preview → Replace or Queue → `POST /api/mes/schedule`.
-5. Sim page: Start → `setInterval` → `POST /api/mes/tick` every 1 s → polls `/api/mes/state` every 2 s.
+5. Sim page: Start → `setInterval` → `POST /api/mes/tick` every 1 s → polls `/api/mes/state` every 2 s. Tick includes ~20% per-line downtime and ~5% random `KickedLid` injection.
 
 ## Colour system (Tailwind custom vars in `globals.css`)
 | Variable | Hex | Tailwind class |
@@ -198,13 +198,14 @@ Two formats in use — `pdfParser.ts` handles both:
 Dark industrial. Fonts: **Space Grotesk** (headings, large numerics) + **Inter** (body, labels, data).
 Icons: Material Symbols Outlined (loaded via Google Fonts CDN in `layout.tsx`).
 
-### Shared page shell (per-route, not in layout)
-Each page renders its own:
-1. **Top nav** — `KINETIC COMMAND` brand, horizontal route links (active = accent underline), shift/time info pill, dashboard link. Font: Space Grotesk.
-2. **Sidebar** (hidden < lg) — `OP-CENTER` header, 5 decorative nav items (Dashboard, Assembly Lines, Inventory, Quality Control, Maintenance), Emergency Stop placeholder, Support/Logs footer. Width: `w-64`.
-3. **Main content** — `flex-1 overflow-y-auto custom-scrollbar bg-background`.
+### Sidebar navigation (per-route, inlined)
+Each page renders its own sidebar with nav items as `<Link>` components. Active state is determined by `usePathname()` — accent border + color when `pathname === href`. Nav items:
+- **Dashboard** → `/` — active when on `/`
+- **Admin** → `/admin` — active when on `/admin`
+- **Inventory / Quality Control / Maintenance** — muted "Coming Soon" placeholders (`text-[#e1e2ec]/15`, `cursor-not-allowed`)
 
-All three are inlined per page (not shared layout components) because each page has different active-nav state and header controls.
+The sidebar also has a non-functional Emergency Stop button (red, disabled) and Support/Logs placeholders at the bottom.
+> Note: The E-STOP was removed from the sidebar as part of M13. Inventory, Quality Control, and Maintenance nav items are disabled placeholders ("Coming Soon") — they are present in the design for future expansion and do not redirect anywhere.
 
 ### Card / panel styling convention
 ```tsx
@@ -273,6 +274,7 @@ All three are inlined per page (not shared layout components) because each page 
 - Bento grid layout, AdminLineCard (2-col: dropzone+config | runsheet preview)
 - Master controls, toggle switch for Not Running
 - Per-line target/headcount inputs
+- **PDF upload UX**: `AdminLineCard` stores parsed schedule in local `pendingSchedule` state and shows the RunSheet Preview immediately — no waiting for the API round-trip. The preview clears when the server confirms via the next `refresh()` poll cycle.
 
 ### `/team-lead` (✅ Stitch redesign applied)
 - Sidebar contains line selector (filter input + line list with status badges: RUNNING/BEHIND/STOPPED/IDLE)
@@ -291,15 +293,21 @@ All three are inlined per page (not shared layout components) because each page 
 - Simulation Info Card: glass panel with speed/tick details
 - Admin Panel quick-link card
 
+#### Sim production rate
+- `POST /api/mes/tick` fires every 1 second (real time)
+- `units` scales with speed: `Math.max(1, Math.round(speed / 60))` — 1 at 1×, 5 at 5×, 15 at 15×
+- Each line has **20% random downtime per tick** — simulates breaks, changeovers, stoppages
+- Expected production per line at 1×: ~26 units/hr (realistic for this floor)
+- **Random kicked panel injection**: ~5% probability per tick, picks a random active line, writes a `KickedLid` scrap entry directly (auditorInitials = "SYS"). This keeps FPY data populated without manual entry.
+- **Efficiency KPI**: `(totalOutput / totalTarget) * 100` — output ÷ daily target as a percentage. Not OEE (no availability or quality factor). A proper OEE card belongs in M10.
+
 ## LineDrawer notes
 - Slide-out panel triggered by clicking a row in `LineTable`.
 - State lives in `page.tsx` (`selectedLineId` → resolved to `selectedLine: Line | null`).
 - Uses `dynamic(() => import("@/components/LineDrawer"), { ssr: false })`.
 - Closes via X button, backdrop click, or Escape key.
-- Per-line time-series (output, FPY, HPU) is derived from the VS-aggregate `trend`
-  using a Mulberry32 RNG seeded from the line's `id` string hash — deterministic
-  across renders.
-- Changeover markers are rendered as `<ReferenceLine>` on each chart.
+- **No mock data** — charts default to empty. Hourly Output chart only renders from real `mesState.hourlyOutput`. FPY/HPU trend charts are placeholders ("coming soon") since MES has no per-interval FPY/HPU source.
+- Empty state message: "Start the simulator to see live production data."
 - **Earmarked** for promotion to `/line/[id]` route in a future release.
 
 ## Mock data
@@ -310,18 +318,20 @@ Set `DEMO_SEED` env var to override for deterministic demos.
 
 Full feature specs live in **`issues.md`**. Items marked ✅ are complete.
 
-### High
-- **M8: Downtime / Line Stop logging** — structured stop events with reason codes, duration, units lost; feeds OEE; see `issues.md` M8
-- **M9: Real-Time Alerts** — proactive banner for stalls, FPY drops, pace alerts; see `issues.md` M9
-- **Supervisor status view** — ON TRACK / WATCH / CRITICAL pill per line in table; hover tooltip shows specific reasons (FPY low, behind pace, zero output, HC short, skipped orders); order ETA in LineDrawer
+### Completed
+- **M8: Downtime / Line Stop logging** ✅ — `DowntimePanel`, `DowntimeForm`, API route, wiring into team-lead page and status reasons; see `issues.md` M8
+- **M9: Real-Time Alerts** ✅ — `AlertBanner` on dashboard, stall/FPY/pace detection in metrics route, acknowledge/dismiss UX; see `issues.md` M9
+- **M10: OEE Tracking** ✅ — OEE = A × P × Q computed per line, avg OEE KPI card, OEE column in LineTable, OEE tab in LineDrawer; see `issues.md` M10
+- **M11: Shift Handoff** ✅ — structured handoff on EOS page, `HandoffBanner` on dashboard for incoming shift acknowledgement; see `issues.md` M11
+- **M12: EOS Scrap Auto-Fill** ✅ — scrap counts auto-populated into EOS form, Quality Summary table on EOS; see `issues.md` M12
+- **M13: Dashboard Floor Awareness** ✅ — shift clock in sidebar, trend chart in main panel, VS highlighting, E-STOP removed, disabled nav placeholders explained
+- **M14: EOS Draft Persistence & Form Structure** ✅ — localStorage draft auto-save, structured notes fields, configurable email recipient
+- **M15: Team Lead Floor Overview + Scrap Speed** ✅ — floor overview grid with live KPIs, quick-log scrap form, comment save feedback toast, floor alert strip
+- **M16: LineTable Readability + LineDrawer Completion** ✅ — sortable columns, wider progress bars, dynamic status label, downtime tab in drawer, target reference line on chart, operator contact field
+- **M17: Simulation Fidelity** ✅ — tick rate fix, changeover penalty on completed orders, multi-defect scrap model, ramp-up/wind-down, equipment failure injection
+
+### Remaining
 - **Bought-in ERP integration** — `boughtIn` boolean on scrap entries; future route queries external ERP for model# lookup and auto-tags entries
-
-### Medium
-- **M10: OEE Tracking** — Availability × Performance × Quality per line; see `issues.md` M10
-- **M11: Shift Handoff** — structured outgoing/incoming supervisor handoff with issue list and acknowledgement; see `issues.md` M11
-- **M12: EOS Scrap Auto-Fill** — pull scrap counts from DB into EOS form automatically; see `issues.md` M12
-
-### Lower
 - **Admin queue reordering** — drag to reorder queued schedules
 - **Per-operator performance** — anonymous or named operator-level output visibility for coaching (sensitive — needs role guard)
 - **Historical trend view** — compare current shift pace to same point on prior shifts

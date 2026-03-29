@@ -2,37 +2,48 @@
 
 ---
 
-## Recently Completed
+## Completed Milestones
 
 ### M7: SQLite Persistence ✅
-**Files:** `src/lib/db.ts` (new), `src/lib/mesStore.ts` (refactored), `src/lib/mesTypes.ts` (updated)
+All MES state persists to SQLite (`data/ops.db`) via a write-through cache in `mesStore.ts`. Cold starts and hot reloads no longer wipe state. Tables: `scan_events`, `line_queues`, `admin_config`, `line_comments`, `scrap_log`, `sim_clock`, `db_meta`.
 
-All MES state now persists to SQLite (`data/ops.db`) via a write-through cache in `mesStore.ts`. Cold starts and hot reloads no longer wipe state. Tables: `scan_events`, `line_queues`, `admin_config`, `line_comments`, `scrap_log`, `sim_clock`, `db_meta`. `AdminLineConfig` type moved to `mesTypes.ts` to avoid circular imports.
+### M8: Downtime / Line Stop Logging ✅
+**Files:** `src/lib/downtimeTypes.ts`, `src/lib/db.ts` (downtime helpers), `src/app/api/downtime/route.ts`, `src/components/team-lead/DowntimePanel.tsx`, `src/components/team-lead/DowntimeForm.tsx`, `src/lib/status.ts` (open downtime in status reasons), plus wiring into team-lead page.
 
-`data/` directory added to `.gitignore`.
+Structured stop events with reason codes (machine-failure, material-shortage, quality-hold, planned-maintenance, operator-break, safety-stop, changeover, other), duration tracking, units lost, and notes. Feeds OEE availability calculation.
 
-### Bug Fixes ✅ (session: 2026-03-28)
-- `ShiftSelector.tsx`: `text-white` on yellow accent → `text-black` (WCAG contrast)
-- `ShiftSelector.tsx`: component renamed from `function Header` → `function ShiftSelector`
-- `Header.tsx`: SIM badge `text-white` → `text-black`
-- `Header.tsx`: `useEffect` closure staleness on `simClock` — added `simClockRef` so interval always reads latest value
-- `ReworkPanel.tsx`: replaced unsafe double-cast type narrowing with discriminated union access
-- `AdminLineCard.tsx`: "Not Running" toggle now calls `onConfigSaved()` to keep parent state in sync
-- `middleware.ts`: removed `/team-lead` redirect for supervisors — loop fixed
-- `sim/SimControls.tsx`: deleted (dead code, never imported)
-- `generateMetrics.ts`: removed module-load example call (`generateMetrics("day")`)
+### M9: Real-Time Alerts ✅
+**Files:** `src/lib/alertStore.ts`, `src/app/api/metrics/route.ts` (alert detection), `src/components/AlertBanner.tsx`, `src/app/page.tsx` (wiring).
 
+Alert detection for stall (output unchanged), FPY drop below threshold, and pace below 75%. AlertBanner fixed at top of dashboard with severity colors, acknowledge/dismiss, and clear-all. Alerts are ephemeral (not persisted to DB).
 
+### M10: OEE Tracking ✅
+**Files:** `src/lib/types.ts` (OEE added to Line), `src/app/api/metrics/route.ts` (OEE computation), `src/app/page.tsx` (Avg OEE KPI card), `src/components/LineTable.tsx` (OEE column), `src/components/LineDrawer.tsx` (OEE tab with A×P×Q breakdown).
 
-### EOS: auto-hide lines without a schedule
+OEE = Availability × Performance × Quality per line. Availability driven by downtime log (M8); Performance by HPU; Quality by FPY.
+
+### M11: Shift Handoff ✅
+**Files:** `src/lib/handoffTypes.ts`, `src/lib/db.ts` (handoff helpers), `src/app/api/handoff/route.ts`, `src/app/eos/page.tsx` (Handoff tab), `src/components/HandoffBanner.tsx`, `src/app/page.tsx` (banner on load).
+
+Structured handoff form at end of shift on EOS page. Incoming shift sees HandoffBanner on dashboard with acknowledge action. Issues auto-pulled from per-hour comments.
+
+### M12: EOS Scrap Auto-Fill ✅
 **File:** `src/app/eos/page.tsx`
 
-On mount/shift change, `refreshFromMes` now checks each line's MES state. If `!state.schedule`, the line's key is added to `hiddenLines` — the line is collapsed into the "Hidden" strip automatically. Manual show/hide still works as before.
+Scrap counts (scrapped panels + kicked lids) auto-populated into EOS form from the scrap log on refresh. Quality Summary table added below line cards showing per-line defect counts and derived FPY.
 
-### HPU: dynamic calculation replacing mock fallback
-**Files:** `src/app/api/metrics/route.ts`, `src/lib/generateMetrics.ts`
-
-`generateMetrics` no longer generates a random HPU — fallback is `0.0`. The `/api/metrics` route now computes `HPU = (headcount × elapsedHours) / output` using `getShiftProgress`, mirroring the EOS formula. Falls back to `0` when output is zero.
+### Bug Fixes (session: 2026-03-28) ✅
+- `ShiftSelector.tsx`: WCAG contrast fix (`text-white` → `text-black` on yellow accent)
+- `ShiftSelector.tsx`: renamed export from `Header` → `ShiftSelector`
+- `Header.tsx`: SIM badge contrast fix (`text-white` → `text-black`)
+- `Header.tsx`: `useEffect` closure staleness — added `simClockRef`
+- `ReworkPanel.tsx`: fixed unsafe double-cast type narrowing with discriminated union
+- `AdminLineCard.tsx`: "Not Running" toggle now calls `onConfigSaved()` to keep parent in sync
+- `middleware.ts`: removed `/team-lead` redirect for supervisors — loop fixed
+- `sim/SimControls.tsx`: deleted (dead code, never imported)
+- `generateMetrics.ts`: removed module-load example call
+- EOS: lines without a schedule auto-hidden via `hiddenLines` strip
+- HPU: now dynamically computed as `(headcount × elapsedHours) / output` in metrics route
 
 ---
 
@@ -47,11 +58,35 @@ On mount/shift change, `refreshFromMes` now checks each line's MES state. If `!s
 | M5: Integration | ✅ Done | PinGate in layout, conditional nav, auth wired throughout |
 | M6: Scrap + Rework Logging | ✅ Done | Types, store helpers, scrap API, ScrapForm, ReworkPanel |
 | M7: SQLite Persistence | ✅ Done | better-sqlite3, db.ts layer, write-through persistence |
-| M8: Downtime / Line Stop Logging | 🔨 In Progress | Issues 8.1–8.3 done (types, DB helpers, API route). Issues 8.4–8.7 pending (DowntimePanel, DowntimeForm, wiring) |
-| M9: Real-Time Alerts | 🔲 Backlog | Not started |
-| M10: OEE Tracking | 🔲 Backlog | Not started |
-| M11: Shift Handoff | 🔲 Backlog | Not started |
-| M12: EOS Scrap Auto-Fill | 🔲 Backlog | Not started |
+| M8: Downtime / Line Stop Logging | ✅ Done | Types, DB helpers, API, DowntimePanel, DowntimeForm, wiring |
+| M9: Real-Time Alerts | ✅ Done | alertStore, alert detection in metrics, AlertBanner |
+| M10: OEE Tracking | ✅ Done | OEE A×P×Q computed, OEE KPI card, OEE column, OEE tab in drawer |
+| M11: Shift Handoff | ✅ Done | Handoff form on EOS, HandoffBanner on dashboard, acknowledge flow |
+| M12: EOS Scrap Auto-Fill | ✅ Done | Scrap stats auto-fill, Quality Summary table on EOS |
+| M13: Dashboard Floor Awareness | ✅ Done | Shift clock, trend chart, VS highlighting, E-STOP removed |
+| M14: EOS Draft Persistence & Form Structure | ✅ Done | localStorage auto-save, structured notes, configurable email recipient |
+| M15: Team Lead Floor Overview + Scrap Speed | ✅ Done | Floor overview grid, quick-log scrap, comment save feedback, alert strip |
+| M16: LineTable Readability + LineDrawer Completion | ✅ Done | Sortable cols, wider bars, downtime tab, target ref line, operator contact |
+| M17: Simulation Fidelity | ✅ Done | Tick rate fix, changeover penalty, multi-defect scrap, ramp-up/wind-down, failure model |
+
+---
+
+## New in this session
+
+### M13: Dashboard Floor Awareness ✅
+Shift clock added to sidebar showing current shift time remaining. Trend chart section added to dashboard main panel with live MES output data. Value stream rows visually highlighted with VS1 (orange) / VS2 (teal) accents. E-STOP button removed from sidebar. Disabled nav items (Inventory / QC / Maintenance) now show "Coming Soon" with muted styling explained in docs.
+
+### M14: EOS Draft Persistence & Form Structure ✅
+EOS form state auto-saves to localStorage on every field change — page refresh no longer loses draft data. Notes field structured with labeled sections. Email recipient field made configurable (previously hardcoded placeholder).
+
+### M15: Team Lead Floor Overview + Scrap Speed ✅
+Team lead page now shows a floor overview grid when no line is selected — all 6 lines visible with live KPIs at a glance. Quick-log scrap button added for faster scrap entry. Comment save shows feedback toast on success. Floor alert strip added showing critical issues across all lines.
+
+### M16: LineTable Readability + LineDrawer Completion ✅
+LineTable gains sortable columns (click header to sort). Progress bars widened for better visual resolution. Dynamic status label now reflects exact condition (ON TRACK, WATCH, CRITICAL, SCHEDULE NEEDED). LineDrawer gains a downtime tab showing all logged stops. Output chart in drawer gains target reference line. Operator contact field added to drawer header.
+
+### M17: Simulation Fidelity ✅
+Simulator tick rate corrected (was over-producing at 1×). Changeover penalty applied when completing an order — simulates setup time. Multi-defect scrap model: kicked lid and scrapped panel injection rates tuned. Ramp-up model: lines start slow, reach full pace mid-shift. Wind-down model: production tapers in final hours. Equipment failure injection: occasional random downtime events in sim.
 
 ---
 

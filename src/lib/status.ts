@@ -38,6 +38,12 @@ export function getPaceColor(projected: number, target: number): string {
   return "text-status-red";
 }
 
+export function getOeeColor(oee: number): string {
+  if (oee >= 85) return "text-status-green";
+  if (oee >= 70) return "text-status-amber";
+  return "text-status-red";
+}
+
 export function calcLinePace(
   output: number,
   elapsedHours: number,
@@ -51,10 +57,15 @@ export function calcLinePace(
 export function getRiskLevel(
   line: Line,
   mesState: LineState | undefined,
-  shiftProgress: ShiftProgress | undefined
+  shiftProgress: ShiftProgress | undefined,
+  isRunning?: boolean,
 ): RiskLevel {
-  // No schedule loaded — not critical, just unscheduled
-  if (!mesState?.schedule) return "unscheduled";
+  // Only show SCHEDULE NEEDED when the line is supposed to be running but has no schedule.
+  // Lines explicitly marked as "Not Running" (isRunning=false) are excluded.
+  if (!mesState?.schedule) {
+    if (isRunning === false) return "none";
+    return "unscheduled";
+  }
 
   const fpyRisk = line.fpy < 90 && line.output < line.target;
 
@@ -86,11 +97,20 @@ export function getStatusReasons(
   mesState: LineState | undefined,
   shiftProgress: ShiftProgress | undefined,
   plannedHeadcount: number | undefined,
-  isZeroOutput: boolean
+  isZeroOutput: boolean,
+  isRunning?: boolean,
+  openDowntime?: boolean,
 ): string[] {
-  if (!mesState?.schedule) return ["No schedule loaded"];
+  if (!mesState?.schedule) {
+    if (isRunning === false) return [];
+    return ["No schedule loaded"];
+  }
 
   const reasons: string[] = [];
+
+  if (openDowntime) {
+    reasons.push("Line stopped");
+  }
 
   if (isZeroOutput) {
     reasons.push("Zero output");
