@@ -1,31 +1,23 @@
 /**
  * SQLite persistence layer using better-sqlite3.
- * All data that must survive a cold start lives here.
- *
- * Migrations run on every import — use IF NOT EXISTS / ADD COLUMN
- * patterns to stay safe across hot reloads.
+ * Uses :memory: mode so it works on Vercel (read-only filesystem at /var/task).
+ * State is lost on cold start — acceptable for a demo.
+ * For production persistence: swap to Vercel KV, Neon, or similar.
  */
 
 import Database from "better-sqlite3";
-import path from "path";
-import fs from "fs";
 import type { AdminLineConfig, LineSchedule, ScanEvent } from "./mesTypes";
 import type { LineComments } from "./mesTypes";
 import type { ScrapEntry } from "./reworkTypes";
 import type { DowntimeEntry } from "./downtimeTypes";
 
-// ── Path setup ────────────────────────────────────────────────────────────────
-
-const DATA_DIR = path.join(process.cwd(), "data");
-const DB_PATH  = path.join(DATA_DIR, "ops.db");
+// ── In-memory SQLite ─────────────────────────────────────────────────────────
 
 let _db: Database.Database | undefined;
 
 export function getDb(): Database.Database {
   if (_db) return _db;
-  fs.mkdirSync(DATA_DIR, { recursive: true });
-  _db = new Database(DB_PATH);
-  _db.pragma("journal_mode = WAL");
+  _db = new Database(":memory:");
   _db.pragma("foreign_keys = ON");
   runMigrations(_db);
   return _db;
