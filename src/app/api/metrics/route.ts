@@ -5,7 +5,6 @@ import { getOutputForLine, getAdminConfig, getKickedLidsForLineShift, getAllLine
 import { getShiftProgress, getShiftWindows } from "@/lib/shiftTime";
 import type { TimePoint } from "@/lib/types";
 
-// The valid shift values the client can request
 const VALID_SHIFTS: ShiftName[] = ["day", "night"];
 
 export async function GET(request: NextRequest): Promise<NextResponse> {
@@ -28,40 +27,34 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   const win = getShiftWindows(shiftParam as ShiftName);
   const now = new Date();
 
-  // Build shift window boundaries for clamping downtime entries
   const shiftStart = new Date(now);
   shiftStart.setHours(Math.floor(win.startHour), 0, 0, 0);
   const shiftEnd = new Date(now);
   const endHour = Math.floor(win.endHour);
   const endMin  = Math.round((win.endHour - endHour) * 60);
   shiftEnd.setHours(endHour % 24, endMin, 0, 0);
-  // If endHour > 23, it's an overnight shift crossing midnight
   if (win.endHour >= 24) shiftEnd.setDate(shiftEnd.getDate() + 1);
 
   const totalShiftMinutes = totalHours * 60;
 
   for (const line of metrics.lines) {
-    const admin = getAdminConfig(line.id);
-    line.target = admin.target ?? getDefaultTarget(line.id);
+    const admin = await getAdminConfig(line.id);
+    line.target    = admin.target    ?? getDefaultTarget(line.id);
     line.headcount = admin.headcount ?? getDefaultHeadcount(line.id);
-    line.output = getOutputForLine(line.id);
+    line.output    = await getOutputForLine(line.id);
 
     const totalOutput = line.output;
-    const kickedLids = getKickedLidsForLineShift(line.id, shiftParam as ShiftName);
-    // FPY = (Total Lids − Kicked Lids) / Total Lids.
-    // tickLine pushes a ScanEvent for every unit produced (good or bad), so
-    // totalOutput = all lids scanned. Kicked lids are a subset that failed quality.
+    const kickedLids  = await getKickedLidsForLineShift(line.id, shiftParam as ShiftName);
     line.fpy =
       totalOutput > 0
         ? Math.min(100, Math.round(((totalOutput - kickedLids) / totalOutput) * 1000) / 10)
         : 100;
 
-    // ── Downtime (used for both Availability and HPU) ───────────────────────
-    const downtimeEntries = getDowntimeEntries(line.id, shiftParam as ShiftName);
+    const downtimeEntries = await getDowntimeEntries(line.id, shiftParam as ShiftName);
     let downtimeMinutes = 0;
     for (const entry of downtimeEntries) {
-      const entryStart = new Date(entry.startTime);
-      const entryEnd = entry.endTime ? new Date(entry.endTime) : now;
+      const entryStart   = new Date(entry.startTime);
+      const entryEnd     = entry.endTime ? new Date(entry.endTime) : now;
       const clampedStart = entryStart < shiftStart ? shiftStart : entryStart;
       const clampedEnd   = entryEnd   > shiftEnd   ? shiftEnd   : entryEnd;
       if (clampedEnd > clampedStart) {
@@ -69,73 +62,58 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       }
     }
 
-    // HPU = (HC × actual uptime hrs) / output.  Uses uptime not elapsed shift time so
-    // that a stopped line's idle hours don't falsely improve its HPU.
     const uptimeMinutes = totalShiftMinutes - downtimeMinutes;
     const uptimeHours   = uptimeMinutes / 60;
     line.hpu = totalOutput > 0 && uptimeHours > 0
       ? Math.round((line.headcount * uptimeHours) / totalOutput * 100) / 100
       : 0;
 
-    // ── OEE: Availability × Performance × Quality ─────────────────────────────
     const availability = totalShiftMinutes > 0
       ? Math.max(0, Math.min(100, Math.round((1 - downtimeMinutes / totalShiftMinutes) * 1000) / 10))
       : 100;
 
-    // Performance: actual UPH vs standard UPH (target / totalHours)
-    // Capped at 100 so performance >100% doesn't inflate OEE beyond max.
-    // If line hasn't produced yet (totalOutput=0), default to 100 — no speed losses yet.
-    const standardUpH = line.target / totalHours; // expected units/hr
-    const actualUpH   = elapsedHours > 0 && totalOutput > 0 ? totalOutput / elapsedHours : 0;
-    const performance = standardUpH > 0 && totalOutput > 0
+    const standardUpH  = line.target / totalHours;
+    const actualUpH    = elapsedHours > 0 && totalOutput > 0 ? totalOutput / elapsedHours : 0;
+    const performance  = standardUpH > 0 && totalOutput > 0
       ? Math.min(100, Math.round((actualUpH / standardUpH) * 1000) / 10)
       : 100;
 
-    // OEE = A × P × Q
     line.availability = availability;
     line.performance  = performance;
-    line.quality     = line.fpy;
+    line.quality      = line.fpy;
     line.oee = Math.round((availability * performance * line.fpy) / 10000) / 100;
   }
 
-  // ── Build real trend from MES hourly output ─────────────────────────────────
-  // If no MES schedule has been loaded, trend stays as empty (all-zero) placeholders.
-  const states = getAllLineStates();
+  const states   = await getAllLineStates();
   const INTERVALS = 16;
   const realTrend: TimePoint[] = [];
 
-  // Build per-interval cumulative output from MES hourlyOutput records
-  // Key by "HH:00" hour buckets
   for (let i = 0; i < INTERVALS; i++) {
     const totalMinutes = win.startHour * 60 + i * 30;
-    const hours = Math.floor(totalMinutes / 60) % 24;
+    const hours   = Math.floor(totalMinutes / 60) % 24;
     const minutes = totalMinutes % 60;
-    const time = `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
+    const time    = `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
 
     let vs1Output = 0;
     let vs2Output = 0;
 
     for (const state of states) {
-      const hourKey = `${String(hours).padStart(2, "0")}:00`;
+      const hourKey    = `${String(hours).padStart(2, "0")}:00`;
       const hourOutput = state.hourlyOutput?.[hourKey] ?? 0;
-      if (state.lineId.startsWith("vs1-")) {
-        vs1Output += hourOutput;
-      } else if (state.lineId.startsWith("vs2-")) {
-        vs2Output += hourOutput;
-      }
+      if (state.lineId.startsWith("vs1-"))      vs1Output += hourOutput;
+      else if (state.lineId.startsWith("vs2-")) vs2Output += hourOutput;
     }
 
     realTrend.push({ time, vs1Output, vs2Output });
   }
 
-  // Only use real trend if we have any MES data; otherwise show all-zero trend
   const hasMesData = states.some((s) =>
     Object.values(s.hourlyOutput ?? {}).some((v) => v > 0)
   );
 
   metrics.trend = hasMesData ? realTrend : Array.from({ length: INTERVALS }, (_, i) => {
     const totalMinutes = win.startHour * 60 + i * 30;
-    const hours = Math.floor(totalMinutes / 60) % 24;
+    const hours   = Math.floor(totalMinutes / 60) % 24;
     const minutes = totalMinutes % 60;
     return { time: `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`, vs1Output: 0, vs2Output: 0 };
   });

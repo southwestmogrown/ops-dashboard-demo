@@ -11,7 +11,7 @@ export async function DELETE(req: Request) {
     return Response.json({ error: "Cannot remove active schedule (index 0)" }, { status: 400 });
   }
 
-  const ok = removeFromQueue(lineId, index);
+  const ok = await removeFromQueue(lineId, index);
   if (!ok) return Response.json({ error: "Index out of range" }, { status: 404 });
 
   return Response.json({ ok: true });

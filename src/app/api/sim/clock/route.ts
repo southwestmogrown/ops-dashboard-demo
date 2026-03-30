@@ -9,9 +9,9 @@ import {
 
 export async function GET(): Promise<NextResponse> {
   return NextResponse.json({
-    clock: getSimClock()?.toISOString() ?? null,
-    running: getSimRunning(),
-    speed: getSimSpeed(),
+    clock:   (await getSimClock())?.toISOString() ?? null,
+    running: await getSimRunning(),
+    speed:   await getSimSpeed(),
   });
 }
 
@@ -25,21 +25,20 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
   if (body.clock !== undefined) {
     if (body.clock === null) {
-      setSimClock(null);
+      await setSimClock(null);
     } else {
       const d = new Date(body.clock as string);
       if (isNaN(d.getTime())) {
         return NextResponse.json({ error: "Invalid clock date" }, { status: 400 });
       }
-      setSimClock(d);
+      await setSimClock(d);
     }
   }
 
   if (body.running !== undefined) {
-    setSimRunning(Boolean(body.running), body.speed as number | undefined);
+    await setSimRunning(Boolean(body.running), body.speed as number | undefined);
   } else if (body.speed !== undefined) {
-    // Only update speed when running state is already managed
-    setSimRunning(getSimRunning(), body.speed as number);
+    await setSimRunning(await getSimRunning(), body.speed as number);
   }
 
   return NextResponse.json({ ok: true });

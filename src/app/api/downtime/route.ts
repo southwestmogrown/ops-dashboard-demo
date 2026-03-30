@@ -22,7 +22,7 @@ const VALID_REASONS: DowntimeReason[] = [
 export async function GET(request: NextRequest): Promise<NextResponse> {
   const { searchParams } = new URL(request.url);
   const lineId = searchParams.get("lineId");
-  const shift   = searchParams.get("shift") as ShiftName | null;
+  const shift  = searchParams.get("shift") as ShiftName | null;
 
   if (!shift) {
     return NextResponse.json({ error: "shift query param is required" }, { status: 400 });
@@ -31,15 +31,11 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ error: "shift must be 'day' or 'night'" }, { status: 400 });
   }
 
-  // With lineId: return entries for that line
   if (lineId) {
-    const entries = getDowntimeEntries(lineId, shift);
-    return NextResponse.json(entries);
+    return NextResponse.json(await getDowntimeEntries(lineId, shift));
   }
 
-  // Without lineId: return all entries for the shift (for dashboard polling)
-  const entries = getAllDowntimeEntriesForShift(shift);
-  return NextResponse.json(entries);
+  return NextResponse.json(await getAllDowntimeEntriesForShift(shift));
 }
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
@@ -66,18 +62,18 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   }
 
   const entry: DowntimeEntry = {
-    id: "", // filled by addDowntimeEntry
-    lineId: lineId as string,
-    shift: shift as ShiftName,
-    reason: reason as DowntimeReason,
+    id: "",
+    lineId:    lineId as string,
+    shift:     shift as ShiftName,
+    reason:    reason as DowntimeReason,
     startTime: startTime as string,
-    endTime: null,
+    endTime:   null,
     unitsLost: typeof unitsLost === "number" ? unitsLost : 0,
-    notes: typeof notes === "string" ? notes : "",
+    notes:     typeof notes     === "string" ? notes     : "",
     createdBy: typeof createdBy === "string" ? createdBy : undefined,
   };
 
-  const saved = addDowntimeEntry(entry);
+  const saved = await addDowntimeEntry(entry);
   return NextResponse.json(saved, { status: 201 });
 }
 
@@ -94,6 +90,6 @@ export async function PATCH(request: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ error: "id and endTime are required" }, { status: 400 });
   }
 
-  closeDowntimeEntry(id as string, endTime as string);
+  await closeDowntimeEntry(id as string, endTime as string);
   return NextResponse.json({ ok: true });
 }

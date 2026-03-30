@@ -36,8 +36,11 @@ yarn-error.log*
 # vercel
 .vercel
 
-# SQLite database
+# SQLite database (local Turso file: mode)
 data/
+local.db
+local.db-wal
+local.db-shm
 
 # typescript
 *.tsbuildinfo

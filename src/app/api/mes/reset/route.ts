@@ -2,6 +2,6 @@ import { NextResponse } from "next/server";
 import { resetAll } from "@/lib/mesStore";
 
 export async function POST(): Promise<NextResponse> {
-  resetAll();
+  await resetAll();
   return NextResponse.json({ ok: true });
 }

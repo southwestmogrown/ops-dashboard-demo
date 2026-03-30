@@ -9,7 +9,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ error: "lineId is required" }, { status: 400 });
   }
 
-  return NextResponse.json(getLineComments(lineId));
+  return NextResponse.json(await getLineComments(lineId));
 }
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
@@ -19,6 +19,6 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ error: "lineId and hour are required" }, { status: 400 });
   }
 
-  setLineComment(body.lineId, body.hour, body.comment ?? "");
+  await setLineComment(body.lineId, body.hour, body.comment ?? "");
   return NextResponse.json({ ok: true });
 }

@@ -5,8 +5,6 @@ import type { LineSchedule } from "@/lib/mesTypes";
 interface ScheduleBody {
   lineId: string;
   schedule: LineSchedule;
-  /** "replace" clears the queue and sets a new active schedule (default).
-   *  "queue" appends behind the current active schedule. */
   mode?: "replace" | "queue";
 }
 
@@ -18,9 +16,9 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   }
 
   if (body.mode === "queue") {
-    enqueueSchedule(body.lineId, body.schedule);
+    await enqueueSchedule(body.lineId, body.schedule);
   } else {
-    setSchedule(body.lineId, body.schedule);
+    await setSchedule(body.lineId, body.schedule);
   }
 
   return NextResponse.json({ ok: true });
@@ -31,7 +29,7 @@ export async function DELETE(request: NextRequest): Promise<NextResponse> {
   if (!body?.lineId) {
     return NextResponse.json({ error: "lineId required" }, { status: 400 });
   }
-  clearLine(body.lineId);
+  await clearLine(body.lineId);
   return NextResponse.json({ ok: true });
 }
 
@@ -47,7 +45,7 @@ export async function PATCH(request: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ error: "lineId, model, and action (skip|unskip) are required" }, { status: 400 });
   }
   const ok = body.action === "skip"
-    ? skipOrder(body.lineId, body.model)
-    : unskipOrder(body.lineId, body.model);
+    ? await skipOrder(body.lineId, body.model)
+    : await unskipOrder(body.lineId, body.model);
   return NextResponse.json({ ok });
 }
