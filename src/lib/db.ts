@@ -11,17 +11,17 @@ import type { LineComments } from "./mesTypes";
 import type { ScrapEntry } from "./reworkTypes";
 import type { DowntimeEntry } from "./downtimeTypes";
 
-// ── Client singleton ──────────────────────────────────────────────────────────
+// ── Client singleton (globalThis survives HMR in dev mode) ───────────────────
 
-let _client: Client | undefined;
+const _G = globalThis as unknown as { __turso_client__?: Client };
 
 export function getClient(): Client {
-  if (_client) return _client;
-  _client = createClient({
+  if (_G.__turso_client__) return _G.__turso_client__;
+  _G.__turso_client__ = createClient({
     url:       process.env.TURSO_DATABASE_URL ?? "file:local.db",
     authToken: process.env.TURSO_AUTH_TOKEN,
   });
-  return _client;
+  return _G.__turso_client__;
 }
 
 // ── Migrations ────────────────────────────────────────────────────────────────
