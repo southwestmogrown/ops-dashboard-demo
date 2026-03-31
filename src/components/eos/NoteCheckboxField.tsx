@@ -11,7 +11,7 @@ export default function NoteCheckboxField({ label, value, onChange }: Props) {
 
   return (
     <div>
-      <label className="flex items-center gap-2 mb-2 cursor-pointer group select-none">
+      <label className="flex items-center gap-3 mb-2 cursor-pointer group select-none">
         <div className="relative flex-shrink-0">
           <input
             type="checkbox"
@@ -23,22 +23,32 @@ export default function NoteCheckboxField({ label, value, onChange }: Props) {
           />
           <div
             className={[
-              "w-4 h-4 rounded-sm border transition-all duration-150",
+              "flex h-5 w-5 items-center justify-center rounded-sm border-2 transition-all duration-150",
               checked
-                ? "bg-accent border-accent"
-                : "bg-transparent border-border group-hover:border-accent/50",
+                ? "border-accent bg-accent shadow-[0_0_0_1px_rgba(249,115,22,0.25)]"
+                : "border-[#748095] bg-surface-highest group-hover:border-accent/70",
             ].join(" ")}
           >
             {checked && (
-              <span className="material-symbols-outlined text-black text-xs absolute inset-0 flex items-center justify-center leading-none">
+              <span className="material-symbols-outlined text-[13px] leading-none text-black">
                 check
               </span>
             )}
           </div>
         </div>
-        <span className="text-[10px] text-[#e1e2ec]/40 tracking-widest uppercase font-bold">
-          {label}
-        </span>
+        <div className="flex items-center gap-2">
+          <span className="text-[10px] text-[#d5dbe6] tracking-widest uppercase font-bold">
+            {label}
+          </span>
+          <span className={[
+            "rounded-sm border px-2 py-0.5 text-[9px] font-bold uppercase tracking-[0.18em]",
+            checked
+              ? "border-accent/45 bg-accent/12 text-[#ffd6b8]"
+              : "border-border bg-surface text-[#aeb8c8]",
+          ].join(" ")}>
+            {checked ? "Checked" : "Off"}
+          </span>
+        </div>
       </label>
       {checked && (
         <input

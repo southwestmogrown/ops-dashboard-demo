@@ -388,7 +388,7 @@ export default function Home() {
 
           {/* Output chart */}
           <section className="mb-6">
-            <OutputChart lines={activeLines} trend={metrics?.trend} totalTarget={totalTarget} />
+            <OutputChart lines={activeLines} trend={metrics?.trend} totalTarget={totalTarget} shift={shift} currentTime={simClock} />
           </section>
 
           {/* Line table */}

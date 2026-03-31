@@ -12,20 +12,50 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import { Line as LineData, TimePoint } from "@/lib/types";
+import { getShiftWindows } from "@/lib/shiftTime";
+import type { ShiftName } from "@/lib/types";
 
 interface OutputChartProps {
   lines: LineData[];
   trend?: TimePoint[];
   totalTarget?: number;
+  shift: ShiftName;
+  currentTime?: Date | null;
 }
 
-export default function OutputChart({ lines, trend, totalTarget }: OutputChartProps) {
+export default function OutputChart({ lines, trend, totalTarget, shift, currentTime }: OutputChartProps) {
   const data = lines.map((line: LineData) => ({
     line: `${line.valueStream} L${line.name.slice(-1)}`,
     output: line.output,
     target: line.target,
     isVs1: line.valueStream === "VS1",
   }));
+
+  const chartNow = currentTime ?? new Date();
+  const shiftWindow = getShiftWindows(shift);
+  const currentHour = chartNow.getHours() + chartNow.getMinutes() / 60 + chartNow.getSeconds() / 3600;
+  const elapsedHours = currentHour >= shiftWindow.startHour
+    ? currentHour - shiftWindow.startHour
+    : currentHour + 24 - shiftWindow.startHour;
+  const clampedElapsedMinutes = Math.max(0, Math.min(shiftWindow.totalClockMinutes, Math.floor(elapsedHours * 60)));
+  const visibleTrendIndex = trend && trend.length > 0
+    ? Math.min(trend.length - 1, Math.floor(clampedElapsedMinutes / 30))
+    : -1;
+  const trendData = (trend ?? []).map((tp, i) => {
+    const visible = i <= visibleTrendIndex;
+    return {
+      ...tp,
+      vs1Output: visible ? tp.vs1Output : null,
+      vs2Output: visible ? tp.vs2Output : null,
+      ...(totalTarget && totalTarget > 0
+        ? {
+            targetLine: visible
+              ? Math.round((i / Math.max(1, (trend?.length ?? 1) - 1)) * totalTarget)
+              : null,
+          }
+        : {}),
+    };
+  });
 
   /** True when any line in the VS has output > 2 std devs below the VS average. */
   function vsHasDramaticOff(vs: "VS1" | "VS2") {
@@ -50,14 +80,14 @@ export default function OutputChart({ lines, trend, totalTarget }: OutputChartPr
           <h2 className="text-lg font-bold font-['Space_Grotesk',sans-serif] tracking-tight uppercase text-[#e1e2ec]">
             Line Output Performance
           </h2>
-          <p className="text-xs text-[#e1e2ec]/40 mt-0.5">
+          <p className="text-xs text-[#c8ceda] mt-0.5">
             Real-time throughput analysis per production line
           </p>
         </div>
         <div className="flex items-center space-x-6">
           <div className="flex items-center space-x-2">
             <div className="w-3 h-3 bg-accent rounded-sm" />
-            <span className="text-[10px] font-bold uppercase tracking-widest text-[#e1e2ec]/50">
+            <span className="text-[10px] font-bold uppercase tracking-widest text-[#cfd6e3]">
               VS1 (Folding)
             </span>
             {vs1Warn && (
@@ -66,7 +96,7 @@ export default function OutputChart({ lines, trend, totalTarget }: OutputChartPr
           </div>
           <div className="flex items-center space-x-2">
             <div className="w-3 h-3 bg-vs2 rounded-sm" />
-            <span className="text-[10px] font-bold uppercase tracking-widest text-[#e1e2ec]/50">
+            <span className="text-[10px] font-bold uppercase tracking-widest text-[#cfd6e3]">
               VS2 (Revolver)
             </span>
             {vs2Warn && (
@@ -90,16 +120,16 @@ export default function OutputChart({ lines, trend, totalTarget }: OutputChartPr
           />
           <XAxis
             dataKey="line"
-            tick={{ fill: "#e1e2ec", fillOpacity: 0.4, fontSize: 11, fontWeight: 700 }}
+            tick={{ fill: "#cfd6e3", fontSize: 11, fontWeight: 700 }}
             axisLine={{ stroke: "#1e2433" }}
             tickLine={false}
           />
           <YAxis
-            tick={{ fill: "#e1e2ec", fillOpacity: 0.4, fontSize: 11 }}
+            tick={{ fill: "#cfd6e3", fontSize: 11 }}
             axisLine={false}
             tickLine={false}
             width={40}
-            label={{ value: "Units", angle: -90, position: "insideLeft", fill: "#e1e2ec", fillOpacity: 0.3, fontSize: 10 }}
+            label={{ value: "Units", angle: -90, position: "insideLeft", fill: "#aeb8c8", fontSize: 10 }}
           />
           <Tooltip
             cursor={{ fill: "rgba(255,255,255,0.03)" }}
@@ -109,7 +139,7 @@ export default function OutputChart({ lines, trend, totalTarget }: OutputChartPr
               borderRadius: "4px",
               fontSize: "12px",
             }}
-            labelStyle={{ color: "#e1e2ec", opacity: 0.6 }}
+            labelStyle={{ color: "#dbe2ef" }}
             itemStyle={{ color: "#e1e2ec" }}
           />
           <Bar
@@ -139,27 +169,27 @@ export default function OutputChart({ lines, trend, totalTarget }: OutputChartPr
               <h3 className="text-base font-bold font-['Space_Grotesk',sans-serif] tracking-tight uppercase text-[#e1e2ec]">
                 Shift Progress
               </h3>
-              <p className="text-xs text-[#e1e2ec]/40 mt-0.5">
+              <p className="text-xs text-[#c8ceda] mt-0.5">
                 Cumulative output vs target trajectory
               </p>
             </div>
             <div className="flex items-center space-x-6">
               <div className="flex items-center space-x-2">
                 <div className="w-3 h-0.5 bg-accent rounded-full" />
-                <span className="text-[10px] font-bold uppercase tracking-widest text-[#e1e2ec]/50">
+                <span className="text-[10px] font-bold uppercase tracking-widest text-[#cfd6e3]">
                   VS1 (Folding)
                 </span>
               </div>
               <div className="flex items-center space-x-2">
                 <div className="w-3 h-0.5 bg-vs2 rounded-full" />
-                <span className="text-[10px] font-bold uppercase tracking-widest text-[#e1e2ec]/50">
+                <span className="text-[10px] font-bold uppercase tracking-widest text-[#cfd6e3]">
                   VS2 (Revolver)
                 </span>
               </div>
               {totalTarget && totalTarget > 0 && (
                 <div className="flex items-center space-x-2">
                   <div className="w-3 h-0.5 border-t-2 border-dashed border-[#e1e2ec]/30 rounded-full" />
-                  <span className="text-[10px] font-bold uppercase tracking-widest text-[#e1e2ec]/50">
+                  <span className="text-[10px] font-bold uppercase tracking-widest text-[#cfd6e3]">
                     Target Trajectory
                   </span>
                 </div>
@@ -169,12 +199,7 @@ export default function OutputChart({ lines, trend, totalTarget }: OutputChartPr
 
           <ResponsiveContainer width="100%" height={240}>
             <LineChart
-              data={trend.map((tp, i) => ({
-                ...tp,
-                ...(totalTarget && totalTarget > 0
-                  ? { targetLine: Math.round((i / Math.max(1, trend.length - 1)) * totalTarget) }
-                  : {}),
-              }))}
+              data={trendData}
               margin={{ top: 5, right: 20, left: 0, bottom: 5 }}
             >
               <CartesianGrid
@@ -184,12 +209,12 @@ export default function OutputChart({ lines, trend, totalTarget }: OutputChartPr
               />
               <XAxis
                 dataKey="time"
-                tick={{ fill: "#e1e2ec", fillOpacity: 0.4, fontSize: 11 }}
+                tick={{ fill: "#cfd6e3", fontSize: 11 }}
                 axisLine={{ stroke: "#1e2433" }}
                 tickLine={false}
               />
               <YAxis
-                tick={{ fill: "#e1e2ec", fillOpacity: 0.4, fontSize: 11 }}
+                tick={{ fill: "#cfd6e3", fontSize: 11 }}
                 axisLine={false}
                 tickLine={false}
                 width={40}
@@ -202,7 +227,7 @@ export default function OutputChart({ lines, trend, totalTarget }: OutputChartPr
                   borderRadius: "4px",
                   fontSize: "12px",
                 }}
-                labelStyle={{ color: "#e1e2ec", opacity: 0.6 }}
+                labelStyle={{ color: "#dbe2ef" }}
                 itemStyle={{ color: "#e1e2ec" }}
               />
 

@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useMemo } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { ShiftMetrics } from "@/lib/types";
-import type { LineState } from "@/lib/mesTypes";
+import type { AdminLineConfig, LineState } from "@/lib/mesTypes";
 import type { EOSFormData, EOSLineDescriptor, EOSLineEntry, EOSValueStream } from "@/lib/eosTypes";
 import { calculateHPU, downloadAllReports } from "@/lib/eosReports";
 import EOSLineCard from "@/components/eos/EOSLineCard";
@@ -97,12 +97,17 @@ function emptyFormData(): EOSFormData {
   };
 }
 
+function lineIdToLineKey(lineId: string): string {
+  return lineId.replace("-l", ":Line ");
+}
+
 // ── Page ─────────────────────────────────────────────────────────────────────
 
 export default function EOSPage() {
   const pathname = usePathname();
   const [formData, setFormData]           = useState<EOSFormData>(emptyFormData());
   const [hiddenLines, setHiddenLines]     = useState<Set<string>>(new Set());
+  const [omittedLines, setOmittedLines]   = useState<Set<string>>(new Set());
   const [activeStream, setActiveStream]   = useState("vs1");
   const [mesRefreshing, setMesRefreshing] = useState(false);
   const [emailRecipient, setEmailRecipient] = useState("ops-leads@kineticcommand.io");
@@ -123,18 +128,24 @@ export default function EOSPage() {
   async function refreshFromMes(shift: string, autoHide: (keys: string[]) => void) {
     setMesRefreshing(true);
     try {
-      const [metrics, mesStates] = await Promise.all([
+      const [metrics, mesStates, adminConfig] = await Promise.all([
         fetch(`/api/metrics?shift=${shift.toLowerCase()}`).then((r) => r.json() as Promise<ShiftMetrics>),
         fetch("/api/mes/state").then((r) => r.json() as Promise<LineState[]>).catch(() => [] as LineState[]),
+        fetch("/api/admin/config").then((r) => r.json() as Promise<Record<string, AdminLineConfig>>).catch(() => ({})),
       ]);
 
       const toHide: string[] = [];
+      const toOmit = Object.entries(adminConfig)
+        .filter(([, config]) => config.isRunning === false)
+        .map(([lineId]) => lineIdToLineKey(lineId));
+
+      setOmittedLines(new Set(toOmit));
 
       setFormData((prev) => {
         const updatedLines = { ...prev.lines };
 
         metrics.lines.forEach((line) => {
-          const lineKey = line.id.replace("-l", ":Line ");
+          const lineKey = lineIdToLineKey(line.id);
           if (!(lineKey in updatedLines)) return;
           const merged = {
             ...updatedLines[lineKey],
@@ -146,7 +157,7 @@ export default function EOSPage() {
         });
 
         mesStates.forEach((state) => {
-          const lineKey = state.lineId.replace("-l", ":Line ");
+          const lineKey = lineIdToLineKey(state.lineId);
           if (!(lineKey in updatedLines)) return;
           if (!state.schedule) {
             toHide.push(lineKey);
@@ -253,10 +264,17 @@ export default function EOSPage() {
 
   const currentStream = VALUE_STREAMS.find((vs) => vs.id === activeStream)!;
   const activeLines   = ALL_LINES.filter(
-    ({ vsId, line }) => vsId === activeStream && !hiddenLines.has(`${vsId}:${line}`),
+    ({ vsId, line }) => vsId === activeStream
+      && !omittedLines.has(`${vsId}:${line}`)
+      && !hiddenLines.has(`${vsId}:${line}`),
   );
-  const visibleLines = currentStream.lines.filter((l) => !hiddenLines.has(`${currentStream.id}:${l}`));
-  const hiddenVsLines = currentStream.lines.filter((l) =>  hiddenLines.has(`${currentStream.id}:${l}`));
+  const visibleLines = currentStream.lines.filter(
+    (line) => !omittedLines.has(`${currentStream.id}:${line}`) && !hiddenLines.has(`${currentStream.id}:${line}`),
+  );
+  const hiddenVsLines = currentStream.lines.filter(
+    (line) => !omittedLines.has(`${currentStream.id}:${line}`) && hiddenLines.has(`${currentStream.id}:${line}`),
+  );
+  const omittedVsLines = currentStream.lines.filter((line) => omittedLines.has(`${currentStream.id}:${line}`));
 
   const filledLines = activeLines.filter(({ lineKey }) => formData.lines[lineKey].output).length;
   const progress    = activeLines.length > 0 ? Math.round((filledLines / activeLines.length) * 100) : 0;
@@ -604,6 +622,12 @@ export default function EOSPage() {
                     />
                   ))}
 
+                  {visibleLines.length === 0 && (
+                    <div className="px-4 py-5 bg-surface border border-border rounded-sm text-sm text-[#e1e2ec]/55">
+                      No running lines in this value stream for the current EOS report.
+                    </div>
+                  )}
+
                   {hiddenVsLines.length > 0 && (
                     <div className="flex flex-wrap gap-2 px-4 py-3 bg-surface border border-dashed border-border rounded-sm">
                       <span className="text-[10px] text-[#e1e2ec]/30 tracking-widest uppercase self-center mr-1 font-bold">
@@ -618,6 +642,22 @@ export default function EOSPage() {
                         >
                           + {line}
                         </button>
+                      ))}
+                    </div>
+                  )}
+
+                  {omittedVsLines.length > 0 && (
+                    <div className="flex flex-wrap gap-2 px-4 py-3 bg-surface border border-border rounded-sm">
+                      <span className="text-[10px] text-[#e1e2ec]/30 tracking-widest uppercase self-center mr-1 font-bold">
+                        Omitted:
+                      </span>
+                      {omittedVsLines.map((line) => (
+                        <span
+                          key={line}
+                          className="border border-border rounded-sm text-[#e1e2ec]/40 text-xs px-2.5 py-0.5"
+                        >
+                          {line} not running
+                        </span>
                       ))}
                     </div>
                   )}
