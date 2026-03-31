@@ -35,26 +35,26 @@ export type DefectType = (typeof DEFECT_TYPES)[number];
 
 /** Weighted defect pool for VS1 (folding) lines. Kicked lids are rare events (~3%). */
 const VS1_DEFECT_WEIGHTS: [DefectType, number][] = [
-  ["kicked-lid",        3],
-  ["damaged-panel",    20],
-  ["surface-scratch",  15],
-  ["dimensional",      12],
-  ["weld-defect",       8],
-  ["missing-hardware",   7],
-  ["electrical-fault",  4],
-  ["sealing-fail",      4],
+  ["kicked-lid", 3],
+  ["damaged-panel", 20],
+  ["surface-scratch", 15],
+  ["dimensional", 12],
+  ["weld-defect", 8],
+  ["missing-hardware", 7],
+  ["electrical-fault", 4],
+  ["sealing-fail", 4],
 ];
 
 /** Weighted defect pool for VS2 (revolver) lines — more weld/electrical defects. Kicked lids ~2%. */
 const VS2_DEFECT_WEIGHTS: [DefectType, number][] = [
-  ["kicked-lid",        2],
-  ["damaged-panel",    14],
-  ["surface-scratch",   8],
-  ["dimensional",       9],
-  ["weld-defect",      20],
-  ["missing-hardware",   9],
+  ["kicked-lid", 2],
+  ["damaged-panel", 14],
+  ["surface-scratch", 8],
+  ["dimensional", 9],
+  ["weld-defect", 20],
+  ["missing-hardware", 9],
   ["electrical-fault", 13],
-  ["sealing-fail",      9],
+  ["sealing-fail", 9],
 ];
 
 /**
@@ -75,11 +75,11 @@ export function pickDefectType(isVS2: boolean): DefectType {
 // ── Base ──────────────────────────────────────────────────────────────────────
 
 interface ScrapEntryBase {
-  id: string;           // "SCR-001" — sequential, resets with resetAll()
-  timestamp: string;    // ISO 8601, auto-set at creation
-  lineId: string;      // auto-populated from team-lead context
-  shift: ShiftName;     // auto-populated from team-lead context
-  model: string;        // part/model number
+  id: string; // "SCR-001" — sequential, resets with resetAll()
+  timestamp: string; // ISO 8601, auto-set at creation
+  lineId: string; // auto-populated from team-lead context
+  shift: ShiftName; // auto-populated from team-lead context
+  model: string; // part/model number
   panel: PanelPosition; // which panel position (A–G)
   /** Manual-entry values (Damaged Panel, Bent Extrusion…) or sim-injected codes (kicked-lid, weld-defect…) */
   damageType: DamageType | DefectType;
@@ -112,11 +112,14 @@ export interface KickedLid extends ScrapEntryBase {
 // ── Union ─────────────────────────────────────────────────────────────────────
 
 export type ScrapEntry = ScrappedPanel | KickedLid;
+export type NewScrapEntry =
+  | Omit<ScrappedPanel, "id" | "timestamp">
+  | Omit<KickedLid, "id" | "timestamp">;
 
 // ── Derived stats ─────────────────────────────────────────────────────────────
 
 export interface ScrapStats {
-  kickedLids: number;      // count of KickedLid entries
-  scrappedPanels: number;  // count of ScrappedPanel entries
-  totalBoughtIn: number;   // count where boughtIn === true
+  kickedLids: number; // count of KickedLid entries
+  scrappedPanels: number; // count of ScrappedPanel entries
+  totalBoughtIn: number; // count where boughtIn === true
 }

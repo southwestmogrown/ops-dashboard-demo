@@ -8,8 +8,14 @@
  * and is shared across all module evaluations (turbopack can re-evaluate
  * route modules independently).
  */
-import type { AdminLineConfig, LineComments, LineSchedule, LineState, ScanEvent } from "./mesTypes";
-import type { ScrapEntry } from "./reworkTypes";
+import type {
+  AdminLineConfig,
+  LineComments,
+  LineSchedule,
+  LineState,
+  ScanEvent,
+} from "./mesTypes";
+import type { NewScrapEntry, ScrapEntry } from "./reworkTypes";
 import type { DowntimeEntry } from "./downtimeTypes";
 import { getShiftWindows } from "./shiftTime";
 import {
@@ -42,22 +48,22 @@ import {
 // ── Cache shape ──────────────────────────────────────────────────────────────
 
 interface MesCache {
-  queues:               Record<string, LineSchedule[]>;
-  scanLog:              ScanEvent[];
-  adminConfig:          Record<string, AdminLineConfig>;
-  comments:             Record<string, LineComments>;
-  scrapLog:             ScrapEntry[];
-  scrapSerial:          number;
-  downtimeLog:          DowntimeEntry[];
-  downtimeSerial:       number;
-  simClock:             Date | null;
-  simRunning:           boolean;
-  simSpeed:             number;
-  changeoverRemaining:  Record<string, number>;
-  failureAccumulator:   Record<string, number>;
-  repairRemaining:      Record<string, number>;
-  initialized:          boolean;
-  initPromise:          Promise<void> | null;
+  queues: Record<string, LineSchedule[]>;
+  scanLog: ScanEvent[];
+  adminConfig: Record<string, AdminLineConfig>;
+  comments: Record<string, LineComments>;
+  scrapLog: ScrapEntry[];
+  scrapSerial: number;
+  downtimeLog: DowntimeEntry[];
+  downtimeSerial: number;
+  simClock: Date | null;
+  simRunning: boolean;
+  simSpeed: number;
+  changeoverRemaining: Record<string, number>;
+  failureAccumulator: Record<string, number>;
+  repairRemaining: Record<string, number>;
+  initialized: boolean;
+  initPromise: Promise<void> | null;
 }
 
 // ── globalThis singleton (survives HMR + shared across module evals) ─────────
@@ -67,22 +73,22 @@ const _G = globalThis as unknown as { __mes_cache__?: MesCache };
 function _c(): MesCache {
   if (!_G.__mes_cache__) {
     _G.__mes_cache__ = {
-      queues:              {},
-      scanLog:             [],
-      adminConfig:         {},
-      comments:            {},
-      scrapLog:            [],
-      scrapSerial:         0,
-      downtimeLog:         [],
-      downtimeSerial:      0,
-      simClock:            null,
-      simRunning:          false,
-      simSpeed:            60,
+      queues: {},
+      scanLog: [],
+      adminConfig: {},
+      comments: {},
+      scrapLog: [],
+      scrapSerial: 0,
+      downtimeLog: [],
+      downtimeSerial: 0,
+      simClock: null,
+      simRunning: false,
+      simSpeed: 60,
       changeoverRemaining: {},
-      failureAccumulator:  {},
-      repairRemaining:     {},
-      initialized:         false,
-      initPromise:         null,
+      failureAccumulator: {},
+      repairRemaining: {},
+      initialized: false,
+      initPromise: null,
     };
   }
   return _G.__mes_cache__!;
@@ -95,30 +101,39 @@ const MTBF_VS2 = 5;
 async function _hydrateFromDb(): Promise<void> {
   const c = _c();
 
-  const [allScans, allQueues, allConfig, allComments, allScrap, sim, allDowntime, scrapSerial, downtimeSerial] =
-    await Promise.all([
-      dbGetAllScans(),
-      dbGetAllQueues(),
-      dbGetAllAdminConfig(),
-      dbGetAllComments(),
-      dbGetAllScrapEntries(),
-      dbGetSimClock(),
-      dbGetAllDowntimeEntries(),
-      getSerialCounter("scrap_serial"),
-      getSerialCounter("downtime_serial"),
-    ]);
+  const [
+    allScans,
+    allQueues,
+    allConfig,
+    allComments,
+    allScrap,
+    sim,
+    allDowntime,
+    scrapSerial,
+    downtimeSerial,
+  ] = await Promise.all([
+    dbGetAllScans(),
+    dbGetAllQueues(),
+    dbGetAllAdminConfig(),
+    dbGetAllComments(),
+    dbGetAllScrapEntries(),
+    dbGetSimClock(),
+    dbGetAllDowntimeEntries(),
+    getSerialCounter("scrap_serial"),
+    getSerialCounter("downtime_serial"),
+  ]);
 
-  c.scanLog        = allScans;
-  c.queues         = allQueues;
-  c.adminConfig    = allConfig;
-  c.comments       = allComments;
-  c.scrapLog       = allScrap;
-  c.scrapSerial    = scrapSerial;
-  c.downtimeLog    = allDowntime;
+  c.scanLog = allScans;
+  c.queues = allQueues;
+  c.adminConfig = allConfig;
+  c.comments = allComments;
+  c.scrapLog = allScrap;
+  c.scrapSerial = scrapSerial;
+  c.downtimeLog = allDowntime;
   c.downtimeSerial = downtimeSerial;
-  c.simClock       = sim.clock;
-  c.simRunning     = sim.running;
-  c.simSpeed       = sim.speed;
+  c.simClock = sim.clock;
+  c.simRunning = sim.running;
+  c.simSpeed = sim.speed;
 }
 
 async function _doInit(): Promise<void> {
@@ -188,7 +203,10 @@ async function advanceQueue(lineId: string): Promise<void> {
 
 // ── Schedule management ───────────────────────────────────────────────────────
 
-export async function setSchedule(lineId: string, schedule: LineSchedule): Promise<void> {
+export async function setSchedule(
+  lineId: string,
+  schedule: LineSchedule,
+): Promise<void> {
   await ensureInit();
   const c = _c();
   const queue = [{ ...schedule, items: schedule.items.map((i) => ({ ...i })) }];
@@ -196,7 +214,10 @@ export async function setSchedule(lineId: string, schedule: LineSchedule): Promi
   await dbSetQueue(lineId, queue);
 }
 
-export async function enqueueSchedule(lineId: string, schedule: LineSchedule): Promise<void> {
+export async function enqueueSchedule(
+  lineId: string,
+  schedule: LineSchedule,
+): Promise<void> {
   await ensureInit();
   const c = _c();
   if (!c.queues[lineId]) c.queues[lineId] = [];
@@ -208,7 +229,9 @@ export async function enqueueSchedule(lineId: string, schedule: LineSchedule): P
   await dbSetQueue(lineId, queue);
 }
 
-export async function getSchedule(lineId: string): Promise<LineSchedule | undefined> {
+export async function getSchedule(
+  lineId: string,
+): Promise<LineSchedule | undefined> {
   await ensureInit();
   return _c().queues[lineId]?.[0];
 }
@@ -219,7 +242,10 @@ export async function clearLine(lineId: string): Promise<void> {
   await dbDeleteQueue(lineId);
 }
 
-export async function removeFromQueue(lineId: string, index: number): Promise<boolean> {
+export async function removeFromQueue(
+  lineId: string,
+  index: number,
+): Promise<boolean> {
   await ensureInit();
   const c = _c();
   const queue = c.queues[lineId];
@@ -230,7 +256,10 @@ export async function removeFromQueue(lineId: string, index: number): Promise<bo
   return true;
 }
 
-export async function skipOrder(lineId: string, model: string): Promise<boolean> {
+export async function skipOrder(
+  lineId: string,
+  model: string,
+): Promise<boolean> {
   await ensureInit();
   const c = _c();
   const queue = c.queues[lineId];
@@ -242,7 +271,10 @@ export async function skipOrder(lineId: string, model: string): Promise<boolean>
   return true;
 }
 
-export async function unskipOrder(lineId: string, model: string): Promise<boolean> {
+export async function unskipOrder(
+  lineId: string,
+  model: string,
+): Promise<boolean> {
   await ensureInit();
   const c = _c();
   const queue = c.queues[lineId];
@@ -256,26 +288,34 @@ export async function unskipOrder(lineId: string, model: string): Promise<boolea
 
 // ── Simulation ────────────────────────────────────────────────────────────────
 
-export async function tickLine(lineId: string, units: number, now?: Date): Promise<void> {
+export async function tickLine(
+  lineId: string,
+  units: number,
+  now?: Date,
+): Promise<void> {
   await ensureInit();
   const c = _c();
-  const effectiveNow    = c.simRunning && c.simClock ? c.simClock : now ?? new Date();
-  const simMinsPerTick  = c.simSpeed / 60;
+  const effectiveNow =
+    c.simRunning && c.simClock ? c.simClock : (now ?? new Date());
+  const simMinsPerTick = c.simSpeed / 60;
   const simHoursPerTick = c.simSpeed / 3600;
 
   if (!c.changeoverRemaining[lineId]) c.changeoverRemaining[lineId] = 0;
-  if (!c.failureAccumulator[lineId])  c.failureAccumulator[lineId]  = 0;
+  if (!c.failureAccumulator[lineId]) c.failureAccumulator[lineId] = 0;
   if (c.repairRemaining[lineId] === undefined) c.repairRemaining[lineId] = 0;
 
   // M17.7 — equipment failure: line is down during repair
   if (c.repairRemaining[lineId] > 0) {
-    c.repairRemaining[lineId] = Math.max(0, c.repairRemaining[lineId] - simMinsPerTick);
+    c.repairRemaining[lineId] = Math.max(
+      0,
+      c.repairRemaining[lineId] - simMinsPerTick,
+    );
     return;
   }
 
   c.failureAccumulator[lineId] += simHoursPerTick;
   const isVS2 = lineId.toLowerCase().includes("vs2");
-  const mtbf  = isVS2 ? MTBF_VS2 : MTBF_VS1;
+  const mtbf = isVS2 ? MTBF_VS2 : MTBF_VS1;
 
   if (c.failureAccumulator[lineId] >= mtbf) {
     c.failureAccumulator[lineId] = 0;
@@ -285,7 +325,10 @@ export async function tickLine(lineId: string, units: number, now?: Date): Promi
 
   // M17.2 — changeover: line is paused between orders
   if (c.changeoverRemaining[lineId] > 0) {
-    c.changeoverRemaining[lineId] = Math.max(0, c.changeoverRemaining[lineId] - simMinsPerTick);
+    c.changeoverRemaining[lineId] = Math.max(
+      0,
+      c.changeoverRemaining[lineId] - simMinsPerTick,
+    );
     return;
   }
 
@@ -294,13 +337,16 @@ export async function tickLine(lineId: string, units: number, now?: Date): Promi
   if (!queue || queue.length === 0) return;
 
   const schedule = queue[0];
-  const shift    = shiftForHour(effectiveNow.getHours());
+  const shift = shiftForHour(effectiveNow.getHours());
 
-  const firstIncomplete = schedule.items.find((it) => !it.skipped && it.completed < it.qty);
-  const orderWillComplete = firstIncomplete !== undefined &&
+  const firstIncomplete = schedule.items.find(
+    (it) => !it.skipped && it.completed < it.qty,
+  );
+  const orderWillComplete =
+    firstIncomplete !== undefined &&
     firstIncomplete.completed + units >= firstIncomplete.qty;
 
-  let remaining  = units;
+  let remaining = units;
   const newEvents: ScanEvent[] = [];
 
   for (const item of schedule.items) {
@@ -345,34 +391,40 @@ export async function getLineState(lineId: string): Promise<LineState> {
   await ensureInit();
   const c = _c();
   await advanceQueue(lineId);
-  const queue       = c.queues[lineId] ?? [];
-  const schedule    = queue[0] ?? null;
+  const queue = c.queues[lineId] ?? [];
+  const schedule = queue[0] ?? null;
   const queuedCount = Math.max(0, queue.length - 1);
 
   const lineScans = c.scanLog.filter((s) => s.lineId === lineId);
 
   const hourlyOutput: Record<string, number> = {};
   for (const scan of lineScans) {
-    const h   = new Date(scan.timestamp).getHours();
+    const h = new Date(scan.timestamp).getHours();
     const key = `${String(h).padStart(2, "0")}:00`;
     hourlyOutput[key] = (hourlyOutput[key] ?? 0) + 1;
   }
 
   const totalOutput = lineScans.length;
 
-  let currentOrder:    string | null = null;
+  let currentOrder: string | null = null;
   let remainingOnOrder = 0;
-  let completedOrders  = 0;
+  let completedOrders = 0;
 
   if (schedule) {
-    completedOrders = schedule.items.filter((it) => it.completed >= it.qty).length;
-    const incomplete = schedule.items.find((it) => !it.skipped && it.completed < it.qty);
+    completedOrders = schedule.items.filter(
+      (it) => it.completed >= it.qty,
+    ).length;
+    const incomplete = schedule.items.find(
+      (it) => !it.skipped && it.completed < it.qty,
+    );
     if (incomplete) {
-      currentOrder     = incomplete.model;
+      currentOrder = incomplete.model;
       remainingOnOrder = incomplete.qty - incomplete.completed;
     } else if (schedule.items.some((it) => !it.skipped)) {
-      const lastActive = [...schedule.items].reverse().find((it) => !it.skipped);
-      currentOrder     = lastActive?.model ?? null;
+      const lastActive = [...schedule.items]
+        .reverse()
+        .find((it) => !it.skipped);
+      currentOrder = lastActive?.model ?? null;
       remainingOnOrder = 0;
     }
   }
@@ -381,17 +433,24 @@ export async function getLineState(lineId: string): Promise<LineState> {
     ? Math.max(0, schedule.totalTarget - totalOutput)
     : 0;
 
-  const skippedItems = schedule ? schedule.items.filter((it) => it.skipped) : [];
+  const skippedItems = schedule
+    ? schedule.items.filter((it) => it.skipped)
+    : [];
 
   return {
-    lineId, schedule, totalOutput,
-    currentOrder, remainingOnOrder, remainingOnRunSheet,
-    completedOrders, queuedCount,
+    lineId,
+    schedule,
+    totalOutput,
+    currentOrder,
+    remainingOnOrder,
+    remainingOnRunSheet,
+    completedOrders,
+    queuedCount,
     queue: queue.slice(1),
     hourlyOutput,
     skippedItems,
     changeoverRemaining: c.changeoverRemaining[lineId] ?? 0,
-    repairRemaining:     c.repairRemaining[lineId]    ?? 0,
+    repairRemaining: c.repairRemaining[lineId] ?? 0,
   };
 }
 
@@ -412,7 +471,10 @@ export async function getOutputForLine(lineId: string): Promise<number> {
 
 // ── Admin config ──────────────────────────────────────────────────────────────
 
-export async function setAdminConfig(lineId: string, config: AdminLineConfig): Promise<void> {
+export async function setAdminConfig(
+  lineId: string,
+  config: AdminLineConfig,
+): Promise<void> {
   await ensureInit();
   const c = _c();
   const merged = { ...c.adminConfig[lineId], ...config };
@@ -425,7 +487,9 @@ export async function getAdminConfig(lineId: string): Promise<AdminLineConfig> {
   return _c().adminConfig[lineId] ?? {};
 }
 
-export async function getAllAdminConfig(): Promise<Record<string, AdminLineConfig>> {
+export async function getAllAdminConfig(): Promise<
+  Record<string, AdminLineConfig>
+> {
   await ensureInit();
   return { ..._c().adminConfig };
 }
@@ -437,7 +501,11 @@ export async function getLineComments(lineId: string): Promise<LineComments> {
   return _c().comments[lineId] ?? {};
 }
 
-export async function setLineComment(lineId: string, hour: string, comment: string): Promise<void> {
+export async function setLineComment(
+  lineId: string,
+  hour: string,
+  comment: string,
+): Promise<void> {
   await ensureInit();
   const c = _c();
   if (!c.comments[lineId]) c.comments[lineId] = {};
@@ -452,12 +520,12 @@ export async function setLineComment(lineId: string, hour: string, comment: stri
 
 // ── Scrap log ─────────────────────────────────────────────────────────────────
 
-export async function addScrapEntry(entry: Omit<ScrapEntry, "id" | "timestamp">): Promise<ScrapEntry> {
+export async function addScrapEntry(entry: NewScrapEntry): Promise<ScrapEntry> {
   await ensureInit();
   const c = _c();
   const full = {
     ...entry,
-    id:        await bumpScrapSerial(),
+    id: await bumpScrapSerial(),
     timestamp: new Date().toISOString(),
   } as ScrapEntry;
   c.scrapLog.push(full);
@@ -465,32 +533,45 @@ export async function addScrapEntry(entry: Omit<ScrapEntry, "id" | "timestamp">)
   return full;
 }
 
-export async function getScrapEntries(lineId: string, shift: "day" | "night"): Promise<ScrapEntry[]> {
+export async function getScrapEntries(
+  lineId: string,
+  shift: "day" | "night",
+): Promise<ScrapEntry[]> {
   await ensureInit();
   return _c().scrapLog.filter((e) => e.lineId === lineId && e.shift === shift);
 }
 
-export async function getAllScrapEntries(shift: "day" | "night"): Promise<ScrapEntry[]> {
+export async function getAllScrapEntries(
+  shift: "day" | "night",
+): Promise<ScrapEntry[]> {
   await ensureInit();
   return _c().scrapLog.filter((e) => e.shift === shift);
 }
 
 export async function getScrapStats(lineId: string, shift: "day" | "night") {
   await ensureInit();
-  const entries = (await getScrapEntries(lineId, shift)).filter((e) => !e.voidReason);
+  const entries = (await getScrapEntries(lineId, shift)).filter(
+    (e) => !e.voidReason,
+  );
   return {
-    kickedLids:     entries.filter((e) => e.kind === "kicked-lid").length,
+    kickedLids: entries.filter((e) => e.kind === "kicked-lid").length,
     scrappedPanels: entries.filter((e) => e.kind === "scrapped-panel").length,
-    totalBoughtIn:  entries.filter((e) => e.boughtIn).length,
+    totalBoughtIn: entries.filter((e) => e.boughtIn).length,
   };
 }
 
-export async function getKickedLidsForLineShift(lineId: string, shift: "day" | "night"): Promise<number> {
+export async function getKickedLidsForLineShift(
+  lineId: string,
+  shift: "day" | "night",
+): Promise<number> {
   await ensureInit();
   return dbGetKickedLids(lineId, shift);
 }
 
-export async function voidScrapEntry(id: string, voidReason: string): Promise<boolean> {
+export async function voidScrapEntry(
+  id: string,
+  voidReason: string,
+): Promise<boolean> {
   await ensureInit();
   const entry = _c().scrapLog.find((e) => e.id === id);
   if (!entry) return false;
@@ -499,23 +580,36 @@ export async function voidScrapEntry(id: string, voidReason: string): Promise<bo
   return true;
 }
 
-export async function updateScrapEntry(id: string, updates: {
-  model?: string; panel?: string; damageType?: string; boughtIn?: boolean;
-}): Promise<ScrapEntry | null> {
+export async function updateScrapEntry(
+  id: string,
+  updates: {
+    model?: string;
+    panel?: string;
+    damageType?: string;
+    boughtIn?: boolean;
+  },
+): Promise<ScrapEntry | null> {
   await ensureInit();
   const entry = _c().scrapLog.find((e) => e.id === id);
   if (!entry) return null;
-  if (updates.model)                   (entry as unknown as Record<string, unknown>).model      = updates.model;
-  if (updates.panel)                   (entry as unknown as Record<string, unknown>).panel      = updates.panel;
-  if (updates.damageType)              (entry as unknown as Record<string, unknown>).damageType = updates.damageType;
-  if (updates.boughtIn !== undefined)  (entry as unknown as Record<string, unknown>).boughtIn   = updates.boughtIn;
+  if (updates.model)
+    (entry as unknown as Record<string, unknown>).model = updates.model;
+  if (updates.panel)
+    (entry as unknown as Record<string, unknown>).panel = updates.panel;
+  if (updates.damageType)
+    (entry as unknown as Record<string, unknown>).damageType =
+      updates.damageType;
+  if (updates.boughtIn !== undefined)
+    (entry as unknown as Record<string, unknown>).boughtIn = updates.boughtIn;
   await dbUpdateScrapEntry(id, updates);
   return entry;
 }
 
 // ── Downtime log ──────────────────────────────────────────────────────────────
 
-export async function addDowntimeEntry(entry: Omit<DowntimeEntry, "id">): Promise<DowntimeEntry> {
+export async function addDowntimeEntry(
+  entry: Omit<DowntimeEntry, "id">,
+): Promise<DowntimeEntry> {
   await ensureInit();
   const c = _c();
   const full: DowntimeEntry = { ...entry, id: await bumpDowntimeSerial() };
@@ -524,17 +618,27 @@ export async function addDowntimeEntry(entry: Omit<DowntimeEntry, "id">): Promis
   return full;
 }
 
-export async function getDowntimeEntries(lineId: string, shift: "day" | "night"): Promise<DowntimeEntry[]> {
+export async function getDowntimeEntries(
+  lineId: string,
+  shift: "day" | "night",
+): Promise<DowntimeEntry[]> {
   await ensureInit();
-  return _c().downtimeLog.filter((e) => e.lineId === lineId && e.shift === shift);
+  return _c().downtimeLog.filter(
+    (e) => e.lineId === lineId && e.shift === shift,
+  );
 }
 
-export async function getAllDowntimeEntriesForShift(shift: "day" | "night"): Promise<DowntimeEntry[]> {
+export async function getAllDowntimeEntriesForShift(
+  shift: "day" | "night",
+): Promise<DowntimeEntry[]> {
   await ensureInit();
   return _c().downtimeLog.filter((e) => e.shift === shift);
 }
 
-export async function closeDowntimeEntry(id: string, endTime: string): Promise<void> {
+export async function closeDowntimeEntry(
+  id: string,
+  endTime: string,
+): Promise<void> {
   await ensureInit();
   const entry = _c().downtimeLog.find((e) => e.id === id);
   if (entry) {
@@ -543,19 +647,27 @@ export async function closeDowntimeEntry(id: string, endTime: string): Promise<v
   }
 }
 
-export async function getOpenDowntime(lineId: string): Promise<DowntimeEntry | null> {
+export async function getOpenDowntime(
+  lineId: string,
+): Promise<DowntimeEntry | null> {
   await ensureInit();
-  return _c().downtimeLog.find((e) => e.lineId === lineId && e.endTime === null) ?? null;
+  return (
+    _c().downtimeLog.find((e) => e.lineId === lineId && e.endTime === null) ??
+    null
+  );
 }
 
-export async function getTotalDowntimeMinutes(lineId: string, shift: "day" | "night"): Promise<number> {
+export async function getTotalDowntimeMinutes(
+  lineId: string,
+  shift: "day" | "night",
+): Promise<number> {
   await ensureInit();
   const entries = await getDowntimeEntries(lineId, shift);
   const now = Date.now();
   let total = 0;
   for (const e of entries) {
     const start = new Date(e.startTime).getTime();
-    const end   = e.endTime ? new Date(e.endTime).getTime() : now;
+    const end = e.endTime ? new Date(e.endTime).getTime() : now;
     total += Math.floor((end - start) / 60000);
   }
   return total;
@@ -576,7 +688,10 @@ export async function setSimClock(time: Date | null): Promise<void> {
   await dbSetSimClock(c.simClock, c.simRunning, c.simSpeed);
 }
 
-export async function setSimRunning(running: boolean, speed?: number): Promise<void> {
+export async function setSimRunning(
+  running: boolean,
+  speed?: number,
+): Promise<void> {
   await ensureInit();
   const c = _c();
   c.simRunning = running;
@@ -601,8 +716,11 @@ export async function advanceSimClock(): Promise<void> {
   c.simClock = new Date(c.simClock.getTime() + c.simSpeed * 1000);
 
   // Auto-stop when the simulated clock reaches the end of the current shift.
-  const h = c.simClock.getUTCHours() + c.simClock.getUTCMinutes() / 60 + c.simClock.getUTCSeconds() / 3600;
-  const shiftName = (h >= 6 && h < 17) ? "day" : "night";
+  const h =
+    c.simClock.getUTCHours() +
+    c.simClock.getUTCMinutes() / 60 +
+    c.simClock.getUTCSeconds() / 3600;
+  const shiftName = h >= 6 && h < 17 ? "day" : "night";
   const win = getShiftWindows(shiftName);
   // Night shift crosses midnight: normalise hours past midnight to 24+
   const normalized = shiftName === "night" && h < win.startHour ? h + 24 : h;
@@ -617,21 +735,21 @@ export async function advanceSimClock(): Promise<void> {
 
 export async function resetAll(): Promise<void> {
   const c = _c();
-  c.queues              = {};
-  c.scanLog             = [];
-  c.comments            = {};
-  c.scrapLog            = [];
-  c.scrapSerial         = 0;
-  c.downtimeLog         = [];
-  c.downtimeSerial      = 0;
-  c.simClock            = null;
-  c.simRunning          = false;
-  c.simSpeed            = 60;
+  c.queues = {};
+  c.scanLog = [];
+  c.comments = {};
+  c.scrapLog = [];
+  c.scrapSerial = 0;
+  c.downtimeLog = [];
+  c.downtimeSerial = 0;
+  c.simClock = null;
+  c.simRunning = false;
+  c.simSpeed = 60;
   c.changeoverRemaining = {};
-  c.failureAccumulator  = {};
-  c.repairRemaining     = {};
-  c.initialized         = true; // prevent re-init overwriting cleared state
-  c.initPromise         = null;
+  c.failureAccumulator = {};
+  c.repairRemaining = {};
+  c.initialized = true; // prevent re-init overwriting cleared state
+  c.initPromise = null;
   await dbResetAll();
   // Re-load admin config — target/headcount are now NULL so lines fall back to seeded defaults;
   // isRunning flags are preserved so floor layout is unchanged.

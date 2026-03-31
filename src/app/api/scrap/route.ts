@@ -15,13 +15,19 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 
   const { searchParams } = new URL(request.url);
   const lineId = searchParams.get("lineId");
-  const shift  = searchParams.get("shift") as ShiftName | null;
+  const shift = searchParams.get("shift") as ShiftName | null;
 
   if (!shift) {
-    return NextResponse.json({ error: "shift query param is required" }, { status: 400 });
+    return NextResponse.json(
+      { error: "shift query param is required" },
+      { status: 400 },
+    );
   }
   if (shift !== "day" && shift !== "night") {
-    return NextResponse.json({ error: "shift must be 'day' or 'night'" }, { status: 400 });
+    return NextResponse.json(
+      { error: "shift must be 'day' or 'night'" },
+      { status: 400 },
+    );
   }
 
   let entries: ScrapEntry[];
@@ -29,8 +35,11 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     entries = await getAllScrapEntries(shift);
   } else if (!lineId) {
     return NextResponse.json(
-      { error: "lineId query param is required (or use lineId=all for all lines)" },
-      { status: 400 }
+      {
+        error:
+          "lineId query param is required (or use lineId=all for all lines)",
+      },
+      { status: 400 },
     );
   } else {
     entries = await getScrapEntries(lineId, shift);
@@ -50,12 +59,17 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
   if (!kind || !lineId || !shift || !model || !panel || !damageType) {
     return NextResponse.json(
-      { error: "kind, lineId, shift, model, panel, damageType are all required" },
-      { status: 400 }
+      {
+        error: "kind, lineId, shift, model, panel, damageType are all required",
+      },
+      { status: 400 },
     );
   }
   if (kind !== "scrapped-panel" && kind !== "kicked-lid") {
-    return NextResponse.json({ error: "kind must be 'scrapped-panel' or 'kicked-lid'" }, { status: 400 });
+    return NextResponse.json(
+      { error: "kind must be 'scrapped-panel' or 'kicked-lid'" },
+      { status: 400 },
+    );
   }
 
   const entry =
@@ -70,7 +84,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
           stationFound: (body.stationFound as string) ?? "",
           howDamaged: (body.howDamaged as string) ?? "",
           boughtIn: Boolean(body.boughtIn),
-        } as Omit<ScrapEntry, "id" | "timestamp">)
+        })
       : await addScrapEntry({
           kind: "kicked-lid",
           lineId: lineId as string,
@@ -79,9 +93,11 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
           panel: panel as KickedLid["panel"],
           damageType: damageType as KickedLid["damageType"],
           affectedArea: (body.affectedArea as "panel" | "extrusion") ?? "panel",
-          auditorInitials: ((body.auditorInitials as string) ?? "").toUpperCase().trim(),
+          auditorInitials: ((body.auditorInitials as string) ?? "")
+            .toUpperCase()
+            .trim(),
           boughtIn: Boolean(body.boughtIn),
-        } as Omit<ScrapEntry, "id" | "timestamp">);
+        });
 
   return NextResponse.json(entry, { status: 201 });
 }
@@ -101,22 +117,43 @@ export async function PATCH(request: NextRequest): Promise<NextResponse> {
   }
 
   if (shouldVoid === true) {
-    if (!voidReason || typeof voidReason !== "string" || voidReason.trim() === "") {
-      return NextResponse.json({ error: "voidReason is required when voiding" }, { status: 400 });
+    if (
+      !voidReason ||
+      typeof voidReason !== "string" ||
+      voidReason.trim() === ""
+    ) {
+      return NextResponse.json(
+        { error: "voidReason is required when voiding" },
+        { status: 400 },
+      );
     }
     const ok = await voidScrapEntry(id, voidReason.trim());
-    if (!ok) return NextResponse.json({ error: "Scrap entry not found" }, { status: 404 });
+    if (!ok)
+      return NextResponse.json(
+        { error: "Scrap entry not found" },
+        { status: 404 },
+      );
     return NextResponse.json({ id, voidReason: voidReason.trim() });
   }
 
   if (shouldVoid === false && updates) {
-    const updated = await updateScrapEntry(id, updates as Parameters<typeof updateScrapEntry>[1]);
-    if (!updated) return NextResponse.json({ error: "Scrap entry not found" }, { status: 404 });
+    const updated = await updateScrapEntry(
+      id,
+      updates as Parameters<typeof updateScrapEntry>[1],
+    );
+    if (!updated)
+      return NextResponse.json(
+        { error: "Scrap entry not found" },
+        { status: 404 },
+      );
     return NextResponse.json(updated);
   }
 
   return NextResponse.json(
-    { error: "Provide either void:true with voidReason, or void:false with updates" },
-    { status: 400 }
+    {
+      error:
+        "Provide either void:true with voidReason, or void:false with updates",
+    },
+    { status: 400 },
   );
 }
