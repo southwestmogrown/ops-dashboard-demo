@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import type { ShiftMetrics } from "@/lib/types";
 import { useAuth } from "@/hooks/useAuth";
+import Header from "@/components/Header";
 import type { AdminLineConfig, LineState } from "@/lib/mesTypes";
 import type {
   EOSFormData,
@@ -118,7 +119,7 @@ function lineIdToLineKey(lineId: string): string {
 export default function EOSPage() {
   const pathname = usePathname();
   const router = useRouter();
-  const { role } = useAuth();
+  const { role, logout } = useAuth();
 
   // Team-lead route guard
   useEffect(() => {
@@ -350,69 +351,8 @@ export default function EOSPage() {
 
   return (
     <div className="h-screen flex flex-col overflow-hidden bg-background text-[#e1e2ec]">
-      {/* ── Top Nav ── */}
-      <nav className="shrink-0 z-50 bg-background border-b border-border font-['Space_Grotesk',sans-serif] tracking-tight">
-        <div className="flex justify-between items-center w-full px-6 py-3">
-          <div className="flex items-center gap-8">
-            <span className="text-xl font-bold tracking-tighter text-accent uppercase select-none">
-              KINETIC COMMAND
-            </span>
-            <div className="hidden md:flex items-center space-x-6">
-              <Link
-                href="/eos"
-                className="text-accent border-b-2 border-accent pb-0.5 font-bold text-sm"
-              >
-                EOS
-              </Link>
-              <Link
-                href="/admin"
-                className="text-sm text-[#e1e2ec]/60 hover:text-[#e1e2ec] transition-colors"
-              >
-                Admin
-              </Link>
-              <Link
-                href="/team-lead"
-                className="text-sm text-[#e1e2ec]/60 hover:text-[#e1e2ec] transition-colors"
-              >
-                Team Lead
-              </Link>
-              <Link
-                href="/sim"
-                className="text-sm text-[#e1e2ec]/60 hover:text-[#e1e2ec] transition-colors"
-              >
-                SIM
-              </Link>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-4">
-            {/* Progress pill */}
-            <div className="flex items-center gap-2 px-3 py-1.5 bg-surface border border-border rounded-sm text-xs font-mono">
-              <span className="text-[#e1e2ec]/50">
-                {filledLines}/{activeLines.length} lines
-              </span>
-              <div className="w-20 h-1.5 bg-background rounded-full overflow-hidden">
-                <div
-                  className="h-full rounded-full transition-all duration-300"
-                  style={{
-                    width: `${progress}%`,
-                    backgroundColor:
-                      progress === 100
-                        ? "var(--color-status-green)"
-                        : "var(--color-accent)",
-                  }}
-                />
-              </div>
-            </div>
-            <Link
-              href="/"
-              className="text-sm text-[#e1e2ec]/60 hover:text-[#e1e2ec] transition-colors"
-            >
-              Dashboard
-            </Link>
-          </div>
-        </div>
-      </nav>
+      {/* ── Header ── */}
+      <Header />
 
       <div className="flex flex-1 overflow-hidden">
         {/* ── Sidebar ── */}

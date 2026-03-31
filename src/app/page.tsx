@@ -83,7 +83,7 @@ function ErrorScreen({
 
 export default function Home() {
   const pathname = usePathname();
-  const { role } = useAuth();
+  const { role, logout } = useAuth();
   const router = useRouter();
   const [metrics, setMetrics] = useState<ShiftMetrics | null>(null);
   const [mesStates, setMesStates] = useState<LineState[]>([]);

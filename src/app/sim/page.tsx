@@ -35,7 +35,7 @@ function unitsForSpeed(speed: number): number {
 export default function SimPage() {
   const pathname = usePathname();
   const router = useRouter();
-  const { role } = useAuth();
+  const { role, logout } = useAuth();
 
   // Team-lead route guard
   useEffect(() => {
@@ -240,61 +240,13 @@ export default function SimPage() {
 
   return (
     <div className="h-screen flex flex-col overflow-hidden bg-background text-[#e1e2ec]">
-      {/* ── Top nav ──────────────────────────────────────────────────────────── */}
-      <header className="fixed top-0 z-50 w-full flex justify-between items-center px-6 py-3 bg-[#0b0e15] border-b border-border/15 font-['Space_Grotesk',sans-serif] tracking-tight">
-        <div className="flex items-center gap-8">
-          <Link
-            href="/"
-            className="text-xl font-bold tracking-tighter text-accent uppercase"
-          >
-            KINETIC COMMAND
-          </Link>
-          <nav className="hidden md:flex items-center gap-6">
-            <Link
-              href="/eos"
-              className="text-[#e1e2ec]/60 hover:text-[#e1e2ec] transition-colors text-sm"
-            >
-              EOS
-            </Link>
-            <Link
-              href="/admin"
-              className="text-[#e1e2ec]/60 hover:text-[#e1e2ec] transition-colors text-sm"
-            >
-              Admin
-            </Link>
-            <Link
-              href="/team-lead"
-              className="text-[#e1e2ec]/60 hover:text-[#e1e2ec] transition-colors text-sm"
-            >
-              Team Lead
-            </Link>
-            <Link
-              href="/sim"
-              className="text-accent border-b-2 border-accent pb-1 font-bold text-sm"
-            >
-              SIM
-            </Link>
-          </nav>
-        </div>
-        <div className="flex items-center gap-6">
-          <div className="flex flex-col items-end">
-            <span className="text-accent text-sm font-bold">
-              Shift: {shift === "day" ? "Day" : "Night"}
-            </span>
-          </div>
-          <div className="h-8 w-px bg-border/30" />
-          <div className="text-[#e1e2ec]/80 font-mono text-sm tabular-nums">
-            {now.toLocaleTimeString([], {
-              hour: "2-digit",
-              minute: "2-digit",
-              second: "2-digit",
-              hour12: false,
-            })}
-          </div>
-        </div>
-      </header>
+      {/* ── Header ── */}
+      <Header
+        shift={shift}
+        onShiftChange={setShift}
+      />
 
-      <div className="flex flex-1 overflow-hidden pt-[52px]">
+      <div className="flex flex-1 overflow-hidden">
         {/* ── Sidebar ────────────────────────────────────────────────────────── */}
         <aside className="w-64 shrink-0 bg-surface-low flex flex-col border-r border-border/10 hidden lg:flex">
           <div className="p-6 flex items-center space-x-3 border-b border-border/10">

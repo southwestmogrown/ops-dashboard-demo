@@ -8,6 +8,7 @@ import type { AdminLineConfig, LineSchedule, LineState } from "@/lib/mesTypes";
 import { useAuth } from "@/hooks/useAuth";
 import type { ShiftName } from "@/lib/types";
 import { LINES, LINE_ADMIN_LABELS } from "@/lib/lines";
+import Header from "@/components/Header";
 import AdminLayout from "@/components/admin/AdminLayout";
 
 const AdminLineCard = dynamic(
@@ -18,7 +19,7 @@ const AdminLineCard = dynamic(
 function AdminPageContent() {
   const pathname = usePathname();
   const router = useRouter();
-  const { role } = useAuth();
+  const { role, logout } = useAuth();
 
   // Team-lead route guard
   useEffect(() => {
@@ -156,56 +157,11 @@ function AdminPageContent() {
 
   return (
     <div className="h-screen flex flex-col overflow-hidden bg-background text-[#e1e2ec]">
-      {/* ── Top Nav ── */}
-      <nav className="shrink-0 z-50 bg-background border-b border-border font-['Space_Grotesk',sans-serif] tracking-tight">
-        <div className="flex justify-between items-center w-full px-6 py-3">
-          <div className="flex items-center gap-8">
-            <span className="text-xl font-bold tracking-tighter text-accent uppercase select-none">
-              KINETIC COMMAND
-            </span>
-            <div className="hidden md:flex items-center space-x-6">
-              <Link
-                href="/eos"
-                className="text-sm text-[#e1e2ec]/60 hover:text-[#e1e2ec] transition-colors"
-              >
-                EOS
-              </Link>
-              <Link
-                href="/admin"
-                className="text-accent border-b-2 border-accent pb-0.5 font-bold text-sm"
-              >
-                Admin
-              </Link>
-              <Link
-                href="/team-lead"
-                className="text-sm text-[#e1e2ec]/60 hover:text-[#e1e2ec] transition-colors"
-              >
-                Team Lead
-              </Link>
-              <Link
-                href="/sim"
-                className="text-sm text-[#e1e2ec]/60 hover:text-[#e1e2ec] transition-colors"
-              >
-                SIM
-              </Link>
-            </div>
-          </div>
-          <div className="flex items-center gap-6">
-            <div className="flex flex-col items-end">
-              <button
-                onClick={() => setShift((s) => (s === "day" ? "night" : "day"))}
-                className="text-xs text-accent font-bold hover:text-orange-300 transition-colors bg-transparent border-none p-0 cursor-pointer text-right leading-tight"
-                title="Click to toggle shift"
-              >
-                Shift: {shift === "day" ? "Day" : "Night"}
-              </button>
-              <span className="text-[10px] text-[#e1e2ec]/40 tabular-nums">
-                {now.toLocaleTimeString("en-GB")} UTC
-              </span>
-            </div>
-          </div>
-        </div>
-      </nav>
+      {/* ── Header ── */}
+      <Header
+        shift={shift}
+        onShiftChange={setShift}
+      />
 
       <div className="flex flex-1 overflow-hidden">
         {/* ── Sidebar ── */}
