@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { ShiftMetrics, ShiftName } from "@/lib/types";
 import type { AdminLineConfig, LineState } from "@/lib/mesTypes";
 import type { ScrapEntry, ScrapStats } from "@/lib/reworkTypes";
@@ -13,7 +14,8 @@ import FloorOverview from "@/components/team-lead/FloorOverview";
 import FloorAlertStrip from "@/components/team-lead/FloorAlertStrip";
 
 export default function TeamLeadPage() {
-  const { role, isAuthenticated } = useAuth();
+  const router = useRouter();
+  const { role, isAuthenticated, logout } = useAuth();
   const isTeamLeadGated = isAuthenticated && role === "team-lead";
 
   const [shift, setShift] = useState<ShiftName>("day");
@@ -250,12 +252,14 @@ export default function TeamLeadPage() {
               KINETIC COMMAND
             </span>
             <div className="hidden md:flex items-center space-x-6">
-              <Link
-                href="/"
-                className="text-base text-[#e1e2ec]/75 hover:text-[#f8f8fb] transition-colors"
-              >
-                Dashboard
-              </Link>
+              {!isTeamLeadGated && (
+                <Link
+                  href="/"
+                  className="text-base text-[#e1e2ec]/75 hover:text-[#f8f8fb] transition-colors"
+                >
+                  Dashboard
+                </Link>
+              )}
               {!isTeamLeadGated && (
                 <>
                   <Link
@@ -309,6 +313,32 @@ export default function TeamLeadPage() {
                 {now.toLocaleTimeString("en-GB")} UTC
               </span>
             </div>
+            {isTeamLeadGated && (
+              <button
+                onClick={() => {
+                  logout();
+                  router.push("/");
+                }}
+                className="p-2 text-[#e1e2ec]/40 hover:text-[#e1e2ec] hover:bg-surface transition-all rounded-sm"
+                title="Logout"
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="18"
+                  height="18"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                  <polyline points="16 17 21 12 16 7" />
+                  <line x1="21" y1="12" x2="9" y2="12" />
+                </svg>
+              </button>
+            )}
           </div>
         </div>
       </nav>
