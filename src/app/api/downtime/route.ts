@@ -29,13 +29,19 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 
   const { searchParams } = new URL(request.url);
   const lineId = searchParams.get("lineId");
-  const shift  = searchParams.get("shift") as ShiftName | null;
+  const shift = searchParams.get("shift") as ShiftName | null;
 
   if (!shift) {
-    return NextResponse.json({ error: "shift query param is required" }, { status: 400 });
+    return NextResponse.json(
+      { error: "shift query param is required" },
+      { status: 400 },
+    );
   }
   if (shift !== "day" && shift !== "night") {
-    return NextResponse.json({ error: "shift must be 'day' or 'night'" }, { status: 400 });
+    return NextResponse.json(
+      { error: "shift must be 'day' or 'night'" },
+      { status: 400 },
+    );
   }
 
   if (lineId) {
@@ -53,30 +59,37 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
   }
 
-  const { lineId, shift, reason, startTime, unitsLost, notes, createdBy } = body;
+  const { lineId, shift, reason, startTime, unitsLost, notes, createdBy } =
+    body;
 
   if (!lineId || !shift || !reason || !startTime) {
     return NextResponse.json(
       { error: "lineId, shift, reason, and startTime are all required" },
-      { status: 400 }
+      { status: 400 },
     );
   }
   if (shift !== "day" && shift !== "night") {
-    return NextResponse.json({ error: "shift must be 'day' or 'night'" }, { status: 400 });
+    return NextResponse.json(
+      { error: "shift must be 'day' or 'night'" },
+      { status: 400 },
+    );
   }
   if (!VALID_REASONS.includes(reason as DowntimeReason)) {
-    return NextResponse.json({ error: "invalid reason value" }, { status: 400 });
+    return NextResponse.json(
+      { error: "invalid reason value" },
+      { status: 400 },
+    );
   }
 
   const entry: DowntimeEntry = {
     id: "",
-    lineId:    lineId as string,
-    shift:     shift as ShiftName,
-    reason:    reason as DowntimeReason,
+    lineId: lineId as string,
+    shift: shift as ShiftName,
+    reason: reason as DowntimeReason,
     startTime: startTime as string,
-    endTime:   null,
+    endTime: null,
     unitsLost: typeof unitsLost === "number" ? unitsLost : 0,
-    notes:     typeof notes     === "string" ? notes     : "",
+    notes: typeof notes === "string" ? notes : "",
     createdBy: typeof createdBy === "string" ? createdBy : undefined,
   };
 
@@ -112,7 +125,10 @@ export async function PATCH(request: NextRequest): Promise<NextResponse> {
   ];
   const entry = entries.find((e) => e.id === id);
   if (!entry) {
-    return NextResponse.json({ error: "Downtime entry not found" }, { status: 404 });
+    return NextResponse.json(
+      { error: "Downtime entry not found" },
+      { status: 404 },
+    );
   }
 
   const startMs = new Date(entry.startTime).getTime();

@@ -5,7 +5,11 @@ import Link from "next/link";
 import { Line, ShiftName } from "@/lib/types";
 import { useAuth } from "@/hooks/useAuth";
 import ExportButton from "./ExportButton";
-import { getShiftWindows, getShiftProgress, formatShiftTime } from "@/lib/shiftTime";
+import {
+  getShiftWindows,
+  getShiftProgress,
+  formatShiftTime,
+} from "@/lib/shiftTime";
 
 interface HeaderProps {
   shift: ShiftName;
@@ -70,8 +74,20 @@ export default function Header({
   }
 
   const nextBreak = nextBreakHours(displayTime);
-  const minutesToNextBreak = nextBreak != null ? Math.round((nextBreak - (displayTime.getHours() + displayTime.getMinutes() / 60 + displayTime.getSeconds() / 3600)) * 60) : null;
-  const isNearBreak = minutesToNextBreak != null && minutesToNextBreak <= 30 && minutesToNextBreak > 0;
+  const minutesToNextBreak =
+    nextBreak != null
+      ? Math.round(
+          (nextBreak -
+            (displayTime.getHours() +
+              displayTime.getMinutes() / 60 +
+              displayTime.getSeconds() / 3600)) *
+            60,
+        )
+      : null;
+  const isNearBreak =
+    minutesToNextBreak != null &&
+    minutesToNextBreak <= 30 &&
+    minutesToNextBreak > 0;
   const isNearEnd = progress.remainingHours <= 0.25;
 
   return (
@@ -82,34 +98,36 @@ export default function Header({
           <span className="text-xl font-bold tracking-tighter text-accent uppercase select-none">
             KINETIC COMMAND
           </span>
-          <nav className="hidden md:flex items-center space-x-6">
-            <Link
-              href="/eos"
-              className="text-sm text-[#e1e2ec]/60 hover:text-[#e1e2ec] transition-colors"
-            >
-              EOS
-            </Link>
-            {role === "supervisor" && (
+          {role !== "team-lead" && (
+            <nav className="hidden md:flex items-center space-x-6">
               <Link
-                href="/admin"
+                href="/eos"
                 className="text-sm text-[#e1e2ec]/60 hover:text-[#e1e2ec] transition-colors"
               >
-                Admin
+                EOS
               </Link>
-            )}
-            <Link
-              href="/team-lead"
-              className="text-sm text-[#e1e2ec]/60 hover:text-[#e1e2ec] transition-colors"
-            >
-              Team Lead
-            </Link>
-            <Link
-              href="/sim"
-              className="text-sm text-[#e1e2ec]/60 hover:text-[#e1e2ec] transition-colors"
-            >
-              SIM
-            </Link>
-          </nav>
+              {role === "supervisor" && (
+                <Link
+                  href="/admin"
+                  className="text-sm text-[#e1e2ec]/60 hover:text-[#e1e2ec] transition-colors"
+                >
+                  Admin
+                </Link>
+              )}
+              <Link
+                href="/team-lead"
+                className="text-sm text-[#e1e2ec]/60 hover:text-[#e1e2ec] transition-colors"
+              >
+                Team Lead
+              </Link>
+              <Link
+                href="/sim"
+                className="text-sm text-[#e1e2ec]/60 hover:text-[#e1e2ec] transition-colors"
+              >
+                SIM
+              </Link>
+            </nav>
+          )}
         </div>
 
         {/* Right: shift pill + actions */}
@@ -126,7 +144,9 @@ export default function Header({
               <span className="text-[9px] uppercase tracking-widest text-[#e1e2ec]/40 font-bold leading-none">
                 Remaining
               </span>
-              <span className={`text-sm font-medium font-mono leading-tight ${isNearEnd || isNearBreak ? 'text-status-amber animate-pulse' : 'text-[#e1e2ec]'}`}>
+              <span
+                className={`text-sm font-medium font-mono leading-tight ${isNearEnd || isNearBreak ? "text-status-amber animate-pulse" : "text-[#e1e2ec]"}`}
+              >
                 {formatShiftTime(progress.remainingHours)}
               </span>
             </div>
@@ -135,7 +155,9 @@ export default function Header({
               <span className="text-[9px] uppercase tracking-widest text-[#e1e2ec]/40 font-bold leading-none">
                 End
               </span>
-              <span className={`text-sm font-medium font-mono leading-tight ${isNearEnd || isNearBreak ? 'text-status-amber animate-pulse' : 'text-[#e1e2ec]'}`}>
+              <span
+                className={`text-sm font-medium font-mono leading-tight ${isNearEnd || isNearBreak ? "text-status-amber animate-pulse" : "text-[#e1e2ec]"}`}
+              >
                 {shiftEndTime}
               </span>
             </div>
@@ -148,9 +170,7 @@ export default function Header({
                 Shift Status
               </span>
               <button
-                onClick={() =>
-                  onShiftChange(shift === "day" ? "night" : "day")
-                }
+                onClick={() => onShiftChange(shift === "day" ? "night" : "day")}
                 className="text-sm font-bold text-accent hover:text-orange-300 transition-colors leading-tight"
                 title="Click to toggle shift"
               >

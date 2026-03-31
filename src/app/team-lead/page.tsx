@@ -7,11 +7,15 @@ import type { AdminLineConfig, LineState } from "@/lib/mesTypes";
 import type { ScrapEntry, ScrapStats } from "@/lib/reworkTypes";
 import type { DowntimeEntry } from "@/lib/downtimeTypes";
 import { getHourlyTargets } from "@/lib/shiftBreaks";
+import { useAuth } from "@/hooks/useAuth";
 import LineDetailCard from "@/components/team-lead/LineDetailCard";
 import FloorOverview from "@/components/team-lead/FloorOverview";
 import FloorAlertStrip from "@/components/team-lead/FloorAlertStrip";
 
 export default function TeamLeadPage() {
+  const { role, isAuthenticated } = useAuth();
+  const isTeamLeadGated = isAuthenticated && role === "team-lead";
+
   const [shift, setShift] = useState<ShiftName>("day");
   const [metrics, setMetrics] = useState<ShiftMetrics | null>(null);
   const [mesStates, setMesStates] = useState<LineState[]>([]);
@@ -252,30 +256,36 @@ export default function TeamLeadPage() {
               >
                 Dashboard
               </Link>
-              <Link
-                href="/eos"
-                className="text-base text-[#e1e2ec]/75 hover:text-[#f8f8fb] transition-colors"
-              >
-                EOS
-              </Link>
-              <Link
-                href="/admin"
-                className="text-base text-[#e1e2ec]/75 hover:text-[#f8f8fb] transition-colors"
-              >
-                Admin
-              </Link>
+              {!isTeamLeadGated && (
+                <>
+                  <Link
+                    href="/eos"
+                    className="text-base text-[#e1e2ec]/75 hover:text-[#f8f8fb] transition-colors"
+                  >
+                    EOS
+                  </Link>
+                  <Link
+                    href="/admin"
+                    className="text-base text-[#e1e2ec]/75 hover:text-[#f8f8fb] transition-colors"
+                  >
+                    Admin
+                  </Link>
+                </>
+              )}
               <Link
                 href="/team-lead"
                 className="text-accent border-b-2 border-accent pb-0.5 font-bold text-base"
               >
                 Team Lead
               </Link>
-              <Link
-                href="/sim"
-                className="text-base text-[#e1e2ec]/75 hover:text-[#f8f8fb] transition-colors"
-              >
-                SIM
-              </Link>
+              {!isTeamLeadGated && (
+                <Link
+                  href="/sim"
+                  className="text-base text-[#e1e2ec]/75 hover:text-[#f8f8fb] transition-colors"
+                >
+                  SIM
+                </Link>
+              )}
             </div>
           </div>
           <div className="flex items-center gap-6">
