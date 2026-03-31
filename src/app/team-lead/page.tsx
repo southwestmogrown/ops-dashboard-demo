@@ -17,9 +17,8 @@ export default function TeamLeadPage() {
   const [mesStates, setMesStates] = useState<LineState[]>([]);
   const [selectedLineId, setSelectedLineId] = useState<string | null>(null);
   const [comments, setComments] = useState<Record<string, Record<string, string>>>({});
-  const [scrapEntries, setScrapEntries] = useState<ScrapEntry[]>([]);
   const [allScrapEntries, setAllScrapEntries] = useState<ScrapEntry[]>([]);
-  const [downtimeEntries, setDowntimeEntries] = useState<DowntimeEntry[]>([]);
+  const [allDowntimeEntries, setAllDowntimeEntries] = useState<DowntimeEntry[]>([]);
   const [adminConfig, setAdminConfig] = useState<Record<string, AdminLineConfig>>({});
   const [isLoading, setIsLoading] = useState(true);
   const [now, setNow] = useState<Date>(new Date());
@@ -30,11 +29,12 @@ export default function TeamLeadPage() {
 
   const fetchData = useCallback(async () => {
     const requestId = ++fetchRequestId.current;
-    const [metricsRes, mesRes, clockRes, allScrapRes, configRes] = await Promise.all([
+    const [metricsRes, mesRes, clockRes, allScrapRes, allDowntimeRes, configRes] = await Promise.all([
       fetch(`/api/metrics?shift=${shift}`, { cache: "no-store" }),
       fetch("/api/mes/state", { cache: "no-store" }),
       fetch("/api/sim/clock", { cache: "no-store" }),
       fetch(`/api/scrap?lineId=all&shift=${shift}`, { cache: "no-store" }),
+      fetch(`/api/downtime?shift=${shift}`, { cache: "no-store" }),
       fetch("/api/admin/config", { cache: "no-store" }),
     ]);
     if (requestId !== fetchRequestId.current) return;
@@ -49,6 +49,7 @@ export default function TeamLeadPage() {
     if (mesRes.ok) setMesStates(await mesRes.json());
     if (clockRes.ok) await clockRes.json();
     if (allScrapRes.ok) setAllScrapEntries(await allScrapRes.json());
+    if (allDowntimeRes.ok) setAllDowntimeEntries(await allDowntimeRes.json());
     if (configRes.ok) setAdminConfig(await configRes.json());
     setIsLoading(false);
   }, [shift]);
@@ -89,44 +90,44 @@ export default function TeamLeadPage() {
   }, [selectedLineId]);
 
   const refreshScrap = useCallback(() => {
-    if (selectedLineId) {
-      fetch(`/api/scrap?lineId=${selectedLineId}&shift=${shift}`)
-        .then((r) => r.json())
-        .then((data: ScrapEntry[]) => setScrapEntries(data));
-    } else {
-      // No line selected — FloorOverview shows all lines; skip per-line scrap state
-      setScrapEntries([]);
-    }
-  }, [selectedLineId, shift]);
+    fetch(`/api/scrap?lineId=all&shift=${shift}`)
+      .then((r) => r.json())
+      .then((data: ScrapEntry[]) => setAllScrapEntries(data));
+  }, [shift]);
 
   const refreshDowntime = useCallback(() => {
-    if (selectedLineId) {
-      fetch(`/api/downtime?lineId=${selectedLineId}&shift=${shift}`)
-        .then((r) => r.json())
-        .then((data: DowntimeEntry[]) => setDowntimeEntries(data));
-    } else {
-      setDowntimeEntries([]);
-    }
-  }, [selectedLineId, shift]);
+    fetch(`/api/downtime?shift=${shift}`)
+      .then((r) => r.json())
+      .then((data: DowntimeEntry[]) => setAllDowntimeEntries(data));
+  }, [shift]);
+
+  const selectedScrapEntries = useMemo(() => {
+    if (!selectedLineId) return [];
+    return allScrapEntries.filter((entry) => entry.lineId === selectedLineId);
+  }, [selectedLineId, allScrapEntries]);
+
+  const selectedDowntimeEntries = useMemo(() => {
+    if (!selectedLineId) return [];
+    return allDowntimeEntries.filter((entry) => entry.lineId === selectedLineId);
+  }, [selectedLineId, allDowntimeEntries]);
 
   const scrapStats = useMemo<ScrapStats>(() => {
     let kickedLids = 0, scrappedPanels = 0, totalBoughtIn = 0;
-    for (const e of scrapEntries) {
+    for (const e of selectedScrapEntries) {
       if (e.kind === "kicked-lid") kickedLids++;
       else if (e.kind === "scrapped-panel") scrappedPanels++;
       if (e.boughtIn) totalBoughtIn++;
     }
     return { kickedLids, scrappedPanels, totalBoughtIn };
-  }, [scrapEntries]);
+  }, [selectedScrapEntries]);
 
   useEffect(() => {
-    if (!selectedLineId) return;
     const initialRefresh = setTimeout(() => {
       refreshScrap();
       refreshDowntime();
     }, 0);
     return () => clearTimeout(initialRefresh);
-  }, [selectedLineId, shift, refreshScrap, refreshDowntime]);
+  }, [shift, refreshScrap, refreshDowntime]);
 
   const { lines, selectedLine, selectedMesState } = useMemo(() => {
     if (!metrics) return { lines: [], selectedLine: null, selectedMesState: null };
@@ -269,16 +270,18 @@ export default function TeamLeadPage() {
               return (
                 <button
                   key={line.id}
+                  disabled={!isRunning}
                   onClick={() => {
+                    if (!isRunning) return;
                     setSelectedLineId(line.id);
                     setViewMode("detail");
                   }}
-                  className={`w-full flex items-center justify-between p-3.5 transition-all cursor-pointer text-left border rounded-sm ${
+                  className={`w-full flex items-center justify-between p-3.5 transition-all text-left border rounded-sm ${
                     !isRunning
-                      ? "bg-surface-low/60 border-slate-500/35 opacity-55 grayscale"
+                      ? "bg-surface-low/60 border-slate-500/35 opacity-50 grayscale cursor-not-allowed"
                       : isSelected
-                        ? "bg-surface-highest border-accent shadow-[inset_3px_0_0_0_#f97316]"
-                        : "border-border/30 hover:bg-surface-high/70 hover:border-border/60"
+                        ? "bg-surface-highest border-accent shadow-[inset_3px_0_0_0_#f97316] cursor-pointer"
+                        : "border-border/30 hover:bg-surface-high/70 hover:border-border/60 cursor-pointer"
                   }`}
                 >
                   <div>
@@ -362,10 +365,10 @@ export default function TeamLeadPage() {
                 setSelectedLineId(null);
                 setViewMode("floor");
               }}
-              scrapEntries={scrapEntries}
+              scrapEntries={selectedScrapEntries}
               scrapStats={scrapStats}
               onRefreshScrap={refreshScrap}
-              downtimeEntries={downtimeEntries}
+              downtimeEntries={selectedDowntimeEntries}
               onRefreshDowntime={refreshDowntime}
             />
           ) : viewMode === "detail" ? (

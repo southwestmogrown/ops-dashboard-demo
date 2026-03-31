@@ -37,7 +37,7 @@ const DOWNTIME_REASONS: DowntimeReason[] = [
 ];
 
 function unitsForSpeed(speed: number): number {
-  return speed / 120;
+  return Math.max(1, Math.round(speed / 60));
 }
 
 function randomChoice<T>(arr: readonly T[]): T {
@@ -189,7 +189,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
     const simSpeed = await getSimSpeed();
     const requestedUnits = body.units > 0 ? body.units : unitsForSpeed(simSpeed);
-    const actualUnits = stochasticRound(requestedUnits * multiplier);
+    const actualUnits = Math.max(1, stochasticRound(requestedUnits * multiplier));
 
     if (actualUnits <= 0) {
       return NextResponse.json({ scansAdded: 0 });
@@ -223,7 +223,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   const { multiplier } = getRateMultiplier(simClock);
   const simSpeed = await getSimSpeed();
   const requestedUnits = body.units > 0 ? body.units : unitsForSpeed(simSpeed);
-  const actualUnits = stochasticRound(requestedUnits * multiplier);
+  const actualUnits = Math.max(1, stochasticRound(requestedUnits * multiplier));
 
   if (actualUnits <= 0) {
     return NextResponse.json({ scansAdded: 0 });

@@ -23,9 +23,8 @@ const SPEED_OPTIONS = [
 ] as const;
 
 function unitsForSpeed(speed: number): number {
-  // Target ~30 units/hour/line at 1x on average, with backend downtime/failure effects.
-  // This yields expected units/tick of 0.5 at 1x, 2.5 at 5x, 7.5 at 15x.
-  return speed / 120;
+  // Keep 1x producing visible output every tick; backend multipliers still shape realism.
+  return Math.max(1, Math.round(speed / 60));
 }
 
 // ── Page ─────────────────────────────────────────────────────────────────────
