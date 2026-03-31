@@ -469,7 +469,9 @@ export async function dbResetAll(): Promise<void> {
       { sql: "DELETE FROM scrap_log",    args: [] },
       { sql: "DELETE FROM downtime_log", args: [] },
       { sql: "DELETE FROM db_meta",      args: [] },
-      // Do NOT delete admin_config — user settings survive a reset
+      // Null out target/headcount overrides so lines revert to seeded defaults after a reset.
+      // isRunning is preserved — structural floor layout survives a sim reset.
+      { sql: "UPDATE admin_config SET target = NULL, headcount = NULL", args: [] },
       { sql: "UPDATE sim_clock SET clock = NULL, running = 0, speed = 60 WHERE id = 1", args: [] },
     ],
     "write"

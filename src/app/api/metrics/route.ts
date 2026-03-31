@@ -94,11 +94,11 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     line.availability = availability;
     line.performance  = performance;
     line.quality      = line.fpy;
-    line.oee = Math.round((availability * performance * line.fpy) / 10000) / 100;
+    line.oee = Math.round((availability * performance * line.fpy) / 100) / 100;
   }
 
   const states   = await getAllLineStates();
-  const INTERVALS = 16;
+  const INTERVALS = Math.round(win.totalClockMinutes / 30) + 1; // 22 for a 10.5h shift
   const realTrend: TimePoint[] = [];
 
   for (let i = 0; i < INTERVALS; i++) {

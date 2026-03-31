@@ -11,6 +11,7 @@
 import type { AdminLineConfig, LineComments, LineSchedule, LineState, ScanEvent } from "./mesTypes";
 import type { ScrapEntry } from "./reworkTypes";
 import type { DowntimeEntry } from "./downtimeTypes";
+import { getShiftWindows } from "./shiftTime";
 import {
   runMigrations,
   dbGetAllScans,
@@ -598,6 +599,17 @@ export async function advanceSimClock(): Promise<void> {
   const c = _c();
   if (!c.simRunning || !c.simClock) return;
   c.simClock = new Date(c.simClock.getTime() + c.simSpeed * 1000);
+
+  // Auto-stop when the simulated clock reaches the end of the current shift.
+  const h = c.simClock.getUTCHours() + c.simClock.getUTCMinutes() / 60 + c.simClock.getUTCSeconds() / 3600;
+  const shiftName = (h >= 6 && h < 17) ? "day" : "night";
+  const win = getShiftWindows(shiftName);
+  // Night shift crosses midnight: normalise hours past midnight to 24+
+  const normalized = shiftName === "night" && h < win.startHour ? h + 24 : h;
+  if (normalized >= win.endHour) {
+    c.simRunning = false;
+  }
+
   await dbSetSimClock(c.simClock, c.simRunning, c.simSpeed);
 }
 
@@ -621,6 +633,7 @@ export async function resetAll(): Promise<void> {
   c.initialized         = true; // prevent re-init overwriting cleared state
   c.initPromise         = null;
   await dbResetAll();
-  // Re-load admin config so user settings survive the reset
+  // Re-load admin config — target/headcount are now NULL so lines fall back to seeded defaults;
+  // isRunning flags are preserved so floor layout is unchanged.
   c.adminConfig = await dbGetAllAdminConfig();
 }

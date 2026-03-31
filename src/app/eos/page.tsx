@@ -70,7 +70,7 @@ const ALL_LINES: EOSLineDescriptor[] = VALUE_STREAMS.flatMap((vs) =>
 const EMPTY_LINE: EOSLineEntry = {
   output: "",
   hpu: "0",
-  hoursWorked: "8",
+  hoursWorked: "10",
   headcount: "",
   orderAtPackout: "",
   remainingOnOrder: "",

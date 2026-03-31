@@ -10,7 +10,6 @@ import {
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
-  ReferenceLine,
 } from "recharts";
 import { Line as LineData, TimePoint } from "@/lib/types";
 
@@ -170,7 +169,12 @@ export default function OutputChart({ lines, trend, totalTarget }: OutputChartPr
 
           <ResponsiveContainer width="100%" height={240}>
             <LineChart
-              data={trend}
+              data={trend.map((tp, i) => ({
+                ...tp,
+                ...(totalTarget && totalTarget > 0
+                  ? { targetLine: Math.round((i / Math.max(1, trend.length - 1)) * totalTarget) }
+                  : {}),
+              }))}
               margin={{ top: 5, right: 20, left: 0, bottom: 5 }}
             >
               <CartesianGrid
@@ -226,25 +230,19 @@ export default function OutputChart({ lines, trend, totalTarget }: OutputChartPr
                 isAnimationActive={false}
               />
 
-              {/* Target trajectory — straight line from 0 to totalTarget at the last time point */}
+              {/* Target trajectory — straight line from 0 to totalTarget across shift */}
               {totalTarget && totalTarget > 0 && (
-                <ReferenceLine
-                  segment={[
-                    { x: trend[0]?.time, y: 0 },
-                    { x: trend[trend.length - 1]?.time, y: totalTarget },
-                  ]}
+                <Line
+                  type="linear"
+                  dataKey="targetLine"
+                  name="Target"
                   stroke="#e1e2ec"
-                  strokeOpacity={0.25}
+                  strokeOpacity={0.3}
                   strokeDasharray="5 4"
                   strokeWidth={1.5}
-                  label={{
-                    value: "Target",
-                    position: "insideEnd",
-                    fill: "#e1e2ec",
-                    fillOpacity: 0.4,
-                    fontSize: 10,
-                    fontWeight: 700,
-                  }}
+                  dot={false}
+                  activeDot={false}
+                  isAnimationActive={false}
                 />
               )}
             </LineChart>
