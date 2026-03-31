@@ -115,6 +115,20 @@ export default function EOSLineCard({ lineKey, vsId, line, vsName, data, onChang
           </div>
         ))}
       </div>
+
+      {/* Per-line notes */}
+      <div className="px-5 pb-5">
+        <label className="block text-[10px] text-[#e1e2ec]/30 mb-1 tracking-widest uppercase font-bold">
+          Line Notes
+        </label>
+        <textarea
+          value={data.lineNotes ?? ""}
+          onChange={(e) => onChange(lineKey, "lineNotes", e.target.value)}
+          rows={3}
+          placeholder="Shift-specific notes for this line..."
+          className="w-full border border-border rounded-sm px-2.5 py-2 text-sm outline-none box-border font-mono bg-surface-highest text-[#e1e2ec] focus:ring-1 focus:ring-accent/30 focus:border-accent/30 resize-y"
+        />
+      </div>
     </div>
   );
 }

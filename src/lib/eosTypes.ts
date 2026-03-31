@@ -24,6 +24,7 @@ export interface EOSLineEntry {
   remainingOnOrder: string;
   remainingOnRunSheet: string;
   changeovers: string;
+  lineNotes: string;
 }
 
 // Structured notes fields for the Operational Summary section

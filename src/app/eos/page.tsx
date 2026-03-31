@@ -76,6 +76,7 @@ const EMPTY_LINE: EOSLineEntry = {
   remainingOnOrder: "",
   remainingOnRunSheet: "",
   changeovers: "",
+  lineNotes: "",
 };
 
 function emptyFormData(): EOSFormData {

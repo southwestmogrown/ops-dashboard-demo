@@ -170,12 +170,16 @@ export default function LineTable({
       .filter((l) => l.valueStream === vs)
       .map((line) => {
         const mesState = mesStateMap?.get(line.id);
-        const pace = calcLinePace(
+        const paceProjection = calcLinePace(
           mesState?.schedule ? mesState.totalOutput : line.output,
           shiftProgress?.elapsedHours ?? 0,
           shiftProgress?.totalHours ?? 10
         );
-        return { line, pace };
+        const pacePerHour =
+          paceProjection !== null && (shiftProgress?.totalHours ?? 0) > 0
+            ? Math.round(paceProjection / (shiftProgress?.totalHours ?? 10))
+            : null;
+        return { line, paceProjection, pacePerHour };
       });
 
     // Sort if performance sort is active
@@ -188,8 +192,8 @@ export default function LineTable({
         return ap - bp;
       }
       if (sortKey === "pace") {
-        const ap = a.pace ?? 0;
-        const bp = b.pace ?? 0;
+        const ap = a.pacePerHour ?? 0;
+        const bp = b.pacePerHour ?? 0;
         return ap - bp;
       }
       return 0;
@@ -198,7 +202,7 @@ export default function LineTable({
     // When sort is "asc" (worst first), top 1-2 get a highlight ring
     const sortHighlightIdx = sortDir === "asc" && sortKey !== "line" ? 2 : 0;
 
-    return sorted.map(({ line, pace }, idx) => {
+    return sorted.map(({ line, paceProjection, pacePerHour }, idx) => {
       const mesState = mesStateMap?.get(line.id);
       const isRunning = adminConfig?.[line.id]?.isRunning;
       const risk = getRiskLevel(line, mesState, shiftProgress, isRunning);
@@ -293,16 +297,16 @@ export default function LineTable({
           {/* Pace */}
           <td
             className={`px-4 py-4 text-center font-mono text-sm ${
-              pace !== null
-                ? getPaceColor(pace, line.target)
+              pacePerHour !== null && paceProjection !== null
+                ? getPaceColor(paceProjection, line.target)
                 : "text-[#e1e2ec]/30"
             }`}
           >
             <span
-              className={pace !== null ? "cursor-pointer" : ""}
-              onClick={(e) => { if (pace !== null) { e.stopPropagation(); handleSort("pace"); } }}
+              className={pacePerHour !== null ? "cursor-pointer" : ""}
+              onClick={(e) => { if (pacePerHour !== null) { e.stopPropagation(); handleSort("pace"); } }}
             >
-              {pace !== null ? `${pace}/hr` : "—"}
+              {pacePerHour !== null ? `${pacePerHour}/hr` : "—"}
             </span>
           </td>
 

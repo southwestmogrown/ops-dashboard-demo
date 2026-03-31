@@ -15,14 +15,14 @@ function generateEOSCSV(
   const headers = [
     "Line", "Output", "HPU", "Hours Worked",
     "Headcount", "Order at Packout", "Remaining on Order",
-    "Remaining on Run Sheet", "Changeovers",
+    "Remaining on Run Sheet", "Changeovers", "Line Notes",
   ];
   const rows = activeLines.map(({ lineKey, line }) => {
     const l = data.lines[lineKey];
     return [
       line, l.output, l.hpu, l.hoursWorked,
       l.headcount, l.orderAtPackout, l.remainingOnOrder,
-      l.remainingOnRunSheet, l.changeovers,
+      l.remainingOnRunSheet, l.changeovers, l.lineNotes,
     ].join(",");
   });
   const meta = [
@@ -77,13 +77,13 @@ function generatePrePostCSV(
   data: EOSFormData,
   activeLines: EOSLineDescriptor[],
 ): string {
-  const headers = ["Line", "Output", "HPU", "Hours Worked", "Headcount", "Changeovers", "Remaining on Order", "Remaining on Run Sheet"];
+  const headers = ["Line", "Output", "HPU", "Hours Worked", "Headcount", "Changeovers", "Remaining on Order", "Remaining on Run Sheet", "Line Notes"];
   const rows = activeLines.map(({ lineKey, line }) => {
     const l = data.lines[lineKey];
     return [
       line, l.output || "—", l.hpu || "0", l.hoursWorked || "8",
       l.headcount || "—", l.changeovers || "0",
-      l.remainingOnOrder || "—", l.remainingOnRunSheet || "—",
+      l.remainingOnOrder || "—", l.remainingOnRunSheet || "—", l.lineNotes || "",
     ].join(",");
   });
   const meta = [
@@ -124,7 +124,8 @@ export function generateEmailBody(
       return `  ${line} (${vsName})
     Output: ${l.output || "—"}  |  HPU: ${l.hpu || "0"}
     Headcount: ${l.headcount || "—"}  |  Hours Worked: ${l.hoursWorked || "8"}  |  Changeovers: ${l.changeovers || "—"}
-    Order @ Packout: ${l.orderAtPackout || "—"}  |  Remaining on Order: ${l.remainingOnOrder || "—"}  |  Remaining on Run Sheet: ${l.remainingOnRunSheet || "—"}`;
+    Order @ Packout: ${l.orderAtPackout || "—"}  |  Remaining on Order: ${l.remainingOnOrder || "—"}  |  Remaining on Run Sheet: ${l.remainingOnRunSheet || "—"}
+    Line Notes: ${l.lineNotes || "—"}`;
     })
     .join("\n\n");
 
