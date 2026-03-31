@@ -33,7 +33,7 @@ export default function OutputChart({ lines, trend, totalTarget, shift, currentT
 
   const chartNow = currentTime ?? new Date();
   const shiftWindow = getShiftWindows(shift);
-  const currentHour = chartNow.getHours() + chartNow.getMinutes() / 60 + chartNow.getSeconds() / 3600;
+  const currentHour = chartNow.getUTCHours() + chartNow.getUTCMinutes() / 60 + chartNow.getUTCSeconds() / 3600;
   const elapsedHours = currentHour >= shiftWindow.startHour
     ? currentHour - shiftWindow.startHour
     : currentHour + 24 - shiftWindow.startHour;

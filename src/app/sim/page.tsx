@@ -23,8 +23,8 @@ const SPEED_OPTIONS = [
 ] as const;
 
 function unitsForSpeed(speed: number): number {
-  // Keep 1x producing visible output every tick; backend multipliers still shape realism.
-  return Math.max(1, Math.round(speed / 60));
+  // Fractional units are accumulated server-side so 1x stays realistic without starving output.
+  return speed / 120;
 }
 
 // ── Page ─────────────────────────────────────────────────────────────────────

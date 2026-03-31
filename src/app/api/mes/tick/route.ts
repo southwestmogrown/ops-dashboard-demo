@@ -10,6 +10,7 @@ import {
   closeDowntimeEntry,
   getOpenDowntime,
   getSimSpeed,
+  claimSimUnits,
   refreshCacheFromDb,
 } from "@/lib/mesStore";
 import { getShiftWindows } from "@/lib/shiftTime";
@@ -25,7 +26,7 @@ interface TickBody {
 
 const DOWNTIME_SKIP_PROBABILITY = 0.08;
 const DEFECT_INJECTION_PROBABILITY = 0.05;
-const KICKED_LID_INJECTION_PROBABILITY = 0.05;
+const KICKED_LID_INJECTION_PROBABILITY = 0.01;
 const DOWNTIME_EVENT_PROBABILITY = 0.35;
 
 const DOWNTIME_REASONS: DowntimeReason[] = [
@@ -37,18 +38,11 @@ const DOWNTIME_REASONS: DowntimeReason[] = [
 ];
 
 function unitsForSpeed(speed: number): number {
-  return Math.max(1, Math.round(speed / 60));
+  return speed / 120;
 }
 
 function randomChoice<T>(arr: readonly T[]): T {
   return arr[Math.floor(Math.random() * arr.length)];
-}
-
-function stochasticRound(value: number): number {
-  if (value <= 0) return 0;
-  const whole = Math.floor(value);
-  const frac = value - whole;
-  return whole + (Math.random() < frac ? 1 : 0);
 }
 
 /**
@@ -58,7 +52,7 @@ function stochasticRound(value: number): number {
  * Middle        → 100% rate
  */
 function getRateMultiplier(simClock: Date): { multiplier: number; actualUnits: number; shiftMinutes: number } {
-  const hour      = simClock.getHours() + simClock.getMinutes() / 60 + simClock.getSeconds() / 3600;
+  const hour      = simClock.getUTCHours() + simClock.getUTCMinutes() / 60 + simClock.getUTCSeconds() / 3600;
   const shiftName: ShiftName = hour >= 6 && hour < 18 ? "day" : "night";
   const win       = getShiftWindows(shiftName);
   const totalWorkMinutes = win.totalWorkMinutes;
@@ -89,7 +83,7 @@ async function maybeInjectDefect(
 
   const line  = randomChoice(activeLines);
   const now   = (await getSimClock()) ?? new Date();
-  const hour  = now.getHours();
+  const hour  = now.getUTCHours();
   const shift: ShiftName = hour >= 6 && hour < 18 ? "day" : "night";
   const isVS2 = line.lineId.toLowerCase().includes("vs2");
 
@@ -184,18 +178,20 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
     const simClock = (await getSimClock()) ?? new Date();
     const shift: ShiftName =
-      simClock.getHours() >= 6 && simClock.getHours() < 18 ? "day" : "night";
+      simClock.getUTCHours() >= 6 && simClock.getUTCHours() < 18 ? "day" : "night";
     const { multiplier } = getRateMultiplier(simClock);
 
     const simSpeed = await getSimSpeed();
     const requestedUnits = body.units > 0 ? body.units : unitsForSpeed(simSpeed);
-    const actualUnits = Math.max(1, stochasticRound(requestedUnits * multiplier));
+    const requestedTickUnits = requestedUnits * multiplier;
 
-    if (actualUnits <= 0) {
+    if (requestedTickUnits <= 0) {
       return NextResponse.json({ scansAdded: 0 });
     }
 
     for (const state of activeLines) {
+      const actualUnits = await claimSimUnits(state.lineId, requestedTickUnits);
+
       // Simulate brief line stops/changeover interruptions.
       if (Math.random() < DOWNTIME_SKIP_PROBABILITY) {
         await maybeInjectDowntime(
@@ -204,6 +200,9 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
           simClock,
           state.schedule?.totalTarget ?? 0,
         );
+        continue;
+      }
+      if (actualUnits <= 0) {
         continue;
       }
       await tickLine(state.lineId, actualUnits);
@@ -223,7 +222,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   const { multiplier } = getRateMultiplier(simClock);
   const simSpeed = await getSimSpeed();
   const requestedUnits = body.units > 0 ? body.units : unitsForSpeed(simSpeed);
-  const actualUnits = Math.max(1, stochasticRound(requestedUnits * multiplier));
+  const actualUnits = await claimSimUnits(body.lineId, requestedUnits * multiplier);
 
   if (actualUnits <= 0) {
     return NextResponse.json({ scansAdded: 0 });

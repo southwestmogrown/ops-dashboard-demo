@@ -60,6 +60,7 @@ interface MesCache {
   simClock: Date | null;
   simRunning: boolean;
   simSpeed: number;
+  unitCarryover: Record<string, number>;
   changeoverRemaining: Record<string, number>;
   failureAccumulator: Record<string, number>;
   repairRemaining: Record<string, number>;
@@ -85,6 +86,7 @@ function _c(): MesCache {
       simClock: null,
       simRunning: false,
       simSpeed: 60,
+      unitCarryover: {},
       changeoverRemaining: {},
       failureAccumulator: {},
       repairRemaining: {},
@@ -338,7 +340,7 @@ export async function tickLine(
   if (!queue || queue.length === 0) return;
 
   const schedule = queue[0];
-  const shift = shiftForHour(effectiveNow.getHours());
+  const shift = shiftForHour(effectiveNow.getUTCHours());
 
   const firstIncomplete = schedule.items.find(
     (it) => !it.skipped && it.completed < it.qty,
@@ -400,7 +402,7 @@ export async function getLineState(lineId: string): Promise<LineState> {
 
   const hourlyOutput: Record<string, number> = {};
   for (const scan of lineScans) {
-    const h = new Date(scan.timestamp).getHours();
+    const h = new Date(scan.timestamp).getUTCHours();
     const key = `${String(h).padStart(2, "0")}:00`;
     hourlyOutput[key] = (hourlyOutput[key] ?? 0) + 1;
   }
@@ -678,8 +680,7 @@ export async function getTotalDowntimeMinutes(
 
 export async function getSimClock(): Promise<Date | null> {
   await ensureInit();
-  const c = _c();
-  return c.simRunning ? c.simClock : null;
+  return _c().simClock;
 }
 
 export async function setSimClock(time: Date | null): Promise<void> {
@@ -708,6 +709,18 @@ export async function getSimRunning(): Promise<boolean> {
 export async function getSimSpeed(): Promise<number> {
   await ensureInit();
   return _c().simSpeed;
+}
+
+export async function claimSimUnits(
+  lineId: string,
+  requestedUnits: number,
+): Promise<number> {
+  await ensureInit();
+  const c = _c();
+  const total = (c.unitCarryover[lineId] ?? 0) + requestedUnits;
+  const wholeUnits = Math.floor(total);
+  c.unitCarryover[lineId] = total - wholeUnits;
+  return wholeUnits;
 }
 
 export async function advanceSimClock(): Promise<void> {
@@ -761,6 +774,7 @@ export async function resetSimulation(): Promise<void> {
   c.simClock = null;
   c.simRunning = false;
   c.simSpeed = 60;
+  c.unitCarryover = {};
   c.changeoverRemaining = {};
   c.failureAccumulator = {};
   c.repairRemaining = {};
@@ -783,6 +797,7 @@ export async function resetAll(): Promise<void> {
   c.simClock = null;
   c.simRunning = false;
   c.simSpeed = 60;
+  c.unitCarryover = {};
   c.changeoverRemaining = {};
   c.failureAccumulator = {};
   c.repairRemaining = {};

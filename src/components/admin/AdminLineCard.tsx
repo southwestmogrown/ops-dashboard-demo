@@ -1,6 +1,6 @@
 "use client";
 
-import { forwardRef, useImperativeHandle, useRef, useState } from "react";
+import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
 import type { LineSchedule, RunSheetItem } from "@/lib/mesTypes";
 
 interface AdminLineCardProps {
@@ -44,6 +44,22 @@ const AdminLineCardInner = forwardRef(function AdminLineCardInner({
   const [isRunning, setIsRunning] = useState(savedIsRunning !== undefined ? savedIsRunning : true);
   const [supervisorName, setSupervisorName] = useState(savedSupervisorName ?? "");
   const [saved, setSaved] = useState(false);
+
+  useEffect(() => {
+    setTarget(savedTarget !== undefined ? String(savedTarget) : "");
+  }, [savedTarget]);
+
+  useEffect(() => {
+    setHeadcount(savedHeadcount !== undefined ? String(savedHeadcount) : "");
+  }, [savedHeadcount]);
+
+  useEffect(() => {
+    setIsRunning(savedIsRunning !== undefined ? savedIsRunning : true);
+  }, [savedIsRunning]);
+
+  useEffect(() => {
+    setSupervisorName(savedSupervisorName ?? "");
+  }, [savedSupervisorName]);
 
   // Expose a save() method so the parent can trigger save-all
   useImperativeHandle(ref, () => ({
@@ -92,7 +108,7 @@ const AdminLineCardInner = forwardRef(function AdminLineCardInner({
   async function handleSave() {
     const t = target !== "" ? Number(target) : undefined;
     const hc = headcount !== "" ? Number(headcount) : undefined;
-    onConfigSaved(lineId, t, hc, isRunning, supervisorName);
+    await onConfigSaved(lineId, t, hc, isRunning, supervisorName);
     setSaved(true);
     setTimeout(() => setSaved(false), 1500);
   }
@@ -104,7 +120,10 @@ const AdminLineCardInner = forwardRef(function AdminLineCardInner({
   const serverConfirmed = schedule !== null && pendingSchedule !== null &&
     schedule.lineId === pendingSchedule.lineId &&
     schedule.date === pendingSchedule.date;
-  if (serverConfirmed) setPendingSchedule(null);
+
+  useEffect(() => {
+    if (serverConfirmed) setPendingSchedule(null);
+  }, [serverConfirmed]);
 
   const pct = activeSchedule
     ? Math.round(
