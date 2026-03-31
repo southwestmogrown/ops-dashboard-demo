@@ -4,8 +4,12 @@ import type { NextRequest } from "next/server";
 export function middleware(request: NextRequest) {
   const role = request.cookies.get("ops-role")?.value;
 
-  // Protect /admin route — only supervisors allowed
-  if (request.nextUrl.pathname.startsWith("/admin")) {
+  // Protect supervisor routes — only supervisors allowed.
+  if (
+    request.nextUrl.pathname.startsWith("/admin") ||
+    request.nextUrl.pathname.startsWith("/eos") ||
+    request.nextUrl.pathname.startsWith("/sim")
+  ) {
     if (!role || role !== "supervisor") {
       return NextResponse.redirect(new URL("/team-lead", request.url));
     }
@@ -24,5 +28,5 @@ export function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/admin/:path*", "/team-lead/:path*"],
+  matcher: ["/admin/:path*", "/eos/:path*", "/sim/:path*", "/team-lead/:path*"],
 };

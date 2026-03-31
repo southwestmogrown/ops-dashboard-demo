@@ -337,7 +337,7 @@ Comprehensive code review identified 7 key waste/redundancy issues. See detailed
 
 - **M19: Navigation Component Consolidation** ✅ COMPLETE (2026-03-31) — Extracted reusable `SidebarNav` component and replaced duplicated sidebar markup across dashboard, admin, EOS, and sim pages.
 
-- **M20: Role-Check Logic Extraction** 🟡 HIGH — Identical redirect pattern in 4 pages (28 LOC waste). Extract `useRedirectTeamLead()` hook. Also: extend middleware to `/eos/*`, `/sim/*` to eliminate client-side render flash.
+- **M20: Role-Check Logic Extraction** ✅ COMPLETE (2026-03-31) — Extracted shared `useRedirectTeamLead()` hook and replaced duplicated redirect logic in 4 pages; middleware coverage extended to `/eos/*` and `/sim/*`.
 
 - **M21: API Fetch Deduplication & Caching** 🟡 MODERATE — Header polls `/api/sim/clock` independently (every page also does → 2-4× redundant). `/api/admin/config` fetched by 6 places. Option A (quick): Header-level caching via context. Option B (ideal): React Query for automatic deduplication & 30s stale cache.
 
@@ -348,9 +348,8 @@ Comprehensive code review identified 7 key waste/redundancy issues. See detailed
 - **M24: Dynamic Import Audit** 🟢 NICE-TO-HAVE — 8 dynamic imports; verify each truly needs SSR exclusion. Remove 2-3 unnecessary imports if found.
 
 **Priority order for implementation:**
-1. M20 (role-check extraction) — high impact on maintainability + UX
-2. M21 (performance) — moderate effort, good ROI if using React Query
-3. M22–M24 (housekeeping) — low priority, do when refactoring that area
+1. M21 (performance) — moderate effort, good ROI if using React Query
+2. M22–M24 (housekeeping) — low priority, do when refactoring that area
 
 
 ### Remaining

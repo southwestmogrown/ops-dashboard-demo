@@ -3,14 +3,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import dynamic from "next/dynamic";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import type { AdminLineConfig, LineState } from "@/lib/mesTypes";
-import { useAuth } from "@/hooks/useAuth";
 import type { ShiftName } from "@/lib/types";
 import { LINES, LINE_LABELS, getDefaultTarget } from "@/lib/lines";
 import { getShiftWindows } from "@/lib/shiftTime";
 import Header from "@/components/Header";
 import SidebarNav from "@/components/SidebarNav";
+import { useRedirectTeamLead } from "@/hooks/useRedirectTeamLead";
 
 const HourlyTable = dynamic(() => import("@/components/sim/HourlyTable"), {
   ssr: false,
@@ -36,15 +36,7 @@ function unitsForSpeed(speed: number): number {
 
 export default function SimPage() {
   const pathname = usePathname();
-  const router = useRouter();
-  const { role, logout } = useAuth();
-
-  // Team-lead route guard
-  useEffect(() => {
-    if (role === "team-lead") {
-      router.push("/team-lead");
-    }
-  }, [role, router]);
+  useRedirectTeamLead();
 
   const [states, setStates] = useState<LineState[]>([]);
   const [adminConfig, setAdminConfig] = useState<

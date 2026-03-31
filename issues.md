@@ -1140,7 +1140,7 @@ Then replace 40-line nav blocks in each file with `<SidebarNav />`.
 
 ## M20: Role-Check Logic Extraction — MODERATE WASTE + SECURITY
 
-**Status:** Not Started  
+**Status:** ✅ Implemented (2026-03-31)  
 **Severity:** HIGH — 28 LOC duplication + redirect flash bug
 
 ### Problem
@@ -1160,7 +1160,7 @@ Appears in: `admin/page.tsx`, `page.tsx`, `eos/page.tsx`, `sim/page.tsx`
 
 ### Solution
 
-**File:** `src/hooks/useRedirectTeamLead.ts` (new)
+**File:** `src/hooks/useRedirectTeamLead.tsx` (new)
 ```typescript
 export function useRedirectTeamLead() {
   const router = useRouter();
@@ -1191,7 +1191,7 @@ export default function AdminPage() {
 Add route matchers:
 ```typescript
 export const config = {
-  matcher: ["/admin", "/eos/:path*", "/sim/:path*"],
+  matcher: ["/admin/:path*", "/eos/:path*", "/sim/:path*", "/team-lead/:path*"],
 };
 ```
 
@@ -1206,9 +1206,9 @@ Then middleware redirects both admin + eos + sim if not supervisor → eliminate
 - `src/app/sim/page.tsx` — remove useEffect redirect, call hook
 
 ### Acceptance Criteria
-- [ ] All 4 pages call `useRedirectTeamLead()`
-- [ ] User does not see brief dashboard flash when accessing `/eos` as team lead
-- [ ] Code removed from 4 pages (~28 LOC)
+- [x] All 4 pages call `useRedirectTeamLead()`
+- [x] User does not see brief dashboard flash when accessing `/eos` as team lead (middleware now guards `/eos/*` and `/sim/*`)
+- [x] Code removed from 4 pages (~28 LOC)
 
 ---
 

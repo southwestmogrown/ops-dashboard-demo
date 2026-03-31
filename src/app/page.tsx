@@ -2,15 +2,14 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
-import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { ShiftMetrics, ShiftName } from "@/lib/types";
 import type { AdminLineConfig, LineState } from "@/lib/mesTypes";
 import type { DowntimeEntry } from "@/lib/downtimeTypes";
 import { getShiftProgress } from "@/lib/shiftTime";
 import Header from "@/components/Header";
 import SidebarNav, { SidebarNavItem } from "@/components/SidebarNav";
-import { useAuth } from "@/hooks/useAuth";
+import { useRedirectTeamLead } from "@/hooks/useRedirectTeamLead";
 import KpiCard from "@/components/KpiCard";
 import LineTable from "@/components/LineTable";
 import { getOutputColor, getFpyColor, getHpuColor, getOeeColor } from "@/lib/status";
@@ -89,8 +88,7 @@ function ErrorScreen({
 
 export default function Home() {
   const pathname = usePathname();
-  const { role, logout } = useAuth();
-  const router = useRouter();
+  useRedirectTeamLead();
   const [metrics, setMetrics] = useState<ShiftMetrics | null>(null);
   const [mesStates, setMesStates] = useState<LineState[]>([]);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
@@ -99,12 +97,6 @@ export default function Home() {
   const [shift, setShift] = useState<ShiftName>("day");
   const [selectedLineId, setSelectedLineId] = useState<string | null>(null);
   const closeDrawer = useCallback(() => setSelectedLineId(null), []);
-
-  useEffect(() => {
-    if (role !== null && role === "team-lead") {
-      router.push("/team-lead");
-    }
-  }, [role]);
 
   const [adminConfig, setAdminConfig] = useState<Record<string, AdminLineConfig>>({});
   const [simClock, setSimClock] = useState<Date | null>(null);

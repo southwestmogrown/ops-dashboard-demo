@@ -1,16 +1,15 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import dynamic from "next/dynamic";
 import type { AdminLineConfig, LineSchedule, LineState } from "@/lib/mesTypes";
-import { useAuth } from "@/hooks/useAuth";
 import type { ShiftName } from "@/lib/types";
 import { LINES, LINE_ADMIN_LABELS } from "@/lib/lines";
 import Header from "@/components/Header";
 import AdminLayout from "@/components/admin/AdminLayout";
 import SidebarNav, { SidebarNavItem } from "@/components/SidebarNav";
+import { useRedirectTeamLead } from "@/hooks/useRedirectTeamLead";
 
 const SIDE_NAV_ITEMS: SidebarNavItem[] = [
   { href: "/", label: "Dashboard", icon: "dashboard" },
@@ -24,15 +23,7 @@ const AdminLineCard = dynamic(
 
 function AdminPageContent() {
   const pathname = usePathname();
-  const router = useRouter();
-  const { role, logout } = useAuth();
-
-  // Team-lead route guard
-  useEffect(() => {
-    if (role === "team-lead") {
-      router.push("/team-lead");
-    }
-  }, [role, router]);
+  useRedirectTeamLead();
 
   const [mesStates, setMesStates] = useState<LineState[]>([]);
   const [adminConfig, setAdminConfig] = useState<

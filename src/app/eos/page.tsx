@@ -1,10 +1,8 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo } from "react";
-import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import type { ShiftMetrics } from "@/lib/types";
-import { useAuth } from "@/hooks/useAuth";
 import Header from "@/components/Header";
 import type { AdminLineConfig, LineState } from "@/lib/mesTypes";
 import type {
@@ -19,6 +17,7 @@ import EOSMetaForm from "@/components/eos/EOSMetaForm";
 import EOSEmailPreview from "@/components/eos/EOSEmailPreview";
 import NoteCheckboxField from "@/components/eos/NoteCheckboxField";
 import SidebarNav, { SidebarNavItem } from "@/components/SidebarNav";
+import { useRedirectTeamLead } from "@/hooks/useRedirectTeamLead";
 
 // ── Draft types ────────────────────────────────────────────────────────────────
 
@@ -124,15 +123,7 @@ function lineIdToLineKey(lineId: string): string {
 
 export default function EOSPage() {
   const pathname = usePathname();
-  const router = useRouter();
-  const { role, logout } = useAuth();
-
-  // Team-lead route guard
-  useEffect(() => {
-    if (role === "team-lead") {
-      router.push("/team-lead");
-    }
-  }, [role, router]);
+  useRedirectTeamLead();
 
   const [formData, setFormData] = useState<EOSFormData>(emptyFormData());
   const [hiddenLines, setHiddenLines] = useState<Set<string>>(new Set());
