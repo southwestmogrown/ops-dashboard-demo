@@ -54,6 +54,15 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
         ? Math.min(100, Math.round(((totalOutput - kickedLids) / totalOutput) * 1000) / 10)
         : 100;
 
+    if (totalOutput === 0) {
+      line.availability = 100;
+      line.performance = 100;
+      line.quality = 100;
+      line.oee = 100;
+      line.hpu = 0;
+      continue;
+    }
+
     const downtimeEntries = await getDowntimeEntries(line.id, shiftParam as ShiftName);
     let downtimeMinutes = 0;
     for (const entry of downtimeEntries) {
@@ -77,8 +86,8 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       : 100;
 
     const standardUpH  = line.target / totalHours;
-    const actualUpH    = elapsedHours > 0 && totalOutput > 0 ? totalOutput / elapsedHours : 0;
-    const performance  = standardUpH > 0 && totalOutput > 0
+    const actualUpH    = elapsedHours > 0 ? totalOutput / elapsedHours : 0;
+    const performance  = standardUpH > 0
       ? Math.min(100, Math.round((actualUpH / standardUpH) * 1000) / 10)
       : 100;
 

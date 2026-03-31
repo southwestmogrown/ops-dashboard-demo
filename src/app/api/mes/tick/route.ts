@@ -20,8 +20,22 @@ interface TickBody {
   units: number;
 }
 
+const DOWNTIME_SKIP_PROBABILITY = 0.12;
+const DEFECT_INJECTION_PROBABILITY = 0.003;
+
+function unitsForSpeed(speed: number): number {
+  return Math.max(1, Math.round(speed / 90));
+}
+
 function randomChoice<T>(arr: readonly T[]): T {
   return arr[Math.floor(Math.random() * arr.length)];
+}
+
+function stochasticRound(value: number): number {
+  if (value <= 0) return 0;
+  const whole = Math.floor(value);
+  const frac = value - whole;
+  return whole + (Math.random() < frac ? 1 : 0);
 }
 
 /**
@@ -59,7 +73,7 @@ async function maybeInjectDefect(
   activeLines: { lineId: string; currentOrder: string | null }[]
 ): Promise<void> {
   if (activeLines.length === 0) return;
-  if (Math.random() < 0.005) return;
+  if (Math.random() >= DEFECT_INJECTION_PROBABILITY) return;
 
   const line  = randomChoice(activeLines);
   const now   = (await getSimClock()) ?? new Date();
@@ -104,10 +118,17 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     const simClock = (await getSimClock()) ?? new Date();
     const { multiplier } = getRateMultiplier(simClock);
 
-    const simSpeed    = await getSimSpeed();
-    const actualUnits = Math.max(1, Math.round((simSpeed / 15) * multiplier));
+    const simSpeed = await getSimSpeed();
+    const requestedUnits = body.units > 0 ? body.units : unitsForSpeed(simSpeed);
+    const actualUnits = stochasticRound(requestedUnits * multiplier);
+
+    if (actualUnits <= 0) {
+      return NextResponse.json({ scansAdded: 0 });
+    }
 
     for (const state of activeLines) {
+      // Simulate brief line stops/changeover interruptions.
+      if (Math.random() < DOWNTIME_SKIP_PROBABILITY) continue;
       await tickLine(state.lineId, actualUnits);
       scansAdded += actualUnits;
     }
@@ -121,10 +142,19 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ error: "lineId or all=true required" }, { status: 400 });
   }
 
-  const simClock    = (await getSimClock()) ?? new Date();
+  const simClock = (await getSimClock()) ?? new Date();
   const { multiplier } = getRateMultiplier(simClock);
-  const simSpeed    = await getSimSpeed();
-  const actualUnits = Math.max(1, Math.round((simSpeed / 15) * multiplier));
+  const simSpeed = await getSimSpeed();
+  const requestedUnits = body.units > 0 ? body.units : unitsForSpeed(simSpeed);
+  const actualUnits = stochasticRound(requestedUnits * multiplier);
+
+  if (actualUnits <= 0) {
+    return NextResponse.json({ scansAdded: 0 });
+  }
+
+  if (Math.random() < DOWNTIME_SKIP_PROBABILITY) {
+    return NextResponse.json({ scansAdded: 0 });
+  }
 
   await tickLine(body.lineId, actualUnits);
   return NextResponse.json({ scansAdded: actualUnits });

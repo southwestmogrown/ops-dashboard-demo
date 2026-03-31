@@ -22,6 +22,11 @@ const SPEED_OPTIONS = [
   { label: "15×", value: 900, desc: "Fast" },
 ] as const;
 
+function unitsForSpeed(speed: number): number {
+  // Keeps higher-speed modes realistic: 1x=1, 5x=3, 15x=10 units/tick.
+  return Math.max(1, Math.round(speed / 90));
+}
+
 // ── Page ─────────────────────────────────────────────────────────────────────
 
 export default function SimPage() {
@@ -71,7 +76,7 @@ export default function SimPage() {
   async function startSim() {
     if (tickInterval.current) return;
     const shiftStart = new Date();
-    shiftStart.setHours(getShiftWindows(shift).startHour, 0, 0, 0);
+    shiftStart.setUTCHours(getShiftWindows(shift).startHour, 0, 0, 0);
     await fetch("/api/sim/clock", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -81,8 +86,8 @@ export default function SimPage() {
     tickInterval.current = setInterval(async () => {
       // Scale units with speed so production rate (units/line/hr) stays ~24-35
       // regardless of how fast simulated time runs.
-      // 1 unit/line/tick at 1×, 5 at 5×, 15 at 15×.
-      const units = Math.max(1, Math.round(speedRef.current / 60));
+      // Tuned profile for smoother realistic pacing at high sim speeds.
+      const units = unitsForSpeed(speedRef.current);
       await fetch("/api/mes/tick", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -569,7 +574,7 @@ export default function SimPage() {
                     </div>
                     <div className="bg-black/20 p-3 rounded-sm">
                       <p className="text-[9px] uppercase text-[#e1e2ec]/40 font-bold mb-1">Tick Rate</p>
-                      <p className="text-sm font-mono">{Math.max(1, Math.round(speed / 60))} unit{Math.max(1, Math.round(speed / 60)) !== 1 ? "s" : ""}/tick</p>
+                      <p className="text-sm font-mono">{unitsForSpeed(speed)} unit{unitsForSpeed(speed) !== 1 ? "s" : ""}/tick</p>
                     </div>
                   </div>
                 </div>
