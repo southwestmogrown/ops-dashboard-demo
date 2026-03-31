@@ -28,7 +28,9 @@ function readStorage(): AuthState {
     const raw = localStorage.getItem("ops-auth");
     if (!raw) return { role: null, isAuthenticated: false };
     const parsed = JSON.parse(raw) as { pin: string; role: UserRole };
-    return { role: parsed.role, isAuthenticated: parsed.pin === AUTH_PIN };
+    const expectedPin =
+      parsed.role === "supervisor" ? SUPERVISOR_PIN : TEAM_LEAD_PIN;
+    return { role: parsed.role, isAuthenticated: parsed.pin === expectedPin };
   } catch {
     return { role: null, isAuthenticated: false };
   }
