@@ -48,6 +48,7 @@ export default function LineDetailCard({
   const [showScrapForm, setShowScrapForm] = useState(false);
   const [showDowntimeForm, setShowDowntimeForm] = useState(false);
   const [resolveDowntime, setResolveDowntime] = useState<DowntimeEntry | null>(null);
+  const changeoverCount = mesState?.completedOrders ?? line.changeovers;
 
   // Single pass over schedule items — avoids double-reduce over the same array
   const { orderPct, completed } = useMemo(() => {
@@ -83,7 +84,7 @@ export default function LineDetailCard({
           </p>
         </div>
 
-        <div className="col-span-12 lg:col-span-8 grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="col-span-12 lg:col-span-8 grid grid-cols-2 md:grid-cols-5 gap-4">
           <div className="bg-surface p-4 border-t-2 border-status-green">
             <span className="block text-[10px] font-bold text-[#e1e2ec]/40 uppercase mb-1">Current Output</span>
             <div className="flex items-baseline gap-2">
@@ -116,6 +117,23 @@ export default function LineDetailCard({
                 {line.headcount}
               </span>
               <span className="material-symbols-outlined text-[16px] text-[#e1e2ec]/40">group</span>
+            </div>
+          </div>
+          <div className="bg-surface p-4 border-t-2 border-status-amber">
+            <span className="block text-[10px] font-bold text-[#e1e2ec]/40 uppercase mb-1">Changeovers</span>
+            <div className="flex items-baseline gap-2">
+              <span className="text-3xl font-['Space_Grotesk',sans-serif] font-bold tabular-nums text-status-amber">
+                {changeoverCount}
+              </span>
+            </div>
+            <div className="mt-2 flex items-center gap-1.5 min-h-3">
+              {changeoverCount > 0 ? (
+                Array.from({ length: Math.min(changeoverCount, 8) }).map((_, idx) => (
+                  <span key={idx} className="h-3 border-l border-dotted border-status-amber/80" />
+                ))
+              ) : (
+                <span className="text-[10px] text-[#e1e2ec]/30 uppercase tracking-widest">None yet</span>
+              )}
             </div>
           </div>
         </div>
