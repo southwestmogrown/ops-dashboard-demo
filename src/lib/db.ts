@@ -6,7 +6,7 @@
 
 import { createClient } from "@libsql/client";
 import type { Client } from "@libsql/client";
-import type { AdminLineConfig, LineSchedule, ScanEvent } from "./mesTypes";
+import type { AdminLineConfig, ChangeoverEvent, LineSchedule, ScanEvent } from "./mesTypes";
 import type { LineComments } from "./mesTypes";
 import type { ScrapEntry } from "./reworkTypes";
 import type { DowntimeEntry } from "./downtimeTypes";
@@ -100,6 +100,16 @@ export async function runMigrations(): Promise<void> {
       created_at TEXT NOT NULL
     );
     CREATE INDEX IF NOT EXISTS idx_downtime_shift ON downtime_log(line_id, shift);
+
+    CREATE TABLE IF NOT EXISTS changeover_log (
+      id              TEXT PRIMARY KEY,
+      line_id         TEXT NOT NULL,
+      shift           TEXT NOT NULL,
+      completed_model TEXT NOT NULL,
+      next_model      TEXT,
+      timestamp       TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_changeover_shift ON changeover_log(line_id, shift);
   `);
 }
 
@@ -430,6 +440,53 @@ export async function dbClearScrap(): Promise<void> {
   await getClient().execute("DELETE FROM scrap_log");
 }
 
+// ── Changeover log ────────────────────────────────────────────────────────────
+
+type ChangeoverRow = {
+  id: string;
+  line_id: string;
+  shift: "day" | "night";
+  completed_model: string;
+  next_model: string | null;
+  timestamp: string;
+};
+
+function _parseChangeoverRow(r: ChangeoverRow): ChangeoverEvent {
+  return {
+    id: r.id,
+    lineId: r.line_id,
+    shift: r.shift,
+    completedModel: r.completed_model,
+    nextModel: r.next_model,
+    timestamp: r.timestamp,
+  };
+}
+
+export async function dbInsertChangeover(event: ChangeoverEvent): Promise<void> {
+  await getClient().execute({
+    sql: `INSERT INTO changeover_log
+            (id, line_id, shift, completed_model, next_model, timestamp)
+          VALUES (?, ?, ?, ?, ?, ?)`,
+    args: [
+      event.id,
+      event.lineId,
+      event.shift,
+      event.completedModel,
+      event.nextModel,
+      event.timestamp,
+    ],
+  });
+}
+
+export async function dbGetAllChangeovers(): Promise<ChangeoverEvent[]> {
+  const result = await getClient().execute(
+    `SELECT id, line_id, shift, completed_model, next_model, timestamp
+     FROM changeover_log
+     ORDER BY timestamp DESC`
+  );
+  return (result.rows as unknown as ChangeoverRow[]).map(_parseChangeoverRow);
+}
+
 // ── Sim clock ─────────────────────────────────────────────────────────────────
 
 export async function dbGetSimClock(): Promise<{ clock: Date | null; running: boolean; speed: number }> {
@@ -462,6 +519,7 @@ export async function dbResetSimulationData(): Promise<void> {
       { sql: "DELETE FROM scan_events", args: [] },
       { sql: "DELETE FROM scrap_log", args: [] },
       { sql: "DELETE FROM downtime_log", args: [] },
+      { sql: "DELETE FROM changeover_log", args: [] },
       { sql: "DELETE FROM db_meta", args: [] },
       { sql: "UPDATE sim_clock SET clock = NULL, running = 0, speed = 60 WHERE id = 1", args: [] },
     ],
@@ -479,6 +537,7 @@ export async function dbResetAll(): Promise<void> {
       { sql: "DELETE FROM line_comments", args: [] },
       { sql: "DELETE FROM scrap_log",    args: [] },
       { sql: "DELETE FROM downtime_log", args: [] },
+      { sql: "DELETE FROM changeover_log", args: [] },
       { sql: "DELETE FROM db_meta",      args: [] },
       // Null out target/headcount overrides so lines revert to seeded defaults after a reset.
       // isRunning is preserved — structural floor layout survives a sim reset.

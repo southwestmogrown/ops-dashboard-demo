@@ -250,6 +250,7 @@ export default function LineDetailCard({
           <HourlyTable
             rows={hourlyTargets}
             comments={comments}
+            changeoversByHour={mesState?.hourlyChangeovers ?? {}}
             onSaveComment={onSaveComment}
           />
         </div>

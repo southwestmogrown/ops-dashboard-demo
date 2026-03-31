@@ -10,6 +10,7 @@
  */
 import type {
   AdminLineConfig,
+  ChangeoverEvent,
   LineComments,
   LineSchedule,
   LineState,
@@ -44,6 +45,8 @@ import {
   dbInsertDowntime,
   dbGetAllDowntimeEntries,
   dbCloseDowntime,
+  dbInsertChangeover,
+  dbGetAllChangeovers,
 } from "./db";
 
 // ── Cache shape ──────────────────────────────────────────────────────────────
@@ -57,6 +60,8 @@ interface MesCache {
   scrapSerial: number;
   downtimeLog: DowntimeEntry[];
   downtimeSerial: number;
+  changeoverLog: ChangeoverEvent[];
+  changeoverSerial: number;
   simClock: Date | null;
   simRunning: boolean;
   simSpeed: number;
@@ -83,6 +88,8 @@ function _c(): MesCache {
       scrapSerial: 0,
       downtimeLog: [],
       downtimeSerial: 0,
+      changeoverLog: [],
+      changeoverSerial: 0,
       simClock: null,
       simRunning: false,
       simSpeed: 60,
@@ -112,8 +119,10 @@ async function _hydrateFromDb(): Promise<void> {
     allScrap,
     sim,
     allDowntime,
+    allChangeovers,
     scrapSerial,
     downtimeSerial,
+    changeoverSerial,
   ] = await Promise.all([
     dbGetAllScans(),
     dbGetAllQueues(),
@@ -122,8 +131,10 @@ async function _hydrateFromDb(): Promise<void> {
     dbGetAllScrapEntries(),
     dbGetSimClock(),
     dbGetAllDowntimeEntries(),
+    dbGetAllChangeovers(),
     getSerialCounter("scrap_serial"),
     getSerialCounter("downtime_serial"),
+    getSerialCounter("changeover_serial"),
   ]);
 
   c.scanLog = allScans;
@@ -134,6 +145,8 @@ async function _hydrateFromDb(): Promise<void> {
   c.scrapSerial = scrapSerial;
   c.downtimeLog = allDowntime;
   c.downtimeSerial = downtimeSerial;
+  c.changeoverLog = allChangeovers;
+  c.changeoverSerial = changeoverSerial;
   c.simClock = sim.clock;
   c.simRunning = sim.running;
   c.simSpeed = sim.speed;
@@ -181,6 +194,13 @@ async function bumpMesSerial(): Promise<string> {
   const next = current + 1;
   await setSerialCounter("mes_serial", next);
   return `BK${String(next).padStart(7, "0")}`;
+}
+
+async function bumpChangeoverSerial(): Promise<string> {
+  const c = _c();
+  c.changeoverSerial += 1;
+  await setSerialCounter("changeover_serial", c.changeoverSerial);
+  return `CHG-${String(c.changeoverSerial).padStart(3, "0")}`;
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -379,6 +399,26 @@ export async function tickLine(
   await dbInsertScansBatch(newEvents);
 
   if (orderWillComplete) {
+    const nextIncomplete = schedule.items.find(
+      (it) => !it.skipped && it.completed < it.qty,
+    );
+    if (
+      firstIncomplete?.model &&
+      nextIncomplete &&
+      nextIncomplete.model !== firstIncomplete.model
+    ) {
+      const changeover: ChangeoverEvent = {
+        id: await bumpChangeoverSerial(),
+        timestamp: effectiveNow.toISOString(),
+        lineId,
+        shift,
+        completedModel: firstIncomplete.model,
+        nextModel: nextIncomplete.model,
+      };
+      c.changeoverLog.push(changeover);
+      await dbInsertChangeover(changeover);
+    }
+
     const totalRemaining = schedule.items
       .filter((it) => !it.skipped)
       .reduce((sum, it) => sum + Math.max(0, it.qty - it.completed), 0);
@@ -399,6 +439,7 @@ export async function getLineState(lineId: string): Promise<LineState> {
   const queuedCount = Math.max(0, queue.length - 1);
 
   const lineScans = c.scanLog.filter((s) => s.lineId === lineId);
+  const lineChangeovers = c.changeoverLog.filter((e) => e.lineId === lineId);
 
   const hourlyOutput: Record<string, number> = {};
   for (const scan of lineScans) {
@@ -408,6 +449,13 @@ export async function getLineState(lineId: string): Promise<LineState> {
   }
 
   const totalOutput = lineScans.length;
+
+  const hourlyChangeovers: Record<string, number> = {};
+  for (const event of lineChangeovers) {
+    const h = new Date(event.timestamp).getUTCHours();
+    const key = `${String(h).padStart(2, "0")}:00`;
+    hourlyChangeovers[key] = (hourlyChangeovers[key] ?? 0) + 1;
+  }
 
   let currentOrder: string | null = null;
   let remainingOnOrder = 0;
@@ -451,6 +499,7 @@ export async function getLineState(lineId: string): Promise<LineState> {
     queuedCount,
     queue: queue.slice(1),
     hourlyOutput,
+    hourlyChangeovers,
     skippedItems,
     changeoverRemaining: c.changeoverRemaining[lineId] ?? 0,
     repairRemaining: c.repairRemaining[lineId] ?? 0,
@@ -463,6 +512,7 @@ export async function getAllLineStates(): Promise<LineState[]> {
   const allIds = new Set([
     ...Object.keys(c.queues),
     ...c.scanLog.map((s) => s.lineId),
+    ...c.changeoverLog.map((e) => e.lineId),
   ]);
   return Promise.all(Array.from(allIds).map(getLineState));
 }
@@ -771,6 +821,8 @@ export async function resetSimulation(): Promise<void> {
   c.scrapSerial = 0;
   c.downtimeLog = [];
   c.downtimeSerial = 0;
+  c.changeoverLog = [];
+  c.changeoverSerial = 0;
   c.simClock = null;
   c.simRunning = false;
   c.simSpeed = 60;
@@ -794,6 +846,8 @@ export async function resetAll(): Promise<void> {
   c.scrapSerial = 0;
   c.downtimeLog = [];
   c.downtimeSerial = 0;
+  c.changeoverLog = [];
+  c.changeoverSerial = 0;
   c.simClock = null;
   c.simRunning = false;
   c.simSpeed = 60;

@@ -8,6 +8,7 @@ type SaveStatus = "idle" | "saving" | "saved" | "error";
 interface HourlyTableProps {
   rows: HourlyTargetRow[];
   comments: Record<string, string>;
+  changeoversByHour?: Record<string, number>;
   onSaveComment: (hour: string, comment: string) => Promise<void>;
 }
 
@@ -67,7 +68,7 @@ const CommentInput = memo(function CommentInput({
   );
 });
 
-export default function HourlyTable({ rows, comments, onSaveComment }: HourlyTableProps) {
+export default function HourlyTable({ rows, comments, changeoversByHour = {}, onSaveComment }: HourlyTableProps) {
   const [saveStatus, setSaveStatus] = useState<Record<string, SaveStatus>>({});
 
   const handleSave = useCallback(
@@ -138,7 +139,14 @@ export default function HourlyTable({ rows, comments, onSaveComment }: HourlyTab
                   }`}
                 >
                   <td className={`px-6 py-4 text-sm font-mono font-bold ${isFuture ? "text-[#e1e2ec]/25" : ""}`}>
-                    {row.hour}
+                    <div className="flex items-center gap-2">
+                      <span>{row.hour}</span>
+                      {(changeoversByHour[row.hour] ?? 0) > 0 && (
+                        <span className="text-[9px] font-bold px-1 py-0.5 rounded-sm bg-status-amber/20 text-status-amber border border-status-amber/30 uppercase">
+                          Chg {changeoversByHour[row.hour]}
+                        </span>
+                      )}
+                    </div>
                   </td>
                   <td className={`px-6 py-4 text-base font-['Space_Grotesk',sans-serif] tabular-nums ${isFuture ? "text-[#e1e2ec]/25" : ""}`}>
                     {isBreak ? "—" : row.planned}

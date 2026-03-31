@@ -40,6 +40,16 @@ export interface ScanEvent {
   partNumber: string; // model # being produced
 }
 
+/** Logged when a line transitions from one order to the next. */
+export interface ChangeoverEvent {
+  id: string;
+  timestamp: string;
+  lineId: string;
+  shift: "day" | "night";
+  completedModel: string;
+  nextModel: string | null;
+}
+
 /**
  * Derived state for one line — returned by GET /api/mes/state.
  * Computed from the scan log + schedule on every request.
@@ -60,6 +70,8 @@ export interface LineState {
   queue: LineSchedule[];
   /** units per hour bucket, key = "HH:00", e.g. "07:00" → 12 */
   hourlyOutput: Record<string, number>;
+  /** changeovers per hour bucket, key = "HH:00", e.g. "09:00" → 1 */
+  hourlyChangeovers: Record<string, number>;
   /** Orders skipped due to material shortage — can be re-activated */
   skippedItems: RunSheetItem[];
   /** M17.2 — simulated changeover minutes remaining before next order starts */

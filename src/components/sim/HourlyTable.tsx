@@ -9,10 +9,11 @@ interface HourlyTableProps {
 }
 
 export default function HourlyTable({ states, lineLabels }: HourlyTableProps) {
-  const { hours, activeStates, colTotals, rowTotals, grandTotal } = useMemo(() => {
+  const { hours, activeStates, colTotals, rowTotals, changeoverRowTotals, grandTotal } = useMemo(() => {
     const hourSet = new Set<string>();
     for (const state of states) {
       Object.keys(state.hourlyOutput).forEach((h) => hourSet.add(h));
+      Object.keys(state.hourlyChangeovers ?? {}).forEach((h) => hourSet.add(h));
     }
     const hours = Array.from(hourSet).sort();
     const activeStates = states.filter((s) => s.schedule !== null);
@@ -26,14 +27,19 @@ export default function HourlyTable({ states, lineLabels }: HourlyTableProps) {
 
     // Row totals: precomputed per hour — O(1) lookup per cell instead of O(n) reduce
     const rowTotals: Record<string, number> = {};
+    const changeoverRowTotals: Record<string, number> = {};
     for (const hour of hours) {
       rowTotals[hour] = activeStates.reduce(
         (sum, s) => sum + (s.hourlyOutput[hour] ?? 0),
         0
       );
+      changeoverRowTotals[hour] = activeStates.reduce(
+        (sum, s) => sum + (s.hourlyChangeovers?.[hour] ?? 0),
+        0,
+      );
     }
 
-    return { hours, activeStates, colTotals, rowTotals, grandTotal };
+    return { hours, activeStates, colTotals, rowTotals, changeoverRowTotals, grandTotal };
   }, [states]);
 
   if (hours.length === 0) {
@@ -70,14 +76,29 @@ export default function HourlyTable({ states, lineLabels }: HourlyTableProps) {
               </td>
               {activeStates.map((s) => {
                 const val = s.hourlyOutput[hour];
+                const changeovers = s.hourlyChangeovers?.[hour] ?? 0;
                 return (
                   <td key={s.lineId} className="px-4 py-3 text-right text-[#e1e2ec]/80">
-                    {val ?? <span className="text-[#e1e2ec]/15">—</span>}
+                    <div className="inline-flex items-center gap-1 justify-end">
+                      <span>{val ?? <span className="text-[#e1e2ec]/15">—</span>}</span>
+                      {changeovers > 0 && (
+                        <span className="text-[9px] font-bold px-1 py-0.5 rounded-sm bg-status-amber/20 text-status-amber border border-status-amber/30">
+                          C{changeovers}
+                        </span>
+                      )}
+                    </div>
                   </td>
                 );
               })}
               <td className="px-6 py-3 text-right text-accent font-semibold">
-                {rowTotals[hour]}
+                  <div className="inline-flex items-center gap-2 justify-end">
+                    <span>{rowTotals[hour]}</span>
+                    {changeoverRowTotals[hour] > 0 && (
+                      <span className="text-[9px] font-bold px-1 py-0.5 rounded-sm bg-status-amber/20 text-status-amber border border-status-amber/30">
+                        {changeoverRowTotals[hour]} chg
+                      </span>
+                    )}
+                  </div>
               </td>
             </tr>
           ))}
