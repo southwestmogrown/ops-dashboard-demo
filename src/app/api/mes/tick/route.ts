@@ -15,7 +15,6 @@ import {
 import { getShiftWindows } from "@/lib/shiftTime";
 import type { ShiftName } from "@/lib/types";
 import { PANEL_OPTIONS, pickDefectType } from "@/lib/reworkTypes";
-import type { KickedLid } from "@/lib/reworkTypes";
 import type { DowntimeReason } from "@/lib/downtimeTypes";
 
 interface TickBody {
@@ -26,6 +25,7 @@ interface TickBody {
 
 const DOWNTIME_SKIP_PROBABILITY = 0.08;
 const DEFECT_INJECTION_PROBABILITY = 0.05;
+const KICKED_LID_INJECTION_PROBABILITY = 0.012;
 const DOWNTIME_EVENT_PROBABILITY = 0.35;
 
 const DOWNTIME_REASONS: DowntimeReason[] = [
@@ -94,7 +94,8 @@ async function maybeInjectDefect(
   const shift: ShiftName = hour >= 6 && hour < 18 ? "day" : "night";
   const isVS2 = line.lineId.toLowerCase().includes("vs2");
 
-  const defectType  = pickDefectType(isVS2);
+  const forcedKickedLid = Math.random() < KICKED_LID_INJECTION_PROBABILITY;
+  const defectType  = forcedKickedLid ? "kicked-lid" : pickDefectType(isVS2);
   const panel       = randomChoice(PANEL_OPTIONS);
   const affectedArea: "panel" | "extrusion" =
     defectType === "kicked-lid" ? randomChoice(AFFECTED_AREAS) : "panel";
@@ -106,11 +107,11 @@ async function maybeInjectDefect(
       shift,
       model:           line.currentOrder ?? "UNKNOWN",
       panel,
-      damageType:      defectType as KickedLid["damageType"],
+      damageType:      defectType,
       affectedArea,
       auditorInitials: "SYS",
       boughtIn:        false,
-    } as Omit<KickedLid, "id" | "timestamp">);
+    });
     return;
   }
 

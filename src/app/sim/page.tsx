@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import { usePathname } from "next/navigation";
-import type { LineState } from "@/lib/mesTypes";
+import type { AdminLineConfig, LineState } from "@/lib/mesTypes";
 import type { ShiftName } from "@/lib/types";
 import { LINES, LINE_LABELS, getDefaultTarget } from "@/lib/lines";
 import { getShiftWindows } from "@/lib/shiftTime";
@@ -33,6 +33,7 @@ function unitsForSpeed(speed: number): number {
 export default function SimPage() {
   const pathname = usePathname();
   const [states, setStates] = useState<LineState[]>([]);
+  const [adminConfig, setAdminConfig] = useState<Record<string, AdminLineConfig>>({});
   const [running, setRunning] = useState(false);
   const [speed, setSpeed] = useState(60);
   const speedRef = useRef(speed); // always mirrors speed; used in interval closures
@@ -52,12 +53,14 @@ export default function SimPage() {
   // ── Polling ─────────────────────────────────────────────────────────────────
   const pollState = useCallback(async () => {
     const requestId = ++pollRequestId.current;
-    const [stateRes, clockRes] = await Promise.all([
+    const [stateRes, clockRes, configRes] = await Promise.all([
       fetch("/api/mes/state", { cache: "no-store" }),
       fetch("/api/sim/clock", { cache: "no-store" }),
+      fetch("/api/admin/config", { cache: "no-store" }),
     ]);
     if (requestId !== pollRequestId.current) return;
     if (stateRes.ok) setStates(await stateRes.json());
+    if (configRes.ok) setAdminConfig(await configRes.json());
     if (clockRes.ok) {
       const c = await clockRes.json();
       setRunning(c.running);
@@ -150,12 +153,26 @@ export default function SimPage() {
 
   // ── Derived data ────────────────────────────────────────────────────────────
   const { totalOutput, totalTarget, scheduledLines, efficiency } = useMemo(() => {
-    const totalOutput = states.reduce((s, st) => s + st.totalOutput, 0);
-    const totalTarget = states.reduce((s, st) => s + (st.schedule?.totalTarget ?? getDefaultTarget(st.lineId)), 0);
-    const scheduledLines = states.filter((s) => s.schedule !== null).length;
+    const runningLineIds = LINES
+      .map((line) => line.id)
+      .filter((lineId) => adminConfig[lineId]?.isRunning !== false);
+
+    const totalOutput = states
+      .filter((st) => runningLineIds.includes(st.lineId))
+      .reduce((sum, st) => sum + st.totalOutput, 0);
+
+    const totalTarget = runningLineIds.reduce(
+      (sum, lineId) => sum + (adminConfig[lineId]?.target ?? getDefaultTarget(lineId)),
+      0,
+    );
+
+    const scheduledLines = states
+      .filter((s) => runningLineIds.includes(s.lineId) && s.schedule !== null)
+      .length;
+
     const efficiency = totalTarget > 0 ? Math.round((totalOutput / totalTarget) * 1000) / 10 : 0;
     return { totalOutput, totalTarget, scheduledLines, efficiency };
-  }, [states]);
+  }, [states, adminConfig]);
 
   const stateMap = useMemo(() => new Map(states.map((s) => [s.lineId, s])), [states]);
 
