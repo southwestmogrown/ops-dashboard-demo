@@ -20,11 +20,11 @@ interface TickBody {
   units: number;
 }
 
-const DOWNTIME_SKIP_PROBABILITY = 0.12;
+const DOWNTIME_SKIP_PROBABILITY = 0.08;
 const DEFECT_INJECTION_PROBABILITY = 0.003;
 
 function unitsForSpeed(speed: number): number {
-  return Math.max(1, Math.round(speed / 90));
+  return speed / 120;
 }
 
 function randomChoice<T>(arr: readonly T[]): T {

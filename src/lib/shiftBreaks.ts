@@ -30,16 +30,16 @@ export function getHourlyTargets(
     const clockHour = h >= 24 ? h - 24 : h;
     const hourKey = `${String(Math.floor(clockHour)).padStart(2, "0")}:00`;
 
-    // Working minutes in this clock hour
+    // Working minutes in this shift hour (raw timeline axis, supports overnight windows).
     let workingMins = 60;
     for (const bw of win.breakWindows) {
-      // shifts overnight: break windows use 24+ clock, so h may already be adjusted
-      // normalise: compare using raw clock values
-      const bStart = bw.start;
-      const bEnd   = bw.end;
-      // normalise h to the same range as the break window
-      const hNorm = clockHour;
-      const overlap = overlapHours(hNorm, hNorm + 1, bStart, bEnd);
+      let bStart = bw.start;
+      let bEnd = bw.end;
+      if (bStart < win.startHour) {
+        bStart += 24;
+        bEnd += 24;
+      }
+      const overlap = overlapHours(h, h + 1, bStart, bEnd);
       workingMins = Math.max(0, workingMins - overlap * 60);
     }
 

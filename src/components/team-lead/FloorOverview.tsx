@@ -65,6 +65,7 @@ interface LineCardProps {
   target: number;
   fpy: number;
   risk: RiskLevel;
+  isRunning: boolean;
   lastScrapTime: string | null;
   onSelect: () => void;
 }
@@ -77,6 +78,7 @@ function LineCard({
   target,
   fpy,
   risk,
+  isRunning,
   lastScrapTime,
   onSelect,
 }: LineCardProps) {
@@ -91,7 +93,12 @@ function LineCard({
   return (
     <button
       onClick={onSelect}
-      className="group w-full text-left bg-surface hover:bg-surface-high transition-all duration-150 rounded-sm overflow-hidden focus:outline-none focus:ring-1 focus:ring-accent/40"
+      disabled={!isRunning}
+      className={`group w-full text-left transition-all duration-150 rounded-sm overflow-hidden focus:outline-none focus:ring-1 focus:ring-accent/40 ${
+        isRunning
+          ? "bg-surface hover:bg-surface-high"
+          : "bg-surface-low opacity-45 grayscale cursor-not-allowed"
+      }`}
     >
       {/* Top accent bar */}
       <div className={`h-[2px] w-full ${vsAccent}`} />
@@ -114,8 +121,8 @@ function LineCard({
           </div>
 
           {/* Status pill */}
-          <span className={`text-[9px] px-2 py-0.5 rounded-sm border font-bold tracking-widest uppercase ${cls}`}>
-            {label}
+          <span className={`text-[9px] px-2 py-0.5 rounded-sm border font-bold tracking-widest uppercase ${isRunning ? cls : "text-[#e1e2ec]/40 border-border bg-surface-high"}`}>
+            {isRunning ? label : "NOT RUNNING"}
           </span>
         </div>
 
@@ -143,7 +150,7 @@ function LineCard({
             <span className="text-[10px] text-[#e1e2ec]/30">FPY</span>
           </div>
 
-          {lastScrapTime && (
+          {isRunning && lastScrapTime && (
             <div className="flex items-center gap-1.5">
               <span className="material-symbols-outlined text-[12px] text-[#e1e2ec]/20">
                 error
@@ -152,6 +159,11 @@ function LineCard({
                 {formatRelativeTime(lastScrapTime)}
               </span>
             </div>
+          )}
+          {!isRunning && (
+            <span className="text-[10px] text-[#e1e2ec]/35 uppercase tracking-wider font-bold">
+              Hidden from active floor pacing
+            </span>
           )}
         </div>
       </div>
@@ -189,11 +201,15 @@ export default function FloorOverview({
         <div className="h-px flex-1 bg-border" />
       </div>
 
+      <p className="mb-3 text-[10px] uppercase tracking-widest text-[#e1e2ec]/35">
+        Greyed cards are marked Not Running in Admin and are excluded from active floor pacing.
+      </p>
+
       {/* Card grid — 2-col on md, 3-col on xl */}
       <div className="grid grid-cols-2 gap-3 xl:grid-cols-3">
         {metrics.lines.map((line) => {
           const mesState = stateMap.get(line.id);
-          const isRunning = adminConfig?.[line.id]?.isRunning;
+          const isRunning = adminConfig?.[line.id]?.isRunning !== false;
           const risk = getRiskLevel(line, mesState, shiftProgress, isRunning);
 
           return (
@@ -206,6 +222,7 @@ export default function FloorOverview({
               target={line.target}
               fpy={line.fpy}
               risk={risk}
+              isRunning={isRunning}
               lastScrapTime={lastScrapByLine.get(line.id) ?? null}
               onSelect={() => onSelectLine(line.id)}
             />

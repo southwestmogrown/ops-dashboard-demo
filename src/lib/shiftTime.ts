@@ -42,9 +42,6 @@ export function getShiftWindows(shift: ShiftName): ShiftWindow {
   };
 }
 
-// Legacy: keep getShiftProgress working with the new windows
-const TOTAL_HOURS = 10;
-
 export interface ShiftProgress {
   elapsedHours: number;
   remainingHours: number;
@@ -54,24 +51,25 @@ export interface ShiftProgress {
 
 export function getShiftProgress(shift: ShiftName, now: Date): ShiftProgress {
   const win = getShiftWindows(shift);
+  const totalHours = win.totalClockMinutes / 60;
   const nowH = now.getHours() + now.getMinutes() / 60 + now.getSeconds() / 3600;
 
   let elapsed: number;
   if (nowH >= win.startHour) {
     elapsed = nowH - win.startHour;
   } else {
-    // overnight: night shift starts at 17, ends at 03:30 = 27.5
+    // Overnight shift crosses midnight (e.g. 17:00 to 03:30).
     elapsed = nowH + 24 - win.startHour;
   }
 
-  const elapsedHours = Math.max(0, Math.min(TOTAL_HOURS, elapsed));
-  const remainingHours = Math.max(0, TOTAL_HOURS - elapsedHours);
+  const elapsedHours = Math.max(0, Math.min(totalHours, elapsed));
+  const remainingHours = Math.max(0, totalHours - elapsedHours);
 
   return {
     elapsedHours,
     remainingHours,
-    totalHours: TOTAL_HOURS,
-    elapsedFraction: elapsedHours / TOTAL_HOURS,
+    totalHours,
+    elapsedFraction: totalHours > 0 ? elapsedHours / totalHours : 0,
   };
 }
 

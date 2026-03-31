@@ -23,8 +23,9 @@ const SPEED_OPTIONS = [
 ] as const;
 
 function unitsForSpeed(speed: number): number {
-  // Keeps higher-speed modes realistic: 1x=1, 5x=3, 15x=10 units/tick.
-  return Math.max(1, Math.round(speed / 90));
+  // Target ~30 units/hour/line at 1x on average, with backend downtime/failure effects.
+  // This yields expected units/tick of 0.5 at 1x, 2.5 at 5x, 7.5 at 15x.
+  return speed / 120;
 }
 
 // ── Page ─────────────────────────────────────────────────────────────────────
@@ -84,9 +85,8 @@ export default function SimPage() {
     });
     setRunning(true);
     tickInterval.current = setInterval(async () => {
-      // Scale units with speed so production rate (units/line/hr) stays ~24-35
-      // regardless of how fast simulated time runs.
-      // Tuned profile for smoother realistic pacing at high sim speeds.
+      // Scale units with speed so production stays in a realistic band while
+      // still accelerating smoothly at higher sim speeds.
       const units = unitsForSpeed(speedRef.current);
       await fetch("/api/mes/tick", {
         method: "POST",
@@ -445,6 +445,17 @@ export default function SimPage() {
                               <p className="text-[10px] text-[#e1e2ec]/40 uppercase tracking-widest">
                                 Order: {st.currentOrder ?? "Complete"}
                               </p>
+                              {st.completedOrders > 0 && (
+                                <div className="mt-2 flex items-center gap-2">
+                                  <span className="text-[9px] text-[#e1e2ec]/35 uppercase tracking-widest">Changeovers</span>
+                                  <div className="flex items-end gap-1">
+                                    {Array.from({ length: Math.min(st.completedOrders, 8) }).map((_, idx) => (
+                                      <span key={idx} className="h-3 border-l border-dotted border-status-amber/80" />
+                                    ))}
+                                  </div>
+                                  <span className="text-[10px] font-mono text-status-amber/80">{st.completedOrders}</span>
+                                </div>
+                              )}
                             </div>
                             <span className={`${statusTextColor} bg-current/10 text-[10px] font-black px-2 py-0.5 border rounded uppercase`}
                               style={{ borderColor: "currentColor", backgroundColor: "transparent" }}>
@@ -574,7 +585,7 @@ export default function SimPage() {
                     </div>
                     <div className="bg-black/20 p-3 rounded-sm">
                       <p className="text-[9px] uppercase text-[#e1e2ec]/40 font-bold mb-1">Tick Rate</p>
-                      <p className="text-sm font-mono">{unitsForSpeed(speed)} unit{unitsForSpeed(speed) !== 1 ? "s" : ""}/tick</p>
+                      <p className="text-sm font-mono">{unitsForSpeed(speed).toFixed(1)} units/tick</p>
                     </div>
                   </div>
                 </div>

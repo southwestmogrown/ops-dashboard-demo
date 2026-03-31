@@ -33,12 +33,12 @@ const SHIFT_SEEDS: Record<ShiftName, number> = {
  * Exported so src/lib/lines.ts can re-export without circular deps.
  */
 export const LINE_DEFS: Pick<Line, "id" | "name" | "valueStream">[] = [
-  { id: "vs1-l1", name: "Line 1", valueStream: "VS1" },
-  { id: "vs1-l2", name: "Line 2", valueStream: "VS1" },
-  { id: "vs1-l3", name: "Line 3", valueStream: "VS1" },
-  { id: "vs1-l4", name: "Line 4", valueStream: "VS1" },
-  { id: "vs2-l1", name: "Line 1", valueStream: "VS2" },
-  { id: "vs2-l2", name: "Line 2", valueStream: "VS2" },
+  { id: "vs1-l1", name: "Folding Line_01", valueStream: "VS1" },
+  { id: "vs1-l2", name: "Folding Line_02", valueStream: "VS1" },
+  { id: "vs1-l3", name: "Folding Line_03", valueStream: "VS1" },
+  { id: "vs1-l4", name: "Folding Line_04", valueStream: "VS1" },
+  { id: "vs2-l1", name: "Revolver Line_01", valueStream: "VS2" },
+  { id: "vs2-l2", name: "Revolver Line_02", valueStream: "VS2" },
 ];
 
 /**

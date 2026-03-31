@@ -19,23 +19,24 @@ export {
   getDefaultTarget,
 } from "./generateMetrics";
 
-/** Pre-computed short labels for sim/team-lead displays, e.g. "VS1 · Line 1" */
-export const LINE_LABELS: Record<string, string> = Object.fromEntries(
-  (["vs1-l1", "vs1-l2", "vs1-l3", "vs1-l4", "vs2-l1", "vs2-l2"] as const).map((id, i) => {
-    const [vs, num] = id.split("-");
-    const name = ["Line 1", "Line 2", "Line 3", "Line 4", "Line 1", "Line 2"][i];
-    return [id, `${vs.toUpperCase()} · ${name}`];
-  })
-);
+/** Pre-computed short labels for sim/team-lead displays. */
+export const LINE_LABELS: Record<string, string> = {
+  "vs1-l1": "VS1 · Folding Line_01",
+  "vs1-l2": "VS1 · Folding Line_02",
+  "vs1-l3": "VS1 · Folding Line_03",
+  "vs1-l4": "VS1 · Folding Line_04",
+  "vs2-l1": "VS2 · Revolver Line_01",
+  "vs2-l2": "VS2 · Revolver Line_02",
+};
 
-/** Short machine-name labels for admin screens, e.g. "LINE_01" */
+/** Admin labels in plant terminology. */
 export const LINE_ADMIN_LABELS: Record<string, string> = {
-  "vs1-l1": "LINE_01",
-  "vs1-l2": "LINE_02",
-  "vs1-l3": "LINE_03",
-  "vs1-l4": "LINE_04",
-  "vs2-l1": "LINE_05",
-  "vs2-l2": "LINE_06",
+  "vs1-l1": "Folding Line_01",
+  "vs1-l2": "Folding Line_02",
+  "vs1-l3": "Folding Line_03",
+  "vs1-l4": "Folding Line_04",
+  "vs2-l1": "Revolver Line_01",
+  "vs2-l2": "Revolver Line_02",
 };
 
 /** Short human-readable label for a line, e.g. "VS1 · Line 1" */
