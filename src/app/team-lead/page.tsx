@@ -7,7 +7,6 @@ import type { AdminLineConfig, LineState } from "@/lib/mesTypes";
 import type { ScrapEntry, ScrapStats } from "@/lib/reworkTypes";
 import type { DowntimeEntry } from "@/lib/downtimeTypes";
 import { getHourlyTargets } from "@/lib/shiftBreaks";
-import { getShiftProgress } from "@/lib/shiftTime";
 import LineDetailCard from "@/components/team-lead/LineDetailCard";
 import FloorOverview from "@/components/team-lead/FloorOverview";
 import FloorAlertStrip from "@/components/team-lead/FloorAlertStrip";
@@ -22,7 +21,6 @@ export default function TeamLeadPage() {
   const [allScrapEntries, setAllScrapEntries] = useState<ScrapEntry[]>([]);
   const [downtimeEntries, setDowntimeEntries] = useState<DowntimeEntry[]>([]);
   const [adminConfig, setAdminConfig] = useState<Record<string, AdminLineConfig>>({});
-  const [simClock, setSimClock] = useState<Date | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [now, setNow] = useState<Date>(new Date());
   const [filter, setFilter] = useState("");
@@ -49,10 +47,7 @@ export default function TeamLeadPage() {
       }
     }
     if (mesRes.ok) setMesStates(await mesRes.json());
-    if (clockRes.ok) {
-      const { clock } = await clockRes.json();
-      setSimClock(clock ? new Date(clock) : null);
-    }
+    if (clockRes.ok) await clockRes.json();
     if (allScrapRes.ok) setAllScrapEntries(await allScrapRes.json());
     if (configRes.ok) setAdminConfig(await configRes.json());
     setIsLoading(false);
@@ -160,8 +155,6 @@ export default function TeamLeadPage() {
     [mesStates]
   );
 
-  const shiftProgress = getShiftProgress(shift, simClock ?? new Date());
-
   const filteredLines = useMemo(() => {
     if (!filter) return lines;
     const q = filter.toLowerCase();
@@ -176,6 +169,16 @@ export default function TeamLeadPage() {
   function getLineStatus(lineId: string) {
     const state = stateMap.get(lineId);
     const line = lines.find((l) => l.id === lineId);
+    const isRunning = adminConfig?.[lineId]?.isRunning !== false;
+
+    if (!isRunning) {
+      return {
+        label: "NOT RUNNING",
+        color: "text-[#94a3b8]",
+        dot: "bg-[#64748b]",
+      };
+    }
+
     if (!state?.schedule) return { label: "IDLE", color: "text-[#e1e2ec]/40", dot: "bg-[#e1e2ec]/20" };
     if (line && line.output === 0) return { label: "STOPPED", color: "text-status-red", dot: "bg-status-red shadow-[0_0_8px_rgba(239,68,68,0.5)]" };
     if (line && line.output / line.target < 0.75) return { label: "BEHIND", color: "text-accent", dot: "bg-accent shadow-[0_0_8px_rgba(249,115,22,0.5)]" };
@@ -260,6 +263,7 @@ export default function TeamLeadPage() {
 
           <div className="flex-1 overflow-y-auto custom-scrollbar p-2 space-y-1">
             {filteredLines.map((line) => {
+              const isRunning = adminConfig?.[line.id]?.isRunning !== false;
               const status = getLineStatus(line.id);
               const isSelected = selectedLineId === line.id;
               return (
@@ -269,23 +273,48 @@ export default function TeamLeadPage() {
                     setSelectedLineId(line.id);
                     setViewMode("detail");
                   }}
-                  className={`w-full flex items-center justify-between p-3.5 transition-all cursor-pointer text-left ${
-                    isSelected
-                      ? "bg-surface-highest border-l-4 border-accent"
-                      : "hover:bg-surface-high/70 border-l-4 border-transparent"
+                  className={`w-full flex items-center justify-between p-3.5 transition-all cursor-pointer text-left border rounded-sm ${
+                    !isRunning
+                      ? "bg-surface-low/60 border-slate-500/35 opacity-55 grayscale"
+                      : isSelected
+                        ? "bg-surface-highest border-accent shadow-[inset_3px_0_0_0_#f97316]"
+                        : "border-border/30 hover:bg-surface-high/70 hover:border-border/60"
                   }`}
                 >
                   <div>
-                    <span className={`block text-xs font-bold ${isSelected ? "text-accent" : "text-[#e1e2ec]/65"}`}>
+                    <span className={`block text-xs font-bold ${
+                      !isRunning
+                        ? "text-[#94a3b8]"
+                        : isSelected
+                          ? "text-accent"
+                          : "text-[#e1e2ec]/65"
+                    }`}>
                       {line.valueStream} — {line.name}
                     </span>
-                    <span className="block text-sm text-[#e1e2ec]/80">
+                    <span className={`block text-sm ${!isRunning ? "text-[#94a3b8]/80" : "text-[#e1e2ec]/80"}`}>
                       {line.output}/{line.target}
                     </span>
+                    {!isRunning && (
+                      <span className="mt-1 block text-[10px] uppercase tracking-[0.18em] text-[#94a3b8]/75">
+                        Hidden in admin
+                      </span>
+                    )}
+                    {isRunning && !isSelected && (
+                      <span className="mt-1 block text-[10px] uppercase tracking-[0.18em] text-[#e1e2ec]/35">
+                        Active floor line
+                      </span>
+                    )}
+                    {isRunning && isSelected && (
+                      <span className="mt-1 block text-[10px] uppercase tracking-[0.18em] text-accent/80">
+                        Selected line
+                      </span>
+                    )}
                   </div>
-                  <div className="flex flex-col items-end">
-                    <span className={`w-2 h-2 rounded-full ${status.dot} mb-1`} />
-                    <span className={`text-[10px] font-mono ${status.color}`}>{status.label}</span>
+                  <div className="flex flex-col items-end gap-1">
+                    <span className={`w-2.5 h-2.5 rounded-full ${status.dot}`} />
+                    <span className={`text-[10px] font-mono ${status.color}`}>
+                      {status.label}
+                    </span>
                   </div>
                 </button>
               );
@@ -326,7 +355,6 @@ export default function TeamLeadPage() {
               line={selectedLine}
               mesState={selectedMesState}
               shift={shift}
-              shiftProgress={shiftProgress}
               hourlyTargets={hourlyTargets}
               comments={selectedLineId ? (comments[selectedLineId] ?? {}) : {}}
               onSaveComment={saveComment}
@@ -367,7 +395,6 @@ export default function TeamLeadPage() {
                 metrics={metrics}
                 mesStates={mesStates}
                 scrapEntries={allScrapEntries}
-                shiftProgress={shiftProgress}
                 adminConfig={adminConfig}
                 onSelectLine={(lineId) => {
                   setSelectedLineId(lineId);
