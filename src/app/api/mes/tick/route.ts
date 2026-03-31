@@ -25,8 +25,8 @@ interface TickBody {
 }
 
 const DOWNTIME_SKIP_PROBABILITY = 0.08;
-const DEFECT_INJECTION_PROBABILITY = 0.05;
-const KICKED_LID_INJECTION_PROBABILITY = 0.01;
+const DEFECT_INJECTION_PROBABILITY = 0.08;
+const KICKED_LID_INJECTION_PROBABILITY = 0.03;
 const DOWNTIME_EVENT_PROBABILITY = 0.35;
 
 const DOWNTIME_REASONS: DowntimeReason[] = [
@@ -38,7 +38,7 @@ const DOWNTIME_REASONS: DowntimeReason[] = [
 ];
 
 function unitsForSpeed(speed: number): number {
-  return speed / 120;
+  return speed / 100;
 }
 
 function randomChoice<T>(arr: readonly T[]): T {

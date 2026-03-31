@@ -247,6 +247,12 @@ export default function TeamLeadPage() {
             </span>
             <div className="hidden md:flex items-center space-x-6">
               <Link
+                href="/"
+                className="text-base text-[#e1e2ec]/75 hover:text-[#f8f8fb] transition-colors"
+              >
+                Dashboard
+              </Link>
+              <Link
                 href="/eos"
                 className="text-base text-[#e1e2ec]/75 hover:text-[#f8f8fb] transition-colors"
               >

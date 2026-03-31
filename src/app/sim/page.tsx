@@ -26,7 +26,7 @@ const SPEED_OPTIONS = [
 
 function unitsForSpeed(speed: number): number {
   // Fractional units are accumulated server-side so 1x stays realistic without starving output.
-  return speed / 120;
+  return speed / 100;
 }
 
 // ── Page ─────────────────────────────────────────────────────────────────────

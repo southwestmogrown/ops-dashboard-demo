@@ -763,10 +763,19 @@ export async function dbGetAllDowntimeEntries(): Promise<DowntimeEntry[]> {
 export async function dbCloseDowntime(
   id: string,
   endTime: string,
+  unitsLost?: number,
 ): Promise<void> {
+  if (unitsLost === undefined) {
+    await getClient().execute({
+      sql: "UPDATE downtime_log SET end_time = ? WHERE id = ? AND end_time IS NULL",
+      args: [endTime, id],
+    });
+    return;
+  }
+
   await getClient().execute({
-    sql: "UPDATE downtime_log SET end_time = ? WHERE id = ? AND end_time IS NULL",
-    args: [endTime, id],
+    sql: "UPDATE downtime_log SET end_time = ?, units_lost = ? WHERE id = ? AND end_time IS NULL",
+    args: [endTime, unitsLost, id],
   });
 }
 

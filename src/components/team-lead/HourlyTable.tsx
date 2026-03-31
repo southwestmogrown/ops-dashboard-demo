@@ -2,6 +2,7 @@
 
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { HourlyTargetRow } from "@/lib/shiftBreaks";
+import type { ShiftName } from "@/lib/types";
 
 type SaveStatus = "idle" | "saving" | "saved" | "error";
 
@@ -9,6 +10,7 @@ interface HourlyTableProps {
   rows: HourlyTargetRow[];
   comments: Record<string, string>;
   changeoversByHour?: Record<string, number>;
+  shift: ShiftName;
   onSaveComment: (hour: string, comment: string) => Promise<void>;
 }
 
@@ -77,9 +79,25 @@ export default function HourlyTable({
   rows,
   comments,
   changeoversByHour = {},
+  shift,
   onSaveComment,
 }: HourlyTableProps) {
   const [saveStatus, setSaveStatus] = useState<Record<string, SaveStatus>>({});
+
+  const currentHourKey = useMemo(() => {
+    const now = new Date();
+    const nowUtcHour = now.getUTCHours();
+    const key = `${String(nowUtcHour).padStart(2, "0")}:00`;
+    if (rows.some((r) => r.hour === key)) {
+      return key;
+    }
+    return null;
+  }, [rows, shift]);
+
+  const currentRowIdx = useMemo(() => {
+    if (!currentHourKey) return -1;
+    return rows.findIndex((r) => r.hour === currentHourKey);
+  }, [rows, currentHourKey]);
 
   const handleSave = useCallback(
     async (hour: string, comment: string) => {
@@ -145,9 +163,10 @@ export default function HourlyTable({
             </tr>
           </thead>
           <tbody className="divide-y divide-border/20">
-            {rows.map((row) => {
+            {rows.map((row, idx) => {
               const isBreak = row.isBreak;
-              const isFuture = !isBreak && row.actual === 0 && row.planned > 0;
+              const isFuture =
+                !isBreak && currentRowIdx >= 0 && idx > currentRowIdx;
               const hasNegVar = !isBreak && !isFuture && row.variance < 0;
               const comment = comments[row.hour] ?? "";
               const status = saveStatus[row.hour] ?? "idle";

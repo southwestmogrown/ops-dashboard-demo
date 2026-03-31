@@ -53,7 +53,6 @@ export default function DowntimeForm({
       : nowLocal(),
   );
   const [endTime, setEndTime] = useState("");
-  const [unitsLost, setUnitsLost] = useState(0);
   const [notes, setNotes] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -71,7 +70,6 @@ export default function DowntimeForm({
           shift,
           reason,
           startTime: new Date(startTime).toISOString(),
-          unitsLost,
           notes,
           createdBy: role ?? "unknown",
         }),
@@ -230,13 +228,9 @@ export default function DowntimeForm({
             {/* Units Lost */}
             <div>
               <label className={labelClass}>Units Lost</label>
-              <input
-                type="number"
-                value={unitsLost}
-                onChange={(e) => setUnitsLost(Number(e.target.value))}
-                min={0}
-                className={`${inputClass} tabular-nums`}
-              />
+              <div className={`${inputClass} tabular-nums text-[#e1e2ec]/65`}>
+                Auto-calculated when downtime is resolved
+              </div>
             </div>
 
             {/* Notes */}

@@ -4,10 +4,14 @@ import {
   getDowntimeEntries,
   closeDowntimeEntry,
   getAllDowntimeEntriesForShift,
+  getAllAdminConfig,
+  getAllLineStates,
   refreshCacheFromDb,
 } from "@/lib/mesStore";
 import type { DowntimeReason, DowntimeEntry } from "@/lib/downtimeTypes";
 import type { ShiftName } from "@/lib/types";
+import { getShiftWindows } from "@/lib/shiftTime";
+import { getDefaultTarget } from "@/lib/generateMetrics";
 
 const VALID_REASONS: DowntimeReason[] = [
   "machine-failure",
@@ -81,6 +85,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 }
 
 export async function PATCH(request: NextRequest): Promise<NextResponse> {
+  await refreshCacheFromDb();
+
   let body: Record<string, unknown>;
   try {
     body = await request.json();
@@ -88,11 +94,52 @@ export async function PATCH(request: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
   }
 
-  const { id, endTime } = body;
-  if (!id || !endTime) {
-    return NextResponse.json({ error: "id and endTime are required" }, { status: 400 });
+  const { id, endTime, actualEndTime } = body;
+  if (!id) {
+    return NextResponse.json({ error: "id is required" }, { status: 400 });
   }
 
-  await closeDowntimeEntry(id as string, endTime as string);
-  return NextResponse.json({ ok: true });
+  const resolvedAt =
+    typeof actualEndTime === "string"
+      ? actualEndTime
+      : typeof endTime === "string"
+        ? endTime
+        : new Date().toISOString();
+
+  const entries = [
+    ...(await getAllDowntimeEntriesForShift("day")),
+    ...(await getAllDowntimeEntriesForShift("night")),
+  ];
+  const entry = entries.find((e) => e.id === id);
+  if (!entry) {
+    return NextResponse.json({ error: "Downtime entry not found" }, { status: 404 });
+  }
+
+  const startMs = new Date(entry.startTime).getTime();
+  const endMs = new Date(resolvedAt).getTime();
+  const durationMinutes = Math.max(0, Math.floor((endMs - startMs) / 60000));
+
+  const [lineStates, adminConfig] = await Promise.all([
+    getAllLineStates(),
+    getAllAdminConfig(),
+  ]);
+  const lineState = lineStates.find((s) => s.lineId === entry.lineId);
+
+  const targetOutput =
+    lineState?.schedule?.totalTarget ??
+    adminConfig[entry.lineId]?.target ??
+    getDefaultTarget(entry.lineId);
+
+  const { totalWorkMinutes } = getShiftWindows(entry.shift);
+  const unitsPerWorkMinute =
+    targetOutput > 0 && totalWorkMinutes > 0
+      ? targetOutput / totalWorkMinutes
+      : 0;
+  const unitsLost =
+    durationMinutes <= 0 || unitsPerWorkMinute <= 0
+      ? 0
+      : Math.max(1, Math.round(unitsPerWorkMinute * durationMinutes));
+
+  await closeDowntimeEntry(id as string, resolvedAt, unitsLost);
+  return NextResponse.json({ ok: true, unitsLost, durationMinutes });
 }

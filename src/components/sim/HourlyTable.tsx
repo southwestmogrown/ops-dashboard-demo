@@ -11,7 +11,7 @@ interface HourlyTableProps {
 export default function HourlyTable({ states, lineLabels }: HourlyTableProps) {
   const {
     hours,
-    activeStates,
+    displayStates,
     colTotals,
     rowTotals,
     changeoverRowTotals,
@@ -23,11 +23,18 @@ export default function HourlyTable({ states, lineLabels }: HourlyTableProps) {
       Object.keys(state.hourlyChangeovers ?? {}).forEach((h) => hourSet.add(h));
     }
     const hours = Array.from(hourSet).sort();
-    const activeStates = states.filter((s) => s.schedule !== null);
+    const displayStates = states.filter((s) => {
+      if (s.schedule !== null) return true;
+      if (s.totalOutput > 0) return true;
+      if (Object.keys(s.hourlyOutput).length > 0) return true;
+      if (Object.keys(s.hourlyChangeovers ?? {}).length > 0) return true;
+      return false;
+    });
+    displayStates.sort((a, b) => a.lineId.localeCompare(b.lineId));
 
     // Column totals: one pass
     const colTotals: Record<string, number> = {};
-    for (const s of activeStates) {
+    for (const s of displayStates) {
       colTotals[s.lineId] = Object.values(s.hourlyOutput).reduce(
         (sum, v) => sum + v,
         0,
@@ -39,11 +46,11 @@ export default function HourlyTable({ states, lineLabels }: HourlyTableProps) {
     const rowTotals: Record<string, number> = {};
     const changeoverRowTotals: Record<string, number> = {};
     for (const hour of hours) {
-      rowTotals[hour] = activeStates.reduce(
+      rowTotals[hour] = displayStates.reduce(
         (sum, s) => sum + (s.hourlyOutput[hour] ?? 0),
         0,
       );
-      changeoverRowTotals[hour] = activeStates.reduce(
+      changeoverRowTotals[hour] = displayStates.reduce(
         (sum, s) => sum + (s.hourlyChangeovers?.[hour] ?? 0),
         0,
       );
@@ -51,7 +58,7 @@ export default function HourlyTable({ states, lineLabels }: HourlyTableProps) {
 
     return {
       hours,
-      activeStates,
+      displayStates,
       colTotals,
       rowTotals,
       changeoverRowTotals,
@@ -75,7 +82,7 @@ export default function HourlyTable({ states, lineLabels }: HourlyTableProps) {
             <th className="px-6 py-3 text-left font-bold uppercase tracking-widest text-[10px] text-[#e1e2ec]/40">
               Hour
             </th>
-            {activeStates.map((s) => (
+            {displayStates.map((s) => (
               <th
                 key={s.lineId}
                 className="px-4 py-3 text-right font-bold uppercase tracking-widest text-[10px] text-[#e1e2ec]/40"
@@ -94,7 +101,7 @@ export default function HourlyTable({ states, lineLabels }: HourlyTableProps) {
               <td className="px-6 py-3 text-[#e1e2ec]/50">
                 {hour}–{String((parseInt(hour) + 1) % 24).padStart(2, "0")}:00
               </td>
-              {activeStates.map((s) => {
+              {displayStates.map((s) => {
                 const val = s.hourlyOutput[hour];
                 const changeovers = s.hourlyChangeovers?.[hour] ?? 0;
                 return (
@@ -133,7 +140,7 @@ export default function HourlyTable({ states, lineLabels }: HourlyTableProps) {
             <td className="px-6 py-3 text-[10px] font-bold uppercase tracking-widest text-[#e1e2ec]/40">
               Total
             </td>
-            {activeStates.map((s) => (
+            {displayStates.map((s) => (
               <td
                 key={s.lineId}
                 className="px-4 py-3 text-right font-semibold text-[#e1e2ec]/60"

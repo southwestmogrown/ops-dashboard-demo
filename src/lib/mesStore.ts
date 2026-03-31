@@ -514,7 +514,8 @@ export async function getAllLineStates(): Promise<LineState[]> {
     ...c.scanLog.map((s) => s.lineId),
     ...c.changeoverLog.map((e) => e.lineId),
   ]);
-  return Promise.all(Array.from(allIds).map(getLineState));
+  const sortedIds = Array.from(allIds).sort();
+  return Promise.all(sortedIds.map(getLineState));
 }
 
 export async function getOutputForLine(lineId: string): Promise<number> {
@@ -691,12 +692,16 @@ export async function getAllDowntimeEntriesForShift(
 export async function closeDowntimeEntry(
   id: string,
   endTime: string,
+  unitsLost?: number,
 ): Promise<void> {
   await ensureInit();
   const entry = _c().downtimeLog.find((e) => e.id === id);
   if (entry) {
     entry.endTime = endTime;
-    await dbCloseDowntime(id, endTime);
+    if (unitsLost !== undefined) {
+      entry.unitsLost = unitsLost;
+    }
+    await dbCloseDowntime(id, endTime, unitsLost);
   }
 }
 

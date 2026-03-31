@@ -300,6 +300,7 @@ export default function LineDetailCard({
             rows={hourlyTargets}
             comments={comments}
             changeoversByHour={mesState?.hourlyChangeovers ?? {}}
+            shift={shift}
             onSaveComment={onSaveComment}
           />
         </div>
