@@ -2,10 +2,16 @@
 
 import { useState, useEffect, useCallback, useMemo } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import type { ShiftMetrics } from "@/lib/types";
+import { useAuth } from "@/hooks/useAuth";
 import type { AdminLineConfig, LineState } from "@/lib/mesTypes";
-import type { EOSFormData, EOSLineDescriptor, EOSLineEntry, EOSValueStream } from "@/lib/eosTypes";
+import type {
+  EOSFormData,
+  EOSLineDescriptor,
+  EOSLineEntry,
+  EOSValueStream,
+} from "@/lib/eosTypes";
 import { calculateHPU, downloadAllReports } from "@/lib/eosReports";
 import EOSLineCard from "@/components/eos/EOSLineCard";
 import EOSMetaForm from "@/components/eos/EOSMetaForm";
@@ -15,7 +21,7 @@ import NoteCheckboxField from "@/components/eos/NoteCheckboxField";
 // ── Draft types ────────────────────────────────────────────────────────────────
 
 interface EosDraftPayload {
-  savedAt: string;        // ISO timestamp
+  savedAt: string; // ISO timestamp
   formData: EOSFormData;
   hiddenLines: string[];
   activeStream: string;
@@ -54,8 +60,12 @@ function clearDraft(shift: string, date: string): void {
 // ── Config ────────────────────────────────────────────────────────────────────
 
 const VALUE_STREAMS: EOSValueStream[] = [
-  { id: "vs1", name: "HFC (Hard Folding Covers)", lines: ["Line 1", "Line 2", "Line 3", "Line 4"] },
-  { id: "vs2", name: "HRC (Hard Rolling Cover)",  lines: ["Line 1", "Line 2"] },
+  {
+    id: "vs1",
+    name: "HFC (Hard Folding Covers)",
+    lines: ["Line 1", "Line 2", "Line 3", "Line 4"],
+  },
+  { id: "vs2", name: "HRC (Hard Rolling Cover)", lines: ["Line 1", "Line 2"] },
 ];
 
 const ALL_LINES: EOSLineDescriptor[] = VALUE_STREAMS.flatMap((vs) =>
@@ -81,7 +91,9 @@ const EMPTY_LINE: EOSLineEntry = {
 
 function emptyFormData(): EOSFormData {
   const lines: Record<string, EOSLineEntry> = {};
-  ALL_LINES.forEach(({ lineKey }) => { lines[lineKey] = { ...EMPTY_LINE }; });
+  ALL_LINES.forEach(({ lineKey }) => {
+    lines[lineKey] = { ...EMPTY_LINE };
+  });
   return {
     supervisor: "",
     date: new Date().toISOString().split("T")[0],
@@ -105,12 +117,24 @@ function lineIdToLineKey(lineId: string): string {
 
 export default function EOSPage() {
   const pathname = usePathname();
-  const [formData, setFormData]           = useState<EOSFormData>(emptyFormData());
-  const [hiddenLines, setHiddenLines]     = useState<Set<string>>(new Set());
-  const [omittedLines, setOmittedLines]   = useState<Set<string>>(new Set());
-  const [activeStream, setActiveStream]   = useState("vs1");
+  const router = useRouter();
+  const { role } = useAuth();
+
+  // Team-lead route guard
+  useEffect(() => {
+    if (role === "team-lead") {
+      router.push("/team-lead");
+    }
+  }, [role, router]);
+
+  const [formData, setFormData] = useState<EOSFormData>(emptyFormData());
+  const [hiddenLines, setHiddenLines] = useState<Set<string>>(new Set());
+  const [omittedLines, setOmittedLines] = useState<Set<string>>(new Set());
+  const [activeStream, setActiveStream] = useState("vs1");
   const [mesRefreshing, setMesRefreshing] = useState(false);
-  const [emailRecipient, setEmailRecipient] = useState("ops-leads@kineticcommand.io");
+  const [emailRecipient, setEmailRecipient] = useState(
+    "ops-leads@kineticcommand.io",
+  );
   const [notesValidation, setNotesValidation] = useState(false);
 
   // Draft restore banner
@@ -122,16 +146,25 @@ export default function EOSPage() {
     if (saved) {
       setDraftInfo({ savedAt: saved.savedAt });
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // run once on mount
 
-  async function refreshFromMes(shift: string, autoHide: (keys: string[]) => void) {
+  async function refreshFromMes(
+    shift: string,
+    autoHide: (keys: string[]) => void,
+  ) {
     setMesRefreshing(true);
     try {
       const [metrics, mesStates, adminConfig] = await Promise.all([
-        fetch(`/api/metrics?shift=${shift.toLowerCase()}`).then((r) => r.json() as Promise<ShiftMetrics>),
-        fetch("/api/mes/state").then((r) => r.json() as Promise<LineState[]>).catch(() => [] as LineState[]),
-        fetch("/api/admin/config").then((r) => r.json() as Promise<Record<string, AdminLineConfig>>).catch(() => ({})),
+        fetch(`/api/metrics?shift=${shift.toLowerCase()}`).then(
+          (r) => r.json() as Promise<ShiftMetrics>,
+        ),
+        fetch("/api/mes/state")
+          .then((r) => r.json() as Promise<LineState[]>)
+          .catch(() => [] as LineState[]),
+        fetch("/api/admin/config")
+          .then((r) => r.json() as Promise<Record<string, AdminLineConfig>>)
+          .catch(() => ({})),
       ]);
 
       const toHide: string[] = [];
@@ -149,10 +182,14 @@ export default function EOSPage() {
           if (!(lineKey in updatedLines)) return;
           const merged = {
             ...updatedLines[lineKey],
-            output:    String(line.output),
+            output: String(line.output),
             headcount: String(line.headcount),
           };
-          merged.hpu = calculateHPU(merged.output, merged.headcount, merged.hoursWorked);
+          merged.hpu = calculateHPU(
+            merged.output,
+            merged.headcount,
+            merged.hoursWorked,
+          );
           updatedLines[lineKey] = merged;
         });
 
@@ -165,10 +202,10 @@ export default function EOSPage() {
           }
           updatedLines[lineKey] = {
             ...updatedLines[lineKey],
-            orderAtPackout:      state.currentOrder ?? "",
-            remainingOnOrder:    String(state.remainingOnOrder),
+            orderAtPackout: state.currentOrder ?? "",
+            remainingOnOrder: String(state.remainingOnOrder),
             remainingOnRunSheet: String(state.remainingOnRunSheet),
-            changeovers:         String(state.completedOrders),
+            changeovers: String(state.completedOrders),
           };
         });
 
@@ -199,7 +236,10 @@ export default function EOSPage() {
       activeStream,
     };
     try {
-      localStorage.setItem(draftKey(formData.shift, formData.date), JSON.stringify(payload));
+      localStorage.setItem(
+        draftKey(formData.shift, formData.date),
+        JSON.stringify(payload),
+      );
     } catch {
       // quota exceeded or private mode — silently ignore
     }
@@ -218,11 +258,23 @@ export default function EOSPage() {
   const handleNotes = (field: keyof EOSFormData["notes"], value: string) =>
     setFormData((p) => ({ ...p, notes: { ...p.notes, [field]: value } }));
 
-  const handleLine = (lineKey: string, field: keyof EOSLineEntry, value: string) =>
+  const handleLine = (
+    lineKey: string,
+    field: keyof EOSLineEntry,
+    value: string,
+  ) =>
     setFormData((p) => {
       const updated = { ...p.lines[lineKey], [field]: value };
-      if (field === "output" || field === "headcount" || field === "hoursWorked") {
-        updated.hpu = calculateHPU(updated.output, updated.headcount, updated.hoursWorked);
+      if (
+        field === "output" ||
+        field === "headcount" ||
+        field === "hoursWorked"
+      ) {
+        updated.hpu = calculateHPU(
+          updated.output,
+          updated.headcount,
+          updated.hoursWorked,
+        );
       }
       return { ...p, lines: { ...p.lines, [lineKey]: updated } };
     });
@@ -263,29 +315,41 @@ export default function EOSPage() {
   // ── Derived state ────────────────────────────────────────────────────────────
 
   const currentStream = VALUE_STREAMS.find((vs) => vs.id === activeStream)!;
-  const activeLines   = ALL_LINES.filter(
-    ({ vsId, line }) => vsId === activeStream
-      && !omittedLines.has(`${vsId}:${line}`)
-      && !hiddenLines.has(`${vsId}:${line}`),
+  const activeLines = ALL_LINES.filter(
+    ({ vsId, line }) =>
+      vsId === activeStream &&
+      !omittedLines.has(`${vsId}:${line}`) &&
+      !hiddenLines.has(`${vsId}:${line}`),
   );
   const visibleLines = currentStream.lines.filter(
-    (line) => !omittedLines.has(`${currentStream.id}:${line}`) && !hiddenLines.has(`${currentStream.id}:${line}`),
+    (line) =>
+      !omittedLines.has(`${currentStream.id}:${line}`) &&
+      !hiddenLines.has(`${currentStream.id}:${line}`),
   );
   const hiddenVsLines = currentStream.lines.filter(
-    (line) => !omittedLines.has(`${currentStream.id}:${line}`) && hiddenLines.has(`${currentStream.id}:${line}`),
+    (line) =>
+      !omittedLines.has(`${currentStream.id}:${line}`) &&
+      hiddenLines.has(`${currentStream.id}:${line}`),
   );
-  const omittedVsLines = currentStream.lines.filter((line) => omittedLines.has(`${currentStream.id}:${line}`));
+  const omittedVsLines = currentStream.lines.filter((line) =>
+    omittedLines.has(`${currentStream.id}:${line}`),
+  );
 
-  const filledLines = activeLines.filter(({ lineKey }) => formData.lines[lineKey].output).length;
-  const progress    = activeLines.length > 0 ? Math.round((filledLines / activeLines.length) * 100) : 0;
+  const filledLines = activeLines.filter(
+    ({ lineKey }) => formData.lines[lineKey].output,
+  ).length;
+  const progress =
+    activeLines.length > 0
+      ? Math.round((filledLines / activeLines.length) * 100)
+      : 0;
 
-  const shiftWindow = formData.shift === "Day" ? "06:00 – 14:00" : "14:00 – 22:00";
+  const shiftWindow =
+    formData.shift === "Day" ? "06:00 – 14:00" : "14:00 – 22:00";
 
   // ── Render ───────────────────────────────────────────────────────────────────
 
   return (
     <div className="h-screen flex flex-col overflow-hidden bg-background text-[#e1e2ec]">
-
       {/* ── Top Nav ── */}
       <nav className="shrink-0 z-50 bg-background border-b border-border font-['Space_Grotesk',sans-serif] tracking-tight">
         <div className="flex justify-between items-center w-full px-6 py-3">
@@ -300,13 +364,22 @@ export default function EOSPage() {
               >
                 EOS
               </Link>
-              <Link href="/admin" className="text-sm text-[#e1e2ec]/60 hover:text-[#e1e2ec] transition-colors">
+              <Link
+                href="/admin"
+                className="text-sm text-[#e1e2ec]/60 hover:text-[#e1e2ec] transition-colors"
+              >
                 Admin
               </Link>
-              <Link href="/team-lead" className="text-sm text-[#e1e2ec]/60 hover:text-[#e1e2ec] transition-colors">
+              <Link
+                href="/team-lead"
+                className="text-sm text-[#e1e2ec]/60 hover:text-[#e1e2ec] transition-colors"
+              >
                 Team Lead
               </Link>
-              <Link href="/sim" className="text-sm text-[#e1e2ec]/60 hover:text-[#e1e2ec] transition-colors">
+              <Link
+                href="/sim"
+                className="text-sm text-[#e1e2ec]/60 hover:text-[#e1e2ec] transition-colors"
+              >
                 SIM
               </Link>
             </div>
@@ -315,13 +388,18 @@ export default function EOSPage() {
           <div className="flex items-center gap-4">
             {/* Progress pill */}
             <div className="flex items-center gap-2 px-3 py-1.5 bg-surface border border-border rounded-sm text-xs font-mono">
-              <span className="text-[#e1e2ec]/50">{filledLines}/{activeLines.length} lines</span>
+              <span className="text-[#e1e2ec]/50">
+                {filledLines}/{activeLines.length} lines
+              </span>
               <div className="w-20 h-1.5 bg-background rounded-full overflow-hidden">
                 <div
                   className="h-full rounded-full transition-all duration-300"
                   style={{
                     width: `${progress}%`,
-                    backgroundColor: progress === 100 ? "var(--color-status-green)" : "var(--color-accent)",
+                    backgroundColor:
+                      progress === 100
+                        ? "var(--color-status-green)"
+                        : "var(--color-accent)",
                   }}
                 />
               </div>
@@ -359,7 +437,9 @@ export default function EOSPage() {
                     : "text-[#e1e2ec]/40 hover:bg-surface-high/50 hover:text-[#e1e2ec] border-l-4 border-transparent"
                 }`}
               >
-                <span className="material-symbols-outlined text-[18px]">dashboard</span>
+                <span className="material-symbols-outlined text-[18px]">
+                  dashboard
+                </span>
                 <span>Dashboard</span>
               </Link>
 
@@ -372,10 +452,11 @@ export default function EOSPage() {
                     : "text-[#e1e2ec]/40 hover:bg-surface-high/50 hover:text-[#e1e2ec] border-l-4 border-transparent"
                 }`}
               >
-                <span className="material-symbols-outlined text-[18px]">factory</span>
+                <span className="material-symbols-outlined text-[18px]">
+                  factory
+                </span>
                 <span>Admin</span>
               </Link>
-
             </div>
           </nav>
         </aside>
@@ -383,11 +464,12 @@ export default function EOSPage() {
         {/* ── Main Content ── */}
         <main className="flex-1 overflow-y-auto custom-scrollbar bg-background">
           <div className="p-6 md:p-10 max-w-[1400px] mx-auto space-y-8">
-
             {/* Draft restore banner */}
             {draftInfo && (
               <div className="flex items-center gap-4 px-5 py-3 bg-vs2/10 border border-vs2/30 rounded-sm">
-                <span className="material-symbols-outlined text-vs2 text-sm">restore</span>
+                <span className="material-symbols-outlined text-vs2 text-sm">
+                  restore
+                </span>
                 <p className="text-sm text-[#e1e2ec] flex-1">
                   Resume draft from{" "}
                   <span className="font-mono text-vs2">
@@ -418,21 +500,31 @@ export default function EOSPage() {
                 </h1>
                 <div className="flex flex-wrap items-center gap-6 text-[#e1e2ec]/60 font-medium text-sm">
                   <div className="flex items-center gap-2">
-                    <span className="material-symbols-outlined text-accent text-sm">calendar_today</span>
+                    <span className="material-symbols-outlined text-accent text-sm">
+                      calendar_today
+                    </span>
                     <span>{formData.date}</span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <span className="material-symbols-outlined text-accent text-sm">schedule</span>
-                    <span>{formData.shift} Shift ({shiftWindow})</span>
+                    <span className="material-symbols-outlined text-accent text-sm">
+                      schedule
+                    </span>
+                    <span>
+                      {formData.shift} Shift ({shiftWindow})
+                    </span>
                   </div>
                   {formData.supervisor && (
                     <div className="flex items-center gap-2">
-                      <span className="material-symbols-outlined text-accent text-sm">badge</span>
+                      <span className="material-symbols-outlined text-accent text-sm">
+                        badge
+                      </span>
                       <span>Shift Lead: {formData.supervisor}</span>
                     </div>
                   )}
                   <div className="flex items-center gap-2">
-                    <span className="material-symbols-outlined text-accent text-sm">mail</span>
+                    <span className="material-symbols-outlined text-accent text-sm">
+                      mail
+                    </span>
                     <input
                       type="email"
                       value={emailRecipient}
@@ -448,25 +540,33 @@ export default function EOSPage() {
                   onClick={() => downloadAllReports(formData, activeLines)}
                   className="px-5 py-2.5 bg-surface-highest text-[#e1e2ec] rounded-sm border border-border hover:bg-surface-high transition-colors flex items-center gap-2 text-xs font-bold uppercase tracking-wider"
                 >
-                  <span className="material-symbols-outlined text-sm">download</span>
+                  <span className="material-symbols-outlined text-sm">
+                    download
+                  </span>
                   CSV Export
                 </button>
                 <button
                   onClick={() => {
-                    const body = document.querySelector("#eos-email-body")?.textContent ?? "";
+                    const body =
+                      document.querySelector("#eos-email-body")?.textContent ??
+                      "";
                     navigator.clipboard.writeText(body);
                   }}
                   title="Copies email body to clipboard"
                   className="px-6 py-2.5 bg-surface-highest text-[#e1e2ec] border border-border rounded-sm hover:bg-surface-high transition-colors flex items-center gap-2 text-xs font-bold uppercase tracking-wider"
                 >
-                  <span className="material-symbols-outlined text-sm">content_copy</span>
+                  <span className="material-symbols-outlined text-sm">
+                    content_copy
+                  </span>
                   Copy Email
                 </button>
                 <button
                   onClick={() => {
                     setNotesValidation(true);
                     if (!formData.notes.topIssueToday.trim()) return;
-                    const body = document.querySelector("#eos-email-body")?.textContent ?? "";
+                    const body =
+                      document.querySelector("#eos-email-body")?.textContent ??
+                      "";
                     navigator.clipboard.writeText(
                       `To: ${emailRecipient}\n\n${body}`,
                     );
@@ -476,7 +576,9 @@ export default function EOSPage() {
                   title="Validate and copy email body to clipboard"
                   className="px-6 py-2.5 bg-accent text-black rounded-sm hover:bg-orange-500 transition-colors flex items-center gap-2 text-xs font-bold uppercase tracking-wider active:scale-95"
                 >
-                  <span className="material-symbols-outlined text-sm">send</span>
+                  <span className="material-symbols-outlined text-sm">
+                    send
+                  </span>
                   Submit &amp; Send
                 </button>
               </div>
@@ -484,17 +586,17 @@ export default function EOSPage() {
 
             {/* Two-column layout */}
             <div className="grid grid-cols-1 xl:grid-cols-12 gap-8 items-start">
-
               {/* ── Left column ── */}
               <div className="xl:col-span-8 space-y-6">
-
                 {/* Meta form + Operational Summary */}
                 <EOSMetaForm data={formData} onChangeMeta={handleMeta} />
 
                 {/* Structured Notes */}
                 <div className="bg-surface-low p-6 border-l-2 border-accent/30">
                   <div className="flex items-center gap-2 mb-5">
-                    <span className="material-symbols-outlined text-accent">notes</span>
+                    <span className="material-symbols-outlined text-accent">
+                      notes
+                    </span>
                     <h3 className="font-['Space_Grotesk',sans-serif] text-lg font-bold tracking-tight uppercase">
                       Operational Summary
                     </h3>
@@ -509,21 +611,25 @@ export default function EOSPage() {
                       <input
                         type="text"
                         value={formData.notes.topIssueToday}
-                        onChange={(e) => handleNotes("topIssueToday", e.target.value)}
+                        onChange={(e) =>
+                          handleNotes("topIssueToday", e.target.value)
+                        }
                         onBlur={() => setNotesValidation(true)}
                         placeholder="Primary issue impacting production this shift"
                         className={[
                           "w-full bg-surface-highest rounded-sm px-3.5 py-2.5 text-[#e1e2ec] text-sm outline-none font-mono focus:ring-1 focus:ring-accent/40 placeholder:text-[#e1e2ec]/20",
-                          notesValidation && !formData.notes.topIssueToday.trim()
+                          notesValidation &&
+                          !formData.notes.topIssueToday.trim()
                             ? "ring-1 ring-status-red/60"
                             : "",
                         ].join(" ")}
                       />
-                      {notesValidation && !formData.notes.topIssueToday.trim() && (
-                        <p className="mt-1 text-[10px] text-status-red font-bold tracking-widest uppercase">
-                          Required — enter the primary issue for this shift
-                        </p>
-                      )}
+                      {notesValidation &&
+                        !formData.notes.topIssueToday.trim() && (
+                          <p className="mt-1 text-[10px] text-status-red font-bold tracking-widest uppercase">
+                            Required — enter the primary issue for this shift
+                          </p>
+                        )}
                     </div>
 
                     {/* Resolved During Shift */}
@@ -557,7 +663,9 @@ export default function EOSPage() {
                       </label>
                       <textarea
                         value={formData.notes.generalNotes}
-                        onChange={(e) => handleNotes("generalNotes", e.target.value)}
+                        onChange={(e) =>
+                          handleNotes("generalNotes", e.target.value)
+                        }
                         rows={3}
                         placeholder="Any additional observations, safety incidents, or production notes..."
                         className="w-full bg-surface-highest border-none rounded-sm px-3.5 py-2.5 text-[#e1e2ec] text-sm leading-relaxed resize-y placeholder:text-[#e1e2ec]/20 outline-none focus:ring-1 focus:ring-accent/40 font-mono"
@@ -588,7 +696,9 @@ export default function EOSPage() {
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                      <span className="material-symbols-outlined text-accent">settings_input_component</span>
+                      <span className="material-symbols-outlined text-accent">
+                        settings_input_component
+                      </span>
                       <h3 className="font-['Space_Grotesk',sans-serif] text-lg font-bold tracking-tight uppercase">
                         Line Metrics
                       </h3>
@@ -598,9 +708,13 @@ export default function EOSPage() {
                         Auto-Synced from MES
                       </span>
                       <button
-                        onClick={() => refreshFromMes(formData.shift, (keys) =>
-                          setHiddenLines((prev) => new Set([...prev, ...keys])),
-                        )}
+                        onClick={() =>
+                          refreshFromMes(formData.shift, (keys) =>
+                            setHiddenLines(
+                              (prev) => new Set([...prev, ...keys]),
+                            ),
+                          )
+                        }
                         disabled={mesRefreshing}
                         className="text-[10px] text-accent uppercase font-bold tracking-wider hover:underline disabled:opacity-50 cursor-pointer bg-transparent border-none"
                       >
@@ -624,7 +738,8 @@ export default function EOSPage() {
 
                   {visibleLines.length === 0 && (
                     <div className="px-4 py-5 bg-surface border border-border rounded-sm text-sm text-[#e1e2ec]/55">
-                      No running lines in this value stream for the current EOS report.
+                      No running lines in this value stream for the current EOS
+                      report.
                     </div>
                   )}
 
@@ -666,9 +781,11 @@ export default function EOSPage() {
                 {/* Bottom actions */}
                 <div className="flex gap-3 flex-wrap pt-2">
                   <button
-                    onClick={() => refreshFromMes(formData.shift, (keys) =>
-                      setHiddenLines((prev) => new Set([...prev, ...keys])),
-                    )}
+                    onClick={() =>
+                      refreshFromMes(formData.shift, (keys) =>
+                        setHiddenLines((prev) => new Set([...prev, ...keys])),
+                      )
+                    }
                     disabled={mesRefreshing}
                     className="px-5 py-2.5 bg-surface text-[#e1e2ec]/50 border border-border rounded-sm cursor-pointer text-xs tracking-widest uppercase hover:border-accent hover:text-accent transition-colors disabled:opacity-50"
                   >

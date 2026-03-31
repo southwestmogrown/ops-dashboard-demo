@@ -3,8 +3,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import dynamic from "next/dynamic";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import type { AdminLineConfig, LineState } from "@/lib/mesTypes";
+import { useAuth } from "@/hooks/useAuth";
 import type { ShiftName } from "@/lib/types";
 import { LINES, LINE_LABELS, getDefaultTarget } from "@/lib/lines";
 import { getShiftWindows } from "@/lib/shiftTime";
@@ -33,6 +34,16 @@ function unitsForSpeed(speed: number): number {
 
 export default function SimPage() {
   const pathname = usePathname();
+  const router = useRouter();
+  const { role } = useAuth();
+
+  // Team-lead route guard
+  useEffect(() => {
+    if (role === "team-lead") {
+      router.push("/team-lead");
+    }
+  }, [role, router]);
+
   const [states, setStates] = useState<LineState[]>([]);
   const [adminConfig, setAdminConfig] = useState<
     Record<string, AdminLineConfig>
