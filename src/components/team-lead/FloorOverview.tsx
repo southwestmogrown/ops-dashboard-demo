@@ -94,34 +94,34 @@ function LineCard({
     <button
       onClick={onSelect}
       disabled={!isRunning}
-      className={`group w-full text-left transition-all duration-150 rounded-sm overflow-hidden focus:outline-none focus:ring-1 focus:ring-accent/40 ${
+      className={`group w-full text-left transition-all duration-150 rounded-sm overflow-hidden border focus:outline-none focus:ring-1 focus:ring-accent/40 ${
         isRunning
-          ? "bg-surface hover:bg-surface-high"
-          : "bg-surface-low opacity-45 grayscale cursor-not-allowed"
+          ? "bg-surface-high border-border/60 hover:bg-surface-highest"
+          : "bg-surface-low border-border/40 opacity-60 grayscale cursor-not-allowed"
       }`}
     >
       {/* Top accent bar */}
       <div className={`h-[2px] w-full ${vsAccent}`} />
 
-      <div className="p-4">
+      <div className="p-4.5">
         {/* Header row */}
         <div className="flex items-start justify-between mb-3">
           <div className="flex flex-col gap-1">
             <div className="flex items-center gap-2">
-              <span className="text-sm font-bold text-[#e1e2ec] font-['Space_Grotesk',sans-serif]">
+              <span className="text-base font-bold text-[#f3f4f8] font-['Space_Grotesk',sans-serif]">
                 {lineName}
               </span>
               <span
-                className={`text-[9px] font-bold px-1.5 py-0.5 rounded-sm uppercase tracking-wider ${vsBadge}`}
+                className={`text-[10px] font-bold px-1.5 py-0.5 rounded-sm uppercase tracking-wider ${vsBadge}`}
               >
                 {valueStream}
               </span>
             </div>
-            <span className="text-[10px] text-[#e1e2ec]/30 font-mono">{lineId}</span>
+            <span className="text-[11px] text-[#e1e2ec]/45 font-mono">{lineId}</span>
           </div>
 
           {/* Status pill */}
-          <span className={`text-[9px] px-2 py-0.5 rounded-sm border font-bold tracking-widest uppercase ${isRunning ? cls : "text-[#e1e2ec]/40 border-border bg-surface-high"}`}>
+          <span className={`text-[10px] px-2 py-0.5 rounded-sm border font-bold tracking-widest uppercase ${isRunning ? cls : "text-[#e1e2ec]/55 border-border bg-surface-high"}`}>
             {isRunning ? label : "NOT RUNNING"}
           </span>
         </div>
@@ -129,12 +129,12 @@ function LineCard({
         {/* Output / Target */}
         <div className="mb-3">
           <div className="flex items-center justify-between mb-1.5">
-            <span className="text-[10px] text-[#e1e2ec]/40 uppercase tracking-widest font-bold">
+            <span className="text-[11px] text-[#e1e2ec]/55 uppercase tracking-widest font-bold">
               Output
             </span>
-            <span className="text-xs font-mono font-bold text-[#e1e2ec]">
+            <span className="text-sm font-mono font-bold text-[#f3f4f8]">
               {output}
-              <span className="text-[#e1e2ec]/30">/{target}</span>
+              <span className="text-[#e1e2ec]/45">/{target}</span>
             </span>
           </div>
           <OutputMiniBar output={output} target={target} />
@@ -144,10 +144,10 @@ function LineCard({
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-1.5">
             <StatusDot fpy={fpy} />
-            <span className={`text-xs font-mono font-bold ${getFpyColor(fpy)}`}>
+            <span className={`text-sm font-mono font-bold ${getFpyColor(fpy)}`}>
               {fpy.toFixed(1)}%
             </span>
-            <span className="text-[10px] text-[#e1e2ec]/30">FPY</span>
+            <span className="text-[11px] text-[#e1e2ec]/45">FPY</span>
           </div>
 
           {isRunning && lastScrapTime && (
@@ -155,13 +155,13 @@ function LineCard({
               <span className="material-symbols-outlined text-[12px] text-[#e1e2ec]/20">
                 error
               </span>
-              <span className="text-[10px] text-[#e1e2ec]/30 font-mono">
+              <span className="text-[11px] text-[#e1e2ec]/45 font-mono">
                 {formatRelativeTime(lastScrapTime)}
               </span>
             </div>
           )}
           {!isRunning && (
-            <span className="text-[10px] text-[#e1e2ec]/35 uppercase tracking-wider font-bold">
+            <span className="text-[11px] text-[#e1e2ec]/45 uppercase tracking-wider font-bold">
               Hidden from active floor pacing
             </span>
           )}
@@ -195,13 +195,13 @@ export default function FloorOverview({
       {/* Section heading */}
       <div className="mb-5 flex items-center gap-3">
         <div className="h-px flex-1 bg-border" />
-        <h2 className="font-['Space_Grotesk',sans-serif] text-sm font-black uppercase tracking-widest text-[#e1e2ec]/40">
+        <h2 className="font-['Space_Grotesk',sans-serif] text-base font-black uppercase tracking-widest text-[#e1e2ec]/55">
           Floor Overview
         </h2>
         <div className="h-px flex-1 bg-border" />
       </div>
 
-      <p className="mb-3 text-[10px] uppercase tracking-widest text-[#e1e2ec]/35">
+      <p className="mb-4 text-xs uppercase tracking-widest text-[#e1e2ec]/50">
         Greyed cards are marked Not Running in Admin and are excluded from active floor pacing.
       </p>
 

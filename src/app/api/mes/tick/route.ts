@@ -25,7 +25,7 @@ interface TickBody {
 
 const DOWNTIME_SKIP_PROBABILITY = 0.08;
 const DEFECT_INJECTION_PROBABILITY = 0.05;
-const KICKED_LID_INJECTION_PROBABILITY = 0.012;
+const KICKED_LID_INJECTION_PROBABILITY = 0.05;
 const DOWNTIME_EVENT_PROBABILITY = 0.35;
 
 const DOWNTIME_REASONS: DowntimeReason[] = [
@@ -86,7 +86,6 @@ async function maybeInjectDefect(
   activeLines: { lineId: string; currentOrder: string | null }[]
 ): Promise<void> {
   if (activeLines.length === 0) return;
-  if (Math.random() >= DEFECT_INJECTION_PROBABILITY) return;
 
   const line  = randomChoice(activeLines);
   const now   = (await getSimClock()) ?? new Date();
@@ -94,25 +93,26 @@ async function maybeInjectDefect(
   const shift: ShiftName = hour >= 6 && hour < 18 ? "day" : "night";
   const isVS2 = line.lineId.toLowerCase().includes("vs2");
 
-  const forcedKickedLid = Math.random() < KICKED_LID_INJECTION_PROBABILITY;
-  const defectType  = forcedKickedLid ? "kicked-lid" : pickDefectType(isVS2);
-  const panel       = randomChoice(PANEL_OPTIONS);
-  const affectedArea: "panel" | "extrusion" =
-    defectType === "kicked-lid" ? randomChoice(AFFECTED_AREAS) : "panel";
-
-  if (defectType === "kicked-lid") {
+  if (Math.random() < KICKED_LID_INJECTION_PROBABILITY) {
     await addScrapEntry({
       kind:            "kicked-lid",
       lineId:          line.lineId,
       shift,
       model:           line.currentOrder ?? "UNKNOWN",
-      panel,
-      damageType:      defectType,
-      affectedArea,
+      panel:           randomChoice(PANEL_OPTIONS),
+      damageType:      "kicked-lid",
+      affectedArea:    randomChoice(AFFECTED_AREAS),
       auditorInitials: "SYS",
       boughtIn:        false,
     });
     return;
+  }
+
+  if (Math.random() >= DEFECT_INJECTION_PROBABILITY) return;
+
+  let defectType = pickDefectType(isVS2);
+  while (defectType === "kicked-lid") {
+    defectType = pickDefectType(isVS2);
   }
 
   await addScrapEntry({
@@ -120,7 +120,7 @@ async function maybeInjectDefect(
     lineId:       line.lineId,
     shift,
     model:        line.currentOrder ?? "UNKNOWN",
-    panel,
+    panel:        randomChoice(PANEL_OPTIONS),
     damageType:   defectType,
     stationFound: "Final Inspection",
     howDamaged:   `Simulated defect: ${defectType}`,
@@ -132,7 +132,7 @@ async function maybeInjectDowntime(
   lineId: string,
   shift: ShiftName,
   simClock: Date,
-  requestedUnits: number
+  targetOutput: number
 ): Promise<void> {
   if (Math.random() >= DOWNTIME_EVENT_PROBABILITY) return;
 
@@ -141,7 +141,11 @@ async function maybeInjectDowntime(
 
   const durationMinutes = 2 + Math.floor(Math.random() * 7); // 2-8 min
   const end = new Date(simClock.getTime() + durationMinutes * 60_000);
-  const unitsLost = Math.max(1, Math.round(requestedUnits * durationMinutes));
+  const { totalWorkMinutes } = getShiftWindows(shift);
+  const unitsPerWorkMinute = targetOutput > 0 ? targetOutput / totalWorkMinutes : 0;
+  const unitsLost = targetOutput > 0
+    ? Math.max(1, Math.round(unitsPerWorkMinute * durationMinutes))
+    : 0;
 
   const entry = await addDowntimeEntry({
     lineId,
@@ -194,7 +198,12 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     for (const state of activeLines) {
       // Simulate brief line stops/changeover interruptions.
       if (Math.random() < DOWNTIME_SKIP_PROBABILITY) {
-        await maybeInjectDowntime(state.lineId, shift, simClock, actualUnits);
+        await maybeInjectDowntime(
+          state.lineId,
+          shift,
+          simClock,
+          state.schedule?.totalTarget ?? 0,
+        );
         continue;
       }
       await tickLine(state.lineId, actualUnits);

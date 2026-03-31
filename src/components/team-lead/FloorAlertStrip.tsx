@@ -3,7 +3,6 @@
 import { useState } from "react";
 import type { Line } from "@/lib/types";
 import type { LineState } from "@/lib/mesTypes";
-import type { ShiftProgress } from "@/lib/shiftTime";
 import type { AdminLineConfig } from "@/lib/mesTypes";
 
 export interface FloorAlert {
@@ -67,33 +66,33 @@ export default function FloorAlertStrip({
       {/* Collapsed strip */}
       <button
         onClick={() => setExpanded((e) => !e)}
-        className={`w-full flex items-center justify-between px-4 py-2.5 rounded-sm border text-left transition-all ${
+        className={`w-full flex items-center justify-between px-4 py-3 rounded-sm border text-left transition-all ${
           criticalCount > 0
-            ? "bg-status-red/10 border-status-red/30 hover:bg-status-red/15"
-            : "bg-status-amber/10 border-status-amber/30 hover:bg-status-amber/15"
+            ? "bg-status-red/12 border-status-red/35 hover:bg-status-red/18"
+            : "bg-status-amber/12 border-status-amber/35 hover:bg-status-amber/18"
         }`}
       >
         <div className="flex items-center gap-3">
           <span className="material-symbols-outlined text-base text-status-red">warning</span>
-          <span className="text-xs font-bold text-[#e1e2ec]">
+          <span className="text-sm font-bold text-[#f3f4f8]">
             {visibleAlerts.length === 1
               ? `${visibleAlerts[0].lineName}: ${visibleAlerts[0].issue}`
               : `${visibleAlerts.length} floor alert${visibleAlerts.length !== 1 ? "s" : ""}`}
           </span>
           <div className="flex gap-1.5">
             {criticalCount > 0 && (
-              <span className="text-[9px] font-bold bg-status-red/20 text-status-red border border-status-red/30 rounded-sm px-1.5 py-0.5">
+              <span className="text-[10px] font-bold bg-status-red/20 text-status-red border border-status-red/30 rounded-sm px-1.5 py-0.5">
                 {criticalCount} CRITICAL
               </span>
             )}
             {warningCount > 0 && (
-              <span className="text-[9px] font-bold bg-status-amber/20 text-status-amber border border-status-amber/30 rounded-sm px-1.5 py-0.5">
+              <span className="text-[10px] font-bold bg-status-amber/20 text-status-amber border border-status-amber/30 rounded-sm px-1.5 py-0.5">
                 {warningCount} WARNING
               </span>
             )}
           </div>
         </div>
-        <span className="text-[#e1e2ec]/40 text-xs">
+        <span className="text-[#e1e2ec]/55 text-sm">
           {expanded ? "\u25B2" : "\u25BC"}
         </span>
       </button>
@@ -116,10 +115,10 @@ export default function FloorAlertStrip({
                     alert.severity === "critical" ? "bg-status-red" : "bg-status-amber"
                   }`}
                 />
-                <span className="text-xs font-bold text-[#e1e2ec]">{alert.lineName}</span>
-                <span className="text-xs text-[#e1e2ec]/40">&middot;</span>
+                <span className="text-sm font-bold text-[#f3f4f8]">{alert.lineName}</span>
+                <span className="text-sm text-[#e1e2ec]/55">&middot;</span>
                 <span
-                  className={`text-xs font-medium ${
+                  className={`text-sm font-medium ${
                     alert.severity === "critical" ? "text-status-red" : "text-status-amber"
                   }`}
                 >
@@ -131,7 +130,7 @@ export default function FloorAlertStrip({
                   e.stopPropagation();
                   setDismissed((prev) => new Set([...prev, `${alert.lineId}|${alert.issue}`]));
                 }}
-                className="text-[#e1e2ec]/30 hover:text-[#e1e2ec]/60 transition-colors text-xs"
+                className="text-[#e1e2ec]/40 hover:text-[#f3f4f8]/80 transition-colors text-sm"
                 title="Dismiss"
               >
                 <span className="material-symbols-outlined text-[14px]">close</span>

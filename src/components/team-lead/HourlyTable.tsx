@@ -47,19 +47,19 @@ const CommentInput = memo(function CommentInput({
         value={localValue}
         placeholder="Add comment..."
         onChange={handleChange}
-        className="min-w-0 flex-1 bg-transparent border-none text-xs text-[#e1e2ec]/60 focus:ring-0 p-0 outline-none placeholder:text-[#e1e2ec]/20"
+        className="min-w-0 flex-1 bg-transparent border-none text-sm text-[#f3f4f8]/85 focus:ring-0 p-0 outline-none placeholder:text-[#e1e2ec]/35"
         type="text"
       />
       {saveStatus === "saving" && (
-        <span className="text-[#e1e2ec]/30 text-[10px] shrink-0 animate-pulse">…</span>
+        <span className="text-[#e1e2ec]/45 text-[11px] shrink-0 animate-pulse">…</span>
       )}
       {saveStatus === "saved" && (
-        <span className="text-status-green text-[10px] shrink-0" title="Saved">
+        <span className="text-status-green text-[11px] shrink-0" title="Saved">
           &#10003;
         </span>
       )}
       {saveStatus === "error" && (
-        <span className="text-status-red text-[10px] shrink-0" title="Save failed">
+        <span className="text-status-red text-[11px] shrink-0" title="Save failed">
           &#10007;
         </span>
       )}
@@ -95,8 +95,8 @@ export default function HourlyTable({ rows, comments, onSaveComment }: HourlyTab
     <div className="bg-surface-low border border-border/40 overflow-hidden">
       {/* Header */}
       <div className="px-6 py-4 border-b border-border/40 flex justify-between items-center">
-        <h3 className="text-xs font-bold uppercase tracking-widest">Shift Hourly Log</h3>
-        <div className="flex gap-4 text-[10px]">
+        <h3 className="text-sm font-bold uppercase tracking-widest">Shift Hourly Log</h3>
+        <div className="flex gap-4 text-xs">
           <span className="flex items-center gap-1">
             <span className="w-2 h-2 bg-status-green rounded-sm" /> ON TARGET
           </span>
@@ -111,11 +111,11 @@ export default function HourlyTable({ rows, comments, onSaveComment }: HourlyTab
         <table className="w-full text-left border-collapse">
           <thead className="bg-background/50">
             <tr>
-              <th className="px-6 py-3 text-[10px] font-bold text-[#e1e2ec]/40 uppercase">Hour</th>
-              <th className="px-6 py-3 text-[10px] font-bold text-[#e1e2ec]/40 uppercase">Planned</th>
-              <th className="px-6 py-3 text-[10px] font-bold text-[#e1e2ec]/40 uppercase">Actual</th>
-              <th className="px-6 py-3 text-[10px] font-bold text-[#e1e2ec]/40 uppercase">Var</th>
-              <th className="px-6 py-3 text-[10px] font-bold text-[#e1e2ec]/40 uppercase">Comments / Observations</th>
+              <th className="px-6 py-3 text-[11px] font-bold text-[#e1e2ec]/55 uppercase">Hour</th>
+              <th className="px-6 py-3 text-[11px] font-bold text-[#e1e2ec]/55 uppercase">Planned</th>
+              <th className="px-6 py-3 text-[11px] font-bold text-[#e1e2ec]/55 uppercase">Actual</th>
+              <th className="px-6 py-3 text-[11px] font-bold text-[#e1e2ec]/55 uppercase">Var</th>
+              <th className="px-6 py-3 text-[11px] font-bold text-[#e1e2ec]/55 uppercase">Comments / Observations</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-border/20">
@@ -137,33 +137,33 @@ export default function HourlyTable({ rows, comments, onSaveComment }: HourlyTab
                         : ""
                   }`}
                 >
-                  <td className={`px-6 py-4 text-xs font-mono font-bold ${isFuture ? "text-[#e1e2ec]/20" : ""}`}>
+                  <td className={`px-6 py-4 text-sm font-mono font-bold ${isFuture ? "text-[#e1e2ec]/25" : ""}`}>
                     {row.hour}
                   </td>
-                  <td className={`px-6 py-4 text-sm font-['Space_Grotesk',sans-serif] tabular-nums ${isFuture ? "text-[#e1e2ec]/20" : ""}`}>
+                  <td className={`px-6 py-4 text-base font-['Space_Grotesk',sans-serif] tabular-nums ${isFuture ? "text-[#e1e2ec]/25" : ""}`}>
                     {isBreak ? "—" : row.planned}
                   </td>
-                  <td className={`px-6 py-4 text-sm font-['Space_Grotesk',sans-serif] tabular-nums font-bold ${
-                    isBreak ? "text-[#e1e2ec]/30"
-                      : isFuture ? "text-[#e1e2ec]/20"
+                  <td className={`px-6 py-4 text-base font-['Space_Grotesk',sans-serif] tabular-nums font-bold ${
+                    isBreak ? "text-[#e1e2ec]/40"
+                      : isFuture ? "text-[#e1e2ec]/25"
                       : row.variance < 0 ? "text-accent"
                       : "text-status-green"
                   }`}>
                     {isBreak ? "—" : isFuture ? "--" : row.actual}
                   </td>
-                  <td className={`px-6 py-4 text-xs font-bold ${
-                    isBreak || isFuture ? "text-[#e1e2ec]/20"
+                  <td className={`px-6 py-4 text-sm font-bold ${
+                    isBreak || isFuture ? "text-[#e1e2ec]/25"
                       : row.variance > 0 ? "text-status-green"
                       : row.variance < 0 ? "text-accent"
-                      : "text-[#e1e2ec]/40"
+                      : "text-[#e1e2ec]/55"
                   }`}>
                     {isBreak ? "—" : isFuture ? "--" : (row.variance > 0 ? `+${row.variance}` : row.variance)}
                   </td>
                   <td className="px-6 py-4">
                     {isBreak ? (
-                      <span className="text-[10px] text-[#e1e2ec]/20 italic uppercase">Break</span>
+                      <span className="text-xs text-[#e1e2ec]/35 italic uppercase">Break</span>
                     ) : isFuture ? (
-                      <span className="text-[10px] text-[#e1e2ec]/20 italic uppercase">Upcoming</span>
+                      <span className="text-xs text-[#e1e2ec]/35 italic uppercase">Upcoming</span>
                     ) : (
                       <div className="flex flex-col gap-0.5">
                         {hasNegVar && comment ? (
@@ -175,7 +175,7 @@ export default function HourlyTable({ rows, comments, onSaveComment }: HourlyTab
                           <CommentInput hour={row.hour} value={comment} saveStatus={status} onSave={handleSave} />
                         )}
                         {status === "error" && (
-                          <p className="text-[9px] text-status-red pl-3">Save failed — retry</p>
+                          <p className="text-[10px] text-status-red pl-3">Save failed — retry</p>
                         )}
                       </div>
                     )}
@@ -189,8 +189,8 @@ export default function HourlyTable({ rows, comments, onSaveComment }: HourlyTab
 
       {/* Footer */}
       <div className="px-6 py-4 bg-surface-low flex justify-between items-center border-t border-border/40">
-        <span className="text-[10px] font-bold text-[#e1e2ec]/40 uppercase">Total Shift Delta</span>
-        <span className={`text-sm font-['Space_Grotesk',sans-serif] font-bold tabular-nums ${
+        <span className="text-xs font-bold text-[#e1e2ec]/55 uppercase">Total Shift Delta</span>
+        <span className={`text-base font-['Space_Grotesk',sans-serif] font-bold tabular-nums ${
           totalVariance >= 0 ? "text-status-green" : "text-accent"
         }`}>
           {totalVariance >= 0 ? "+" : ""}{totalVariance} Units

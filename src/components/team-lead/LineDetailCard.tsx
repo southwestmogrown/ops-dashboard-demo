@@ -1,9 +1,8 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useState } from "react";
 import { Line, ShiftName } from "@/lib/types";
 import type { LineState } from "@/lib/mesTypes";
-import type { ShiftProgress } from "@/lib/shiftTime";
 import HourlyTable from "./HourlyTable";
 import ReworkPanel from "./ReworkPanel";
 import ScrapForm from "./ScrapForm";
@@ -18,7 +17,6 @@ interface LineDetailCardProps {
   line: Line;
   mesState: LineState | null;
   shift: ShiftName;
-  shiftProgress: ShiftProgress;
   hourlyTargets: HourlyTargetRow[];
   comments: Record<string, string>;
   onSaveComment: (hour: string, comment: string) => Promise<void>;
@@ -34,7 +32,6 @@ export default function LineDetailCard({
   line,
   mesState,
   shift,
-  shiftProgress,
   hourlyTargets,
   comments,
   onSaveComment,
@@ -51,12 +48,12 @@ export default function LineDetailCard({
   const changeoverCount = mesState?.completedOrders ?? line.changeovers;
 
   // Single pass over schedule items — avoids double-reduce over the same array
-  const { orderPct, completed } = useMemo(() => {
+  const { orderPct, completed } = (() => {
     if (!mesState?.schedule) return { orderPct: 0, completed: 0 };
-    const completed = mesState.schedule.items.reduce((s, i) => s + i.completed, 0);
-    const orderPct = Math.min(100, Math.round((completed / mesState.schedule!.totalTarget) * 100));
+    const completed = mesState.schedule.items.reduce((sum, item) => sum + item.completed, 0);
+    const orderPct = Math.min(100, Math.round((completed / mesState.schedule.totalTarget) * 100));
     return { orderPct, completed };
-  }, [mesState?.schedule]);
+  })();
 
   const handleScrapCreated = useCallback(() => {
     onRefreshScrap();
@@ -70,7 +67,7 @@ export default function LineDetailCard({
         <div className="col-span-12 lg:col-span-4 flex flex-col justify-end">
           <button
             onClick={onBack}
-            className="text-[#e1e2ec]/40 hover:text-[#e1e2ec] transition-colors text-[10px] uppercase tracking-widest mb-2 bg-transparent border-none p-0 cursor-pointer text-left flex items-center gap-1"
+            className="text-[#e1e2ec]/60 hover:text-[#f8f8fb] transition-colors text-[11px] uppercase tracking-widest mb-2 bg-transparent border-none p-0 cursor-pointer text-left flex items-center gap-1"
           >
             <span className="material-symbols-outlined text-[14px]">arrow_back</span>
             All Lines
@@ -78,7 +75,7 @@ export default function LineDetailCard({
           <h1 className="text-4xl font-black font-['Space_Grotesk',sans-serif] leading-none mb-1">
             {line.valueStream} — {line.name}
           </h1>
-          <p className="text-sm font-medium text-accent tracking-widest flex items-center gap-2">
+          <p className="text-base font-medium text-accent tracking-widest flex items-center gap-2">
             <span className="material-symbols-outlined text-[14px]" style={{ fontVariationSettings: "'FILL' 1" }}>radio_button_checked</span>
             LIVE PRODUCTION TELEMETRY
           </p>
@@ -86,16 +83,16 @@ export default function LineDetailCard({
 
         <div className="col-span-12 lg:col-span-8 grid grid-cols-2 md:grid-cols-5 gap-4">
           <div className="bg-surface p-4 border-t-2 border-status-green">
-            <span className="block text-[10px] font-bold text-[#e1e2ec]/40 uppercase mb-1">Current Output</span>
+            <span className="block text-[11px] font-bold text-[#e1e2ec]/55 uppercase mb-1">Current Output</span>
             <div className="flex items-baseline gap-2">
               <span className={`text-3xl font-['Space_Grotesk',sans-serif] font-bold tabular-nums ${getOutputColor(line.output, line.target)}`}>
                 {line.output.toLocaleString()}
               </span>
-              <span className="text-xs text-[#e1e2ec]/40">/ {line.target.toLocaleString()}</span>
+              <span className="text-sm text-[#e1e2ec]/55">/ {line.target.toLocaleString()}</span>
             </div>
           </div>
           <div className="bg-surface p-4 border-t-2 border-status-green">
-            <span className="block text-[10px] font-bold text-[#e1e2ec]/40 uppercase mb-1">First Pass Yield</span>
+            <span className="block text-[11px] font-bold text-[#e1e2ec]/55 uppercase mb-1">First Pass Yield</span>
             <div className="flex items-baseline gap-2">
               <span className={`text-3xl font-['Space_Grotesk',sans-serif] font-bold tabular-nums ${getFpyColor(line.fpy)}`}>
                 {line.fpy.toFixed(1)}%
@@ -103,7 +100,7 @@ export default function LineDetailCard({
             </div>
           </div>
           <div className="bg-surface p-4 border-t-2 border-accent">
-            <span className="block text-[10px] font-bold text-[#e1e2ec]/40 uppercase mb-1">Hours Per Unit</span>
+            <span className="block text-[11px] font-bold text-[#e1e2ec]/55 uppercase mb-1">Hours Per Unit</span>
             <div className="flex items-baseline gap-2">
               <span className={`text-3xl font-['Space_Grotesk',sans-serif] font-bold tabular-nums ${getHpuColor(line.hpu)}`}>
                 {line.hpu.toFixed(2)}
@@ -111,7 +108,7 @@ export default function LineDetailCard({
             </div>
           </div>
           <div className="bg-surface p-4 border-t-2 border-status-green">
-            <span className="block text-[10px] font-bold text-[#e1e2ec]/40 uppercase mb-1">Headcount</span>
+            <span className="block text-[11px] font-bold text-[#e1e2ec]/55 uppercase mb-1">Headcount</span>
             <div className="flex items-baseline gap-2">
               <span className="text-3xl font-['Space_Grotesk',sans-serif] font-bold tabular-nums">
                 {line.headcount}
@@ -120,7 +117,7 @@ export default function LineDetailCard({
             </div>
           </div>
           <div className="bg-surface p-4 border-t-2 border-status-amber">
-            <span className="block text-[10px] font-bold text-[#e1e2ec]/40 uppercase mb-1">Changeovers</span>
+            <span className="block text-[11px] font-bold text-[#e1e2ec]/55 uppercase mb-1">Changeovers</span>
             <div className="flex items-baseline gap-2">
               <span className="text-3xl font-['Space_Grotesk',sans-serif] font-bold tabular-nums text-status-amber">
                 {changeoverCount}
@@ -132,7 +129,7 @@ export default function LineDetailCard({
                   <span key={idx} className="h-3 border-l border-dotted border-status-amber/80" />
                 ))
               ) : (
-                <span className="text-[10px] text-[#e1e2ec]/30 uppercase tracking-widest">None yet</span>
+                <span className="text-[11px] text-[#e1e2ec]/45 uppercase tracking-widest">None yet</span>
               )}
             </div>
           </div>
@@ -150,16 +147,16 @@ export default function LineDetailCard({
             <div className="bg-surface p-6 relative overflow-hidden">
               <div className="flex justify-between items-start mb-6">
                 <div>
-                  <span className="text-[10px] font-bold text-accent block mb-1">CURRENT JOB</span>
-                  <h3 className="text-xl font-bold font-['Space_Grotesk',sans-serif] uppercase">
+                  <span className="text-[11px] font-bold text-accent block mb-1">CURRENT JOB</span>
+                  <h3 className="text-2xl font-bold font-['Space_Grotesk',sans-serif] uppercase">
                     {mesState.currentOrder ?? "All Complete"}
                   </h3>
-                  <p className="text-xs text-[#e1e2ec]/40 mt-1">
+                  <p className="text-sm text-[#e1e2ec]/55 mt-1">
                     {mesState.remainingOnOrder} remaining on order &middot; {mesState.remainingOnRunSheet} on sheet
                   </p>
                 </div>
                 <div className="text-right">
-                  <span className="text-2xl font-bold font-['Space_Grotesk',sans-serif] tabular-nums">{orderPct}%</span>
+                  <span className="text-3xl font-bold font-['Space_Grotesk',sans-serif] tabular-nums">{orderPct}%</span>
                 </div>
               </div>
               <div className="w-full bg-background h-1.5 rounded-full overflow-hidden">
@@ -171,9 +168,9 @@ export default function LineDetailCard({
                   }}
                 />
               </div>
-              <div className="flex justify-between mt-3 text-[10px] font-mono tracking-tighter">
+              <div className="flex justify-between mt-3 text-[11px] font-mono tracking-tighter">
                 <span>PROD: {completed.toLocaleString()}</span>
-                <span className="text-[#e1e2ec]/40">TARGET: {mesState.schedule.totalTarget.toLocaleString()}</span>
+                <span className="text-[#e1e2ec]/55">TARGET: {mesState.schedule.totalTarget.toLocaleString()}</span>
               </div>
             </div>
           )}
@@ -181,13 +178,13 @@ export default function LineDetailCard({
           {/* Scrap & Quality Panel */}
           <div className="bg-surface-low border border-border/40">
             <div className="p-4 border-b border-border/40 flex justify-between items-center">
-              <h3 className="text-xs font-bold uppercase tracking-widest flex items-center gap-2">
+              <h3 className="text-sm font-bold uppercase tracking-widest flex items-center gap-2">
                 <span className="material-symbols-outlined text-[18px] text-status-red">dangerous</span>
                 Scrap &amp; Quality
               </h3>
               <button
                 onClick={() => setShowScrapForm(true)}
-                className="bg-accent text-black px-3 py-1 text-[10px] font-bold rounded-sm hover:opacity-90 active:scale-95 transition-all cursor-pointer border-none"
+                className="bg-accent text-black px-3 py-1 text-[11px] font-bold rounded-sm hover:opacity-90 active:scale-95 transition-all cursor-pointer border-none"
               >
                 ADD ENTRY
               </button>
@@ -195,8 +192,8 @@ export default function LineDetailCard({
             <div className="p-4 space-y-4">
               <div className="flex justify-between items-center bg-background/40 p-3">
                 <div>
-                  <span className="block text-xs font-bold">Scrapped Panels</span>
-                  <span className="text-[10px] text-[#e1e2ec]/40 font-mono">No FPY impact</span>
+                  <span className="block text-sm font-bold">Scrapped Panels</span>
+                  <span className="text-[11px] text-[#e1e2ec]/55 font-mono">No FPY impact</span>
                 </div>
                 <span className="text-xl font-['Space_Grotesk',sans-serif] font-bold text-status-red tabular-nums">
                   {String(scrapStats.scrappedPanels).padStart(2, "0")}
@@ -204,8 +201,8 @@ export default function LineDetailCard({
               </div>
               <div className="flex justify-between items-center bg-background/40 p-3">
                 <div>
-                  <span className="block text-xs font-bold">Kicked Lids</span>
-                  <span className="text-[10px] text-[#e1e2ec]/40 font-mono">Reduces FPY</span>
+                  <span className="block text-sm font-bold">Kicked Lids</span>
+                  <span className="text-[11px] text-[#e1e2ec]/55 font-mono">Reduces FPY</span>
                 </div>
                 <span className="text-xl font-['Space_Grotesk',sans-serif] font-bold text-status-amber tabular-nums">
                   {String(scrapStats.kickedLids).padStart(2, "0")}
@@ -227,13 +224,13 @@ export default function LineDetailCard({
           {/* Downtime Panel */}
           <div className="bg-surface-low border border-border/40">
             <div className="p-4 border-b border-border/40 flex justify-between items-center">
-              <h3 className="text-xs font-bold uppercase tracking-widest flex items-center gap-2">
+              <h3 className="text-sm font-bold uppercase tracking-widest flex items-center gap-2">
                 <span className="material-symbols-outlined text-[18px] text-status-red">flag</span>
                 Line Downtime
               </h3>
               <button
                 onClick={() => setShowDowntimeForm(true)}
-                className="bg-accent text-black px-3 py-1 text-[10px] font-bold rounded-sm hover:opacity-90 active:scale-95 transition-all cursor-pointer border-none"
+                className="bg-accent text-black px-3 py-1 text-[11px] font-bold rounded-sm hover:opacity-90 active:scale-95 transition-all cursor-pointer border-none"
               >
                 + LOG STOP
               </button>
@@ -241,7 +238,6 @@ export default function LineDetailCard({
             <div className="p-4">
               <DowntimePanel
                 entries={downtimeEntries}
-                onRefresh={onRefreshDowntime}
                 onLogStop={() => setShowDowntimeForm(true)}
                 onResolve={(entry) => setResolveDowntime(entry)}
               />

@@ -59,10 +59,16 @@ export default function TeamLeadPage() {
   }, [shift]);
 
   useEffect(() => {
-    fetchData();
+    const initialFetch = setTimeout(() => {
+      void fetchData();
+    }, 0);
     const interval = setInterval(fetchData, 5000);
     const clock = setInterval(() => setNow(new Date()), 1000);
-    return () => { clearInterval(interval); clearInterval(clock); };
+    return () => {
+      clearTimeout(initialFetch);
+      clearInterval(interval);
+      clearInterval(clock);
+    };
   }, [fetchData]);
 
   useEffect(() => {
@@ -120,8 +126,11 @@ export default function TeamLeadPage() {
 
   useEffect(() => {
     if (!selectedLineId) return;
-    refreshScrap();
-    refreshDowntime();
+    const initialRefresh = setTimeout(() => {
+      refreshScrap();
+      refreshDowntime();
+    }, 0);
+    return () => clearTimeout(initialRefresh);
   }, [selectedLineId, shift, refreshScrap, refreshDowntime]);
 
   const { lines, selectedLine, selectedMesState } = useMemo(() => {
@@ -174,53 +183,53 @@ export default function TeamLeadPage() {
   }
 
   return (
-    <div className="h-screen flex flex-col overflow-hidden bg-background text-[#e1e2ec]">
+    <div className="h-screen flex flex-col overflow-hidden bg-background text-[#f3f4f8]">
       {isLoading && (
         <div className="absolute inset-0 z-[100] flex items-center justify-center bg-background/80">
-          <div className="text-[#e1e2ec]/40 text-sm">Loading...</div>
+          <div className="text-[#e1e2ec]/60 text-base">Loading...</div>
         </div>
       )}
 
       {/* ── Top Nav ── */}
-      <nav className="shrink-0 z-50 bg-background border-b border-border font-['Space_Grotesk',sans-serif] tracking-tight">
+      <nav className="shrink-0 z-50 bg-background border-b border-border/80 font-['Space_Grotesk',sans-serif] tracking-tight">
         <div className="flex justify-between items-center w-full px-6 py-3">
           <div className="flex items-center gap-8">
             <span className="text-xl font-bold tracking-tighter text-accent uppercase select-none">
               KINETIC COMMAND
             </span>
             <div className="hidden md:flex items-center space-x-6">
-              <Link href="/eos" className="text-sm text-[#e1e2ec]/60 hover:text-[#e1e2ec] transition-colors">
+              <Link href="/eos" className="text-base text-[#e1e2ec]/75 hover:text-[#f8f8fb] transition-colors">
                 EOS
               </Link>
-              <Link href="/admin" className="text-sm text-[#e1e2ec]/60 hover:text-[#e1e2ec] transition-colors">
+              <Link href="/admin" className="text-base text-[#e1e2ec]/75 hover:text-[#f8f8fb] transition-colors">
                 Admin
               </Link>
-              <Link href="/team-lead" className="text-accent border-b-2 border-accent pb-0.5 font-bold text-sm">
+              <Link href="/team-lead" className="text-accent border-b-2 border-accent pb-0.5 font-bold text-base">
                 Team Lead
               </Link>
-              <Link href="/sim" className="text-sm text-[#e1e2ec]/60 hover:text-[#e1e2ec] transition-colors">
+              <Link href="/sim" className="text-base text-[#e1e2ec]/75 hover:text-[#f8f8fb] transition-colors">
                 SIM
               </Link>
             </div>
           </div>
           <div className="flex items-center gap-6">
-            <div className="flex items-center gap-4 text-xs font-medium uppercase tracking-wider">
+            <div className="flex items-center gap-4 text-sm font-medium uppercase tracking-wider">
               <div className="flex gap-1">
                 {(["day", "night"] as ShiftName[]).map((s) => (
                   <button
                     key={s}
                     onClick={() => setShift(s)}
-                    className={`px-3 py-1 rounded-sm text-xs font-medium transition-colors cursor-pointer ${
+                    className={`px-3.5 py-1.5 rounded-sm text-sm font-medium transition-colors cursor-pointer ${
                       shift === s
                         ? "bg-accent/10 text-accent border border-accent/30"
-                        : "text-[#e1e2ec]/40 hover:text-[#e1e2ec] border border-transparent"
+                        : "text-[#e1e2ec]/65 hover:text-[#f8f8fb] border border-transparent"
                     }`}
                   >
                     {s === "day" ? "Day" : "Night"}
                   </button>
                 ))}
               </div>
-              <span className="text-[#e1e2ec]/40 tabular-nums text-[10px]">{now.toLocaleTimeString("en-GB")} UTC</span>
+              <span className="text-[#e1e2ec]/60 tabular-nums text-[11px]">{now.toLocaleTimeString("en-GB")} UTC</span>
             </div>
           </div>
         </div>
@@ -229,11 +238,11 @@ export default function TeamLeadPage() {
       <div className="flex flex-1 overflow-hidden">
 
         {/* ── Sidebar: Line Selector ── */}
-        <aside className="w-72 shrink-0 bg-surface-low border-r border-border flex flex-col">
-          <div className="p-4 border-b border-border">
+        <aside className="w-72 shrink-0 bg-surface border-r border-border/80 flex flex-col">
+          <div className="p-4 border-b border-border/80">
             <div className="flex items-center justify-between mb-4">
               <div>
-                <h2 className="font-black text-lg text-accent font-['Space_Grotesk',sans-serif]">OP-CENTER</h2>
+                <h2 className="font-black text-xl text-accent font-['Space_Grotesk',sans-serif]">OP-CENTER</h2>
               </div>
               <span className="material-symbols-outlined text-accent">factory</span>
             </div>
@@ -241,17 +250,16 @@ export default function TeamLeadPage() {
               <input
                 value={filter}
                 onChange={(e) => setFilter(e.target.value)}
-                className="w-full bg-background border-none text-[10px] tracking-widest p-2 rounded-sm text-[#e1e2ec] outline-none focus:ring-1 focus:ring-accent/30 placeholder:text-[#e1e2ec]/30"
+                className="w-full bg-surface-highest border-none text-[11px] tracking-[0.18em] p-2.5 rounded-sm text-[#f3f4f8] outline-none focus:ring-1 focus:ring-accent/30 placeholder:text-[#e1e2ec]/45"
                 placeholder="FILTER LINES..."
                 type="text"
               />
-              <span className="material-symbols-outlined absolute right-2 top-2 text-[16px] text-[#e1e2ec]/30">search</span>
+              <span className="material-symbols-outlined absolute right-2.5 top-2.5 text-[16px] text-[#e1e2ec]/45">search</span>
             </div>
           </div>
 
           <div className="flex-1 overflow-y-auto custom-scrollbar p-2 space-y-1">
             {filteredLines.map((line) => {
-              const state = stateMap.get(line.id);
               const status = getLineStatus(line.id);
               const isSelected = selectedLineId === line.id;
               return (
@@ -261,23 +269,23 @@ export default function TeamLeadPage() {
                     setSelectedLineId(line.id);
                     setViewMode("detail");
                   }}
-                  className={`w-full flex items-center justify-between p-3 transition-all cursor-pointer text-left ${
+                  className={`w-full flex items-center justify-between p-3.5 transition-all cursor-pointer text-left ${
                     isSelected
-                      ? "bg-surface-high border-l-4 border-accent"
-                      : "hover:bg-surface-high/50 border-l-4 border-transparent"
+                      ? "bg-surface-highest border-l-4 border-accent"
+                      : "hover:bg-surface-high/70 border-l-4 border-transparent"
                   }`}
                 >
                   <div>
-                    <span className={`block text-[10px] font-bold ${isSelected ? "text-accent" : "text-[#e1e2ec]/40"}`}>
+                    <span className={`block text-xs font-bold ${isSelected ? "text-accent" : "text-[#e1e2ec]/65"}`}>
                       {line.valueStream} — {line.name}
                     </span>
-                    <span className="block text-xs text-[#e1e2ec]/60">
+                    <span className="block text-sm text-[#e1e2ec]/80">
                       {line.output}/{line.target}
                     </span>
                   </div>
                   <div className="flex flex-col items-end">
                     <span className={`w-2 h-2 rounded-full ${status.dot} mb-1`} />
-                    <span className={`text-[9px] font-mono ${status.color}`}>{status.label}</span>
+                    <span className={`text-[10px] font-mono ${status.color}`}>{status.label}</span>
                   </div>
                 </button>
               );
@@ -289,23 +297,23 @@ export default function TeamLeadPage() {
         {/* ── Main Content ── */}
         <main className="flex-1 overflow-y-auto custom-scrollbar p-6 bg-background">
           {/* Tab toggle */}
-          <div className="flex items-center gap-1 mb-6 p-1 bg-surface-low rounded-sm w-fit">
+          <div className="flex items-center gap-1 mb-6 p-1 bg-surface-low rounded-sm w-fit border border-border/50">
             <button
               onClick={() => setViewMode("floor")}
-              className={`px-4 py-2 rounded-sm text-xs font-bold tracking-wider transition-colors ${
+              className={`px-4 py-2 rounded-sm text-sm font-bold tracking-wider transition-colors ${
                 viewMode === "floor"
                   ? "bg-accent text-background"
-                  : "text-[#e1e2ec]/40 hover:text-[#e1e2ec]"
+                  : "text-[#e1e2ec]/65 hover:text-[#f8f8fb]"
               }`}
             >
               FLOOR OVERVIEW
             </button>
             <button
               onClick={() => setViewMode("detail")}
-              className={`px-4 py-2 rounded-sm text-xs font-bold tracking-wider transition-colors ${
+              className={`px-4 py-2 rounded-sm text-sm font-bold tracking-wider transition-colors ${
                 viewMode === "detail"
                   ? "bg-accent text-background"
-                  : "text-[#e1e2ec]/40 hover:text-[#e1e2ec]"
+                  : "text-[#e1e2ec]/65 hover:text-[#f8f8fb]"
               }`}
             >
               LINE DETAIL
@@ -335,15 +343,15 @@ export default function TeamLeadPage() {
           ) : viewMode === "detail" ? (
             <div className="h-full flex flex-col items-center justify-center text-center">
               <span className="material-symbols-outlined text-[#e1e2ec]/10 text-7xl mb-4">factory</span>
-              <h2 className="font-['Space_Grotesk',sans-serif] text-2xl font-bold text-[#e1e2ec]/20 mb-2">
+              <h2 className="font-['Space_Grotesk',sans-serif] text-3xl font-bold text-[#e1e2ec]/35 mb-2">
                 No Line Selected
               </h2>
-              <p className="text-[#e1e2ec]/30 text-sm max-w-sm mb-6">
+              <p className="text-[#e1e2ec]/50 text-base max-w-sm mb-6">
                 Choose an assembly line from the sidebar, or switch to Floor Overview to see all lines at a glance.
               </p>
               <button
                 onClick={() => setViewMode("floor")}
-                className="px-4 py-2 bg-accent/15 text-accent border border-accent/30 rounded-sm text-xs font-bold tracking-wider hover:bg-accent/25 transition-colors"
+                className="px-4 py-2 bg-accent/15 text-accent border border-accent/30 rounded-sm text-sm font-bold tracking-wider hover:bg-accent/25 transition-colors"
               >
                 FLOOR OVERVIEW
               </button>

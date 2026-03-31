@@ -71,9 +71,14 @@ export default function SimPage() {
   }, []);
 
   useEffect(() => {
-    pollState();
+    const initialPoll = setTimeout(() => {
+      void pollState();
+    }, 0);
     pollInterval.current = setInterval(pollState, 2000);
-    return () => { if (pollInterval.current) clearInterval(pollInterval.current); };
+    return () => {
+      clearTimeout(initialPoll);
+      if (pollInterval.current) clearInterval(pollInterval.current);
+    };
   }, [pollState]);
 
   // ── Simulation controls ─────────────────────────────────────────────────────
@@ -123,7 +128,7 @@ export default function SimPage() {
   async function resetSim() {
     if (tickInterval.current) { clearInterval(tickInterval.current); tickInterval.current = null; }
     await Promise.all([
-      fetch("/api/mes/reset", { method: "POST" }),
+      fetch("/api/sim/reset", { method: "POST" }),
       fetch("/api/sim/clock", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -175,22 +180,6 @@ export default function SimPage() {
   }, [states, adminConfig]);
 
   const stateMap = useMemo(() => new Map(states.map((s) => [s.lineId, s])), [states]);
-
-  const recentScans = useMemo(() =>
-    states
-      .filter((s) => s.schedule)
-      .flatMap((s) =>
-        Object.entries(s.hourlyOutput).map(([hour, count]) => ({
-          lineId: s.lineId,
-          hour,
-          count,
-          order: s.currentOrder ?? "—",
-        }))
-      )
-      .sort((a, b) => b.hour.localeCompare(a.hour))
-      .slice(0, 8),
-    [states]
-  );
 
   const { speedLabel, speedDesc } = useMemo(
     () => {

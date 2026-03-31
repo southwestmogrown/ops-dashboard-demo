@@ -6,7 +6,6 @@ import { DOWNTIME_REASON_LABELS } from "@/lib/downtimeTypes";
 
 interface DowntimePanelProps {
   entries: DowntimeEntry[];
-  onRefresh: () => void;
   onLogStop: () => void;
   onResolve: (entry: DowntimeEntry) => void;
 }
@@ -42,21 +41,20 @@ function getReasonBadge(reason: DowntimeEntry["reason"]): string {
   return map[reason] ?? "bg-slate-500/20 text-slate-400";
 }
 
-export default function DowntimePanel({ entries, onRefresh, onLogStop, onResolve }: DowntimePanelProps) {
+export default function DowntimePanel({ entries, onLogStop, onResolve }: DowntimePanelProps) {
   const [open, setOpen] = useState(false);
-  // Live ticker for ongoing entries — ticks every 10 s
-  const [, setTick] = useState(0);
+  const [now, setNow] = useState(() => Date.now());
 
   useEffect(() => {
     const hasOngoing = entries.some((e) => e.endTime === null);
     if (!hasOngoing) return;
-    const id = setInterval(() => setTick((t) => t + 1), 10000);
+    const id = setInterval(() => setNow(Date.now()), 10000);
     return () => clearInterval(id);
   }, [entries]);
 
   const totalMinutes = entries.reduce<number>((sum, e) => {
     const start = new Date(e.startTime).getTime();
-    const end   = e.endTime ? new Date(e.endTime).getTime() : Date.now();
+    const end   = e.endTime ? new Date(e.endTime).getTime() : now;
     return sum + Math.floor((end - start) / 60000);
   }, 0);
 
@@ -70,58 +68,58 @@ export default function DowntimePanel({ entries, onRefresh, onLogStop, onResolve
         onClick={() => setOpen((o) => !o)}
         className="w-full flex items-center justify-between bg-transparent border-none cursor-pointer text-left hover:opacity-80 transition-opacity p-0"
       >
-        <span className="text-[10px] text-[#e1e2ec]/40 uppercase tracking-widest font-bold flex items-center gap-1.5">
+        <span className="text-[11px] text-[#e1e2ec]/55 uppercase tracking-widest font-bold flex items-center gap-1.5">
           <span className="material-symbols-outlined text-[14px] text-status-red">flag</span>
           {entries.length === 0
             ? "No downtime"
             : `${totalLabel} downtime`}
         </span>
-        <span className="text-[#e1e2ec]/30 text-xs">{open ? "\u25B2" : "\u25BC"}</span>
+        <span className="text-[#e1e2ec]/45 text-sm">{open ? "\u25B2" : "\u25BC"}</span>
       </button>
 
       {open && (
         <div className="mt-2 space-y-2">
           {entries.length === 0 ? (
-            <p className="text-[10px] text-[#e1e2ec]/30 italic">No downtime logged this shift.</p>
+            <p className="text-xs text-[#e1e2ec]/45 italic">No downtime logged this shift.</p>
           ) : (
             entries.map((entry) => (
-              <div key={entry.id} className="bg-background/40 p-2.5 rounded-sm">
+              <div key={entry.id} className="bg-background/55 p-3 rounded-sm border border-border/30">
                 <div className="flex items-start justify-between gap-2">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-1.5 flex-wrap">
                       <span
-                        className={`text-[8px] font-bold uppercase tracking-widest px-1.5 py-0.5 rounded-sm ${getReasonBadge(entry.reason)}`}
+                        className={`text-[9px] font-bold uppercase tracking-widest px-1.5 py-0.5 rounded-sm ${getReasonBadge(entry.reason)}`}
                       >
                         {DOWNTIME_REASON_LABELS[entry.reason]}
                       </span>
                       {entry.endTime === null && (
-                        <span className="text-[8px] font-bold uppercase tracking-widest px-1.5 py-0.5 rounded-sm bg-status-red/20 text-status-red animate-pulse">
+                        <span className="text-[9px] font-bold uppercase tracking-widest px-1.5 py-0.5 rounded-sm bg-status-red/20 text-status-red animate-pulse">
                           ONGOING
                         </span>
                       )}
                     </div>
-                    <div className="text-[10px] text-[#e1e2ec]/60 mt-1 font-mono">
+                    <div className="text-[11px] text-[#e1e2ec]/75 mt-1 font-mono">
                       {formatTime(entry.startTime)}
                       {entry.endTime ? (
                         <> &rarr; {formatTime(entry.endTime)}</>
                       ) : (
                         <> &rarr; <span className="text-status-red">now</span></>
                       )}
-                      <span className="text-[#e1e2ec]/30 ml-1">&middot; {formatDuration(entry.startTime, entry.endTime)}</span>
+                      <span className="text-[#e1e2ec]/45 ml-1">&middot; {formatDuration(entry.startTime, entry.endTime)}</span>
                     </div>
                     {entry.notes && (
-                      <p className="text-[9px] text-[#e1e2ec]/30 mt-0.5 italic truncate">{entry.notes}</p>
+                      <p className="text-[10px] text-[#e1e2ec]/45 mt-0.5 italic truncate">{entry.notes}</p>
                     )}
                   </div>
                   {entry.unitsLost > 0 && (
-                    <span className="shrink-0 text-[9px] font-mono bg-status-red/10 text-status-red border border-status-red/20 px-1.5 py-0.5 rounded-sm">
+                    <span className="shrink-0 text-[10px] font-mono bg-status-red/10 text-status-red border border-status-red/20 px-1.5 py-0.5 rounded-sm">
                       {entry.unitsLost} lost
                     </span>
                   )}
                   {entry.endTime === null && (
                     <button
                       onClick={() => onResolve(entry)}
-                      className="shrink-0 text-[9px] font-bold bg-status-green/10 text-status-green border border-status-green/20 px-1.5 py-0.5 rounded-sm hover:bg-status-green/20 transition-colors cursor-pointer"
+                      className="shrink-0 text-[10px] font-bold bg-status-green/10 text-status-green border border-status-green/20 px-1.5 py-0.5 rounded-sm hover:bg-status-green/20 transition-colors cursor-pointer"
                     >
                       RESOLVE
                     </button>
@@ -133,7 +131,7 @@ export default function DowntimePanel({ entries, onRefresh, onLogStop, onResolve
 
           <button
             onClick={onLogStop}
-            className="w-full mt-1 bg-transparent border border-accent/30 text-accent text-[10px] font-bold uppercase tracking-widest py-2 rounded-sm hover:bg-accent/10 transition-colors cursor-pointer"
+            className="w-full mt-1 bg-transparent border border-accent/30 text-accent text-[11px] font-bold uppercase tracking-widest py-2 rounded-sm hover:bg-accent/10 transition-colors cursor-pointer"
           >
             + Log Stop
           </button>

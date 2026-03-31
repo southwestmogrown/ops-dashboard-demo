@@ -38,6 +38,7 @@ import {
   dbGetSimClock,
   dbSetSimClock,
   dbResetAll,
+  dbResetSimulationData,
   getSerialCounter,
   setSerialCounter,
   dbInsertDowntime,
@@ -731,7 +732,44 @@ export async function advanceSimClock(): Promise<void> {
   await dbSetSimClock(c.simClock, c.simRunning, c.simSpeed);
 }
 
+function resetQueueProgress(queue: LineSchedule[]): LineSchedule[] {
+  return queue.map((schedule) => ({
+    ...schedule,
+    items: schedule.items.map((item) => ({
+      ...item,
+      completed: 0,
+    })),
+  }));
+}
+
 // ── Reset ─────────────────────────────────────────────────────────────────────
+
+export async function resetSimulation(): Promise<void> {
+  await ensureInit();
+  const c = _c();
+
+  const resetQueues = Object.fromEntries(
+    Object.entries(c.queues).map(([lineId, queue]) => [lineId, resetQueueProgress(queue)])
+  );
+
+  c.queues = resetQueues;
+  c.scanLog = [];
+  c.scrapLog = [];
+  c.scrapSerial = 0;
+  c.downtimeLog = [];
+  c.downtimeSerial = 0;
+  c.simClock = null;
+  c.simRunning = false;
+  c.simSpeed = 60;
+  c.changeoverRemaining = {};
+  c.failureAccumulator = {};
+  c.repairRemaining = {};
+
+  await dbResetSimulationData();
+  await Promise.all(
+    Object.entries(resetQueues).map(([lineId, queue]) => dbSetQueue(lineId, queue))
+  );
+}
 
 export async function resetAll(): Promise<void> {
   const c = _c();

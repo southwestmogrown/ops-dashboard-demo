@@ -456,6 +456,19 @@ export async function dbClearSimClock(): Promise<void> {
   );
 }
 
+export async function dbResetSimulationData(): Promise<void> {
+  await getClient().batch(
+    [
+      { sql: "DELETE FROM scan_events", args: [] },
+      { sql: "DELETE FROM scrap_log", args: [] },
+      { sql: "DELETE FROM downtime_log", args: [] },
+      { sql: "DELETE FROM db_meta", args: [] },
+      { sql: "UPDATE sim_clock SET clock = NULL, running = 0, speed = 60 WHERE id = 1", args: [] },
+    ],
+    "write"
+  );
+}
+
 // ── Full reset ─────────────────────────────────────────────────────────────────
 
 export async function dbResetAll(): Promise<void> {
