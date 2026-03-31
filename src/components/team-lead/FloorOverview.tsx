@@ -22,7 +22,11 @@ interface FloorOverviewProps {
 function OutputMiniBar({ output, target }: { output: number; target: number }) {
   const pct = target > 0 ? Math.min(100, (output / target) * 100) : 0;
   const barColor =
-    pct >= 90 ? "bg-status-green" : pct >= 75 ? "bg-status-amber" : "bg-status-red";
+    pct >= 90
+      ? "bg-status-green"
+      : pct >= 75
+        ? "bg-status-amber"
+        : "bg-status-red";
   return (
     <div className="w-full h-1.5 bg-surface-highest rounded-full overflow-hidden">
       <div
@@ -38,8 +42,8 @@ function StatusDot({ fpy }: { fpy: number }) {
     fpy >= 95
       ? "bg-status-green shadow-[0_0_8px_rgba(34,197,94,0.5)]"
       : fpy >= 90
-      ? "bg-status-amber shadow-[0_0_8px_rgba(245,158,11,0.5)]"
-      : "bg-status-red shadow-[0_0_8px_rgba(239,68,68,0.5)]";
+        ? "bg-status-amber shadow-[0_0_8px_rgba(245,158,11,0.5)]"
+        : "bg-status-red shadow-[0_0_8px_rgba(239,68,68,0.5)]";
   return <span className={`w-2 h-2 rounded-full shrink-0 ${color}`} />;
 }
 
@@ -52,7 +56,10 @@ function formatRelativeTime(isoTimestamp: string): string {
   if (diffMins < 60) return `${diffMins}m ago`;
   const diffHours = Math.floor(diffMins / 60);
   if (diffHours < 24) return `${diffHours}h ago`;
-  return new Date(isoTimestamp).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
+  return new Date(isoTimestamp).toLocaleTimeString("en-GB", {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
 }
 
 interface LineCardProps {
@@ -81,8 +88,7 @@ function LineCard({
   onSelect,
 }: LineCardProps) {
   const { label, cls } = PILL_STYLE[risk];
-  const vsAccent =
-    valueStream === "VS1" ? "bg-accent" : "bg-vs2";
+  const vsAccent = valueStream === "VS1" ? "bg-accent" : "bg-vs2";
   const vsBadge =
     valueStream === "VS1"
       ? "bg-accent/15 text-accent border border-accent/30"
@@ -115,11 +121,15 @@ function LineCard({
                 {valueStream}
               </span>
             </div>
-            <span className="text-[11px] text-[#e1e2ec]/45 font-mono">{lineId}</span>
+            <span className="text-[11px] text-[#e1e2ec]/45 font-mono">
+              {lineId}
+            </span>
           </div>
 
           {/* Status pill */}
-          <span className={`text-[10px] px-2 py-0.5 rounded-sm border font-bold tracking-widest uppercase ${isRunning ? cls : "text-[#e1e2ec]/55 border-border bg-surface-high"}`}>
+          <span
+            className={`text-[10px] px-2 py-0.5 rounded-sm border font-bold tracking-widest uppercase ${isRunning ? cls : "text-[#e1e2ec]/55 border-border bg-surface-high"}`}
+          >
             {isRunning ? label : "NOT RUNNING"}
           </span>
         </div>
@@ -199,7 +209,8 @@ export default function FloorOverview({
       </div>
 
       <p className="mb-4 text-xs uppercase tracking-widest text-[#e1e2ec]/50">
-        Greyed cards are marked Not Running in Admin and are excluded from active floor pacing.
+        Greyed cards are marked Not Running in Admin and are excluded from
+        active floor pacing.
       </p>
 
       {/* Card grid — 2-col on md, 3-col on xl */}

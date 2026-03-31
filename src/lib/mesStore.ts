@@ -812,7 +812,10 @@ export async function resetSimulation(): Promise<void> {
   const c = _c();
 
   const resetQueues = Object.fromEntries(
-    Object.entries(c.queues).map(([lineId, queue]) => [lineId, resetQueueProgress(queue)])
+    Object.entries(c.queues).map(([lineId, queue]) => [
+      lineId,
+      resetQueueProgress(queue),
+    ]),
   );
 
   c.queues = resetQueues;
@@ -833,7 +836,9 @@ export async function resetSimulation(): Promise<void> {
 
   await dbResetSimulationData();
   await Promise.all(
-    Object.entries(resetQueues).map(([lineId, queue]) => dbSetQueue(lineId, queue))
+    Object.entries(resetQueues).map(([lineId, queue]) =>
+      dbSetQueue(lineId, queue),
+    ),
   );
 }
 

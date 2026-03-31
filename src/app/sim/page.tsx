@@ -9,7 +9,9 @@ import type { ShiftName } from "@/lib/types";
 import { LINES, LINE_LABELS, getDefaultTarget } from "@/lib/lines";
 import { getShiftWindows } from "@/lib/shiftTime";
 
-const HourlyTable = dynamic(() => import("@/components/sim/HourlyTable"), { ssr: false });
+const HourlyTable = dynamic(() => import("@/components/sim/HourlyTable"), {
+  ssr: false,
+});
 
 const SIDE_NAV: { icon: string; label: string; href?: string }[] = [
   { icon: "dashboard", label: "Dashboard", href: "/" },
@@ -32,7 +34,9 @@ function unitsForSpeed(speed: number): number {
 export default function SimPage() {
   const pathname = usePathname();
   const [states, setStates] = useState<LineState[]>([]);
-  const [adminConfig, setAdminConfig] = useState<Record<string, AdminLineConfig>>({});
+  const [adminConfig, setAdminConfig] = useState<
+    Record<string, AdminLineConfig>
+  >({});
   const [running, setRunning] = useState(false);
   const [speed, setSpeed] = useState(60);
   const speedRef = useRef(speed); // always mirrors speed; used in interval closures
@@ -88,7 +92,11 @@ export default function SimPage() {
     await fetch("/api/sim/clock", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ clock: shiftStart.toISOString(), running: true, speed: speedRef.current }),
+      body: JSON.stringify({
+        clock: shiftStart.toISOString(),
+        running: true,
+        speed: speedRef.current,
+      }),
     });
     setRunning(true);
     tickInterval.current = setInterval(async () => {
@@ -104,7 +112,10 @@ export default function SimPage() {
         const data = await res.json();
         if (data.stopped) {
           // Server reached shift end — stop the client interval.
-          if (tickInterval.current) { clearInterval(tickInterval.current); tickInterval.current = null; }
+          if (tickInterval.current) {
+            clearInterval(tickInterval.current);
+            tickInterval.current = null;
+          }
           setRunning(false);
           await pollState();
         }
@@ -114,7 +125,10 @@ export default function SimPage() {
   }
 
   async function pauseSim() {
-    if (tickInterval.current) { clearInterval(tickInterval.current); tickInterval.current = null; }
+    if (tickInterval.current) {
+      clearInterval(tickInterval.current);
+      tickInterval.current = null;
+    }
     await fetch("/api/sim/clock", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -125,7 +139,10 @@ export default function SimPage() {
   }
 
   async function resetSim() {
-    if (tickInterval.current) { clearInterval(tickInterval.current); tickInterval.current = null; }
+    if (tickInterval.current) {
+      clearInterval(tickInterval.current);
+      tickInterval.current = null;
+    }
     await Promise.all([
       fetch("/api/sim/reset", { method: "POST" }),
       fetch("/api/sim/clock", {
@@ -152,41 +169,48 @@ export default function SimPage() {
   }
 
   useEffect(() => {
-    return () => { if (tickInterval.current) clearInterval(tickInterval.current); };
+    return () => {
+      if (tickInterval.current) clearInterval(tickInterval.current);
+    };
   }, []);
 
   // ── Derived data ────────────────────────────────────────────────────────────
-  const { totalOutput, totalTarget, scheduledLines, efficiency } = useMemo(() => {
-    const runningLineIds = LINES
-      .map((line) => line.id)
-      .filter((lineId) => adminConfig[lineId]?.isRunning !== false);
+  const { totalOutput, totalTarget, scheduledLines, efficiency } =
+    useMemo(() => {
+      const runningLineIds = LINES.map((line) => line.id).filter(
+        (lineId) => adminConfig[lineId]?.isRunning !== false,
+      );
 
-    const totalOutput = states
-      .filter((st) => runningLineIds.includes(st.lineId))
-      .reduce((sum, st) => sum + st.totalOutput, 0);
+      const totalOutput = states
+        .filter((st) => runningLineIds.includes(st.lineId))
+        .reduce((sum, st) => sum + st.totalOutput, 0);
 
-    const totalTarget = runningLineIds.reduce(
-      (sum, lineId) => sum + (adminConfig[lineId]?.target ?? getDefaultTarget(lineId)),
-      0,
-    );
+      const totalTarget = runningLineIds.reduce(
+        (sum, lineId) =>
+          sum + (adminConfig[lineId]?.target ?? getDefaultTarget(lineId)),
+        0,
+      );
 
-    const scheduledLines = states
-      .filter((s) => runningLineIds.includes(s.lineId) && s.schedule !== null)
-      .length;
+      const scheduledLines = states.filter(
+        (s) => runningLineIds.includes(s.lineId) && s.schedule !== null,
+      ).length;
 
-    const efficiency = totalTarget > 0 ? Math.round((totalOutput / totalTarget) * 1000) / 10 : 0;
-    return { totalOutput, totalTarget, scheduledLines, efficiency };
-  }, [states, adminConfig]);
+      const efficiency =
+        totalTarget > 0
+          ? Math.round((totalOutput / totalTarget) * 1000) / 10
+          : 0;
+      return { totalOutput, totalTarget, scheduledLines, efficiency };
+    }, [states, adminConfig]);
 
-  const stateMap = useMemo(() => new Map(states.map((s) => [s.lineId, s])), [states]);
-
-  const { speedLabel, speedDesc } = useMemo(
-    () => {
-      const opt = SPEED_OPTIONS.find((o) => o.value === speed);
-      return { speedLabel: opt?.label ?? `${speed}`, speedDesc: opt?.desc ?? "" };
-    },
-    [speed]
+  const stateMap = useMemo(
+    () => new Map(states.map((s) => [s.lineId, s])),
+    [states],
   );
+
+  const { speedLabel, speedDesc } = useMemo(() => {
+    const opt = SPEED_OPTIONS.find((o) => o.value === speed);
+    return { speedLabel: opt?.label ?? `${speed}`, speedDesc: opt?.desc ?? "" };
+  }, [speed]);
 
   // ── Hourly production bars data (extracted from IIFE) ───────────────────────
   const hourlyBars = useMemo(() => {
@@ -205,41 +229,76 @@ export default function SimPage() {
 
   return (
     <div className="h-screen flex flex-col overflow-hidden bg-background text-[#e1e2ec]">
-
       {/* ── Top nav ──────────────────────────────────────────────────────────── */}
       <header className="fixed top-0 z-50 w-full flex justify-between items-center px-6 py-3 bg-[#0b0e15] border-b border-border/15 font-['Space_Grotesk',sans-serif] tracking-tight">
         <div className="flex items-center gap-8">
-          <Link href="/" className="text-xl font-bold tracking-tighter text-accent uppercase">
+          <Link
+            href="/"
+            className="text-xl font-bold tracking-tighter text-accent uppercase"
+          >
             KINETIC COMMAND
           </Link>
           <nav className="hidden md:flex items-center gap-6">
-            <Link href="/eos" className="text-[#e1e2ec]/60 hover:text-[#e1e2ec] transition-colors text-sm">EOS</Link>
-            <Link href="/admin" className="text-[#e1e2ec]/60 hover:text-[#e1e2ec] transition-colors text-sm">Admin</Link>
-            <Link href="/team-lead" className="text-[#e1e2ec]/60 hover:text-[#e1e2ec] transition-colors text-sm">Team Lead</Link>
-            <Link href="/sim" className="text-accent border-b-2 border-accent pb-1 font-bold text-sm">SIM</Link>
+            <Link
+              href="/eos"
+              className="text-[#e1e2ec]/60 hover:text-[#e1e2ec] transition-colors text-sm"
+            >
+              EOS
+            </Link>
+            <Link
+              href="/admin"
+              className="text-[#e1e2ec]/60 hover:text-[#e1e2ec] transition-colors text-sm"
+            >
+              Admin
+            </Link>
+            <Link
+              href="/team-lead"
+              className="text-[#e1e2ec]/60 hover:text-[#e1e2ec] transition-colors text-sm"
+            >
+              Team Lead
+            </Link>
+            <Link
+              href="/sim"
+              className="text-accent border-b-2 border-accent pb-1 font-bold text-sm"
+            >
+              SIM
+            </Link>
           </nav>
         </div>
         <div className="flex items-center gap-6">
           <div className="flex flex-col items-end">
-            <span className="text-accent text-sm font-bold">Shift: {shift === "day" ? "Day" : "Night"}</span>
+            <span className="text-accent text-sm font-bold">
+              Shift: {shift === "day" ? "Day" : "Night"}
+            </span>
           </div>
           <div className="h-8 w-px bg-border/30" />
           <div className="text-[#e1e2ec]/80 font-mono text-sm tabular-nums">
-            {now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false })}
+            {now.toLocaleTimeString([], {
+              hour: "2-digit",
+              minute: "2-digit",
+              second: "2-digit",
+              hour12: false,
+            })}
           </div>
         </div>
       </header>
 
       <div className="flex flex-1 overflow-hidden pt-[52px]">
-
         {/* ── Sidebar ────────────────────────────────────────────────────────── */}
         <aside className="w-64 shrink-0 bg-surface-low flex flex-col border-r border-border/10 hidden lg:flex">
           <div className="p-6 flex items-center space-x-3 border-b border-border/10">
             <div className="w-10 h-10 rounded bg-accent/10 flex items-center justify-center border border-accent/20">
-              <span className="material-symbols-outlined text-accent" style={{ fontVariationSettings: "'FILL' 1" }}>precision_manufacturing</span>
+              <span
+                className="material-symbols-outlined text-accent"
+                style={{ fontVariationSettings: "'FILL' 1" }}
+              >
+                precision_manufacturing
+              </span>
             </div>
             <div>
-              <h2 className="text-lg font-black text-accent font-['Space_Grotesk',sans-serif] uppercase leading-none">OP-CENTER</h2>
+              <h2 className="text-lg font-black text-accent font-['Space_Grotesk',sans-serif] uppercase leading-none">
+                OP-CENTER
+              </h2>
               <p className="text-[10px] text-status-green font-medium tracking-tighter uppercase">
                 {running ? "Simulation Active" : "Standby"}
               </p>
@@ -268,14 +327,14 @@ export default function SimPage() {
 
         {/* ── Main content ───────────────────────────────────────────────────── */}
         <main className="flex-1 overflow-y-auto p-6 custom-scrollbar bg-background">
-
           {/* ── Simulator Control Bar + Status Bento ─────────────────────────── */}
           <section className="grid grid-cols-12 gap-6 mb-10">
-
             {/* Control Panel — left 7 cols */}
             <div className="col-span-12 lg:col-span-7 bg-surface-low rounded-sm p-6 border-l-4 border-accent relative overflow-hidden">
               <div className="absolute top-0 right-0 p-4 opacity-5 pointer-events-none">
-                <span className="material-symbols-outlined text-[120px]">play_circle</span>
+                <span className="material-symbols-outlined text-[120px]">
+                  play_circle
+                </span>
               </div>
 
               <div className="flex items-center justify-between mb-6">
@@ -293,7 +352,12 @@ export default function SimPage() {
                       onClick={startSim}
                       className="px-4 py-2 bg-accent text-black rounded-sm font-bold text-xs uppercase flex items-center gap-2 hover:opacity-90 transition-colors cursor-pointer border-none"
                     >
-                      <span className="material-symbols-outlined text-sm" style={{ fontVariationSettings: "'FILL' 1" }}>play_arrow</span>
+                      <span
+                        className="material-symbols-outlined text-sm"
+                        style={{ fontVariationSettings: "'FILL' 1" }}
+                      >
+                        play_arrow
+                      </span>
                       Start
                     </button>
                   ) : (
@@ -301,7 +365,9 @@ export default function SimPage() {
                       onClick={pauseSim}
                       className="px-4 py-2 bg-surface-highest text-[#e1e2ec] rounded-sm font-bold text-xs uppercase flex items-center gap-2 border border-border/30 hover:bg-surface-high transition-colors cursor-pointer"
                     >
-                      <span className="material-symbols-outlined text-sm">pause</span>
+                      <span className="material-symbols-outlined text-sm">
+                        pause
+                      </span>
                       Pause
                     </button>
                   )}
@@ -309,7 +375,9 @@ export default function SimPage() {
                     onClick={resetSim}
                     className="px-4 py-2 bg-surface-highest text-[#e1e2ec] rounded-sm font-bold text-xs uppercase flex items-center gap-2 border border-border/30 hover:bg-surface-high transition-colors cursor-pointer"
                   >
-                    <span className="material-symbols-outlined text-sm">refresh</span>
+                    <span className="material-symbols-outlined text-sm">
+                      refresh
+                    </span>
                     Reset
                   </button>
                 </div>
@@ -319,7 +387,9 @@ export default function SimPage() {
               <div className="space-y-4">
                 <div className="flex justify-between items-center text-xs uppercase font-bold tracking-widest text-[#e1e2ec]/40">
                   <span>Simulation Speed</span>
-                  <span className="text-accent">Current: {speedLabel} ({speedDesc})</span>
+                  <span className="text-accent">
+                    Current: {speedLabel} ({speedDesc})
+                  </span>
                 </div>
                 <div className="flex gap-2">
                   {SPEED_OPTIONS.map((opt) => (
@@ -339,7 +409,9 @@ export default function SimPage() {
 
                 {/* Shift selector */}
                 <div className="flex items-center gap-3 pt-2">
-                  <span className="text-[10px] uppercase tracking-widest text-[#e1e2ec]/40 font-bold">Shift</span>
+                  <span className="text-[10px] uppercase tracking-widest text-[#e1e2ec]/40 font-bold">
+                    Shift
+                  </span>
                   {(["day", "night"] as ShiftName[]).map((s) => (
                     <button
                       key={s}
@@ -371,16 +443,24 @@ export default function SimPage() {
             {/* Status Bento — right 5 cols */}
             <div className="col-span-12 lg:col-span-5 grid grid-cols-2 gap-4">
               <div className="bg-surface p-4 rounded-sm flex flex-col justify-between border-t-2 border-status-green">
-                <span className="text-[10px] font-bold uppercase tracking-widest text-status-green">Output %</span>
+                <span className="text-[10px] font-bold uppercase tracking-widest text-status-green">
+                  Output %
+                </span>
                 <span className="font-['Space_Grotesk',sans-serif] text-4xl font-light tabular-nums">
-                  {efficiency}<span className="text-lg opacity-40">%</span>
+                  {efficiency}
+                  <span className="text-lg opacity-40">%</span>
                 </span>
                 <div className="h-1 w-full bg-surface-highest mt-2 rounded-full overflow-hidden">
-                  <div className="h-full bg-status-green transition-all duration-500" style={{ width: `${Math.min(efficiency, 100)}%` }} />
+                  <div
+                    className="h-full bg-status-green transition-all duration-500"
+                    style={{ width: `${Math.min(efficiency, 100)}%` }}
+                  />
                 </div>
               </div>
               <div className="bg-surface p-4 rounded-sm flex flex-col justify-between border-t-2 border-accent">
-                <span className="text-[10px] font-bold uppercase tracking-widest text-accent">Total Output</span>
+                <span className="text-[10px] font-bold uppercase tracking-widest text-accent">
+                  Total Output
+                </span>
                 <span className="font-['Space_Grotesk',sans-serif] text-4xl font-light tabular-nums">
                   {totalOutput.toLocaleString()}
                 </span>
@@ -391,14 +471,23 @@ export default function SimPage() {
               <div className="col-span-2 bg-surface p-4 rounded-sm flex items-center justify-between">
                 <div>
                   <span className="text-[10px] font-bold uppercase tracking-widest text-[#e1e2ec]/40">
-                    {running ? "Simulation Running" : scheduledLines > 0 ? "Simulation Paused" : "No Schedules Loaded"}
+                    {running
+                      ? "Simulation Running"
+                      : scheduledLines > 0
+                        ? "Simulation Paused"
+                        : "No Schedules Loaded"}
                   </span>
                   <div className="font-['Space_Grotesk',sans-serif] text-xl font-medium flex items-center gap-2 mt-0.5">
-                    <span className={`w-2.5 h-2.5 rounded-full ${running ? "bg-status-green animate-pulse" : "bg-[#e1e2ec]/20"}`} />
-                    {scheduledLines} / {LINES.length} <span className="text-sm opacity-50">Lines Active</span>
+                    <span
+                      className={`w-2.5 h-2.5 rounded-full ${running ? "bg-status-green animate-pulse" : "bg-[#e1e2ec]/20"}`}
+                    />
+                    {scheduledLines} / {LINES.length}{" "}
+                    <span className="text-sm opacity-50">Lines Active</span>
                   </div>
                 </div>
-                <span className="material-symbols-outlined text-accent/20 text-4xl">timer</span>
+                <span className="material-symbols-outlined text-accent/20 text-4xl">
+                  timer
+                </span>
               </div>
             </div>
           </section>
@@ -406,11 +495,17 @@ export default function SimPage() {
           {/* ── Empty state ──────────────────────────────────────────────────── */}
           {scheduledLines === 0 && (
             <div className="bg-surface-low rounded-sm p-12 text-center border border-border/10">
-              <span className="material-symbols-outlined text-5xl text-[#e1e2ec]/10 mb-4 block">upload_file</span>
-              <p className="text-sm text-[#e1e2ec]/40 mb-2">No run sheets loaded</p>
+              <span className="material-symbols-outlined text-5xl text-[#e1e2ec]/10 mb-4 block">
+                upload_file
+              </span>
+              <p className="text-sm text-[#e1e2ec]/40 mb-2">
+                No run sheets loaded
+              </p>
               <p className="text-xs text-[#e1e2ec]/25">
                 Load run sheets from the{" "}
-                <Link href="/admin" className="text-accent hover:underline">Admin panel</Link>
+                <Link href="/admin" className="text-accent hover:underline">
+                  Admin panel
+                </Link>
                 , then use the controls above to simulate production.
               </p>
             </div>
@@ -419,19 +514,21 @@ export default function SimPage() {
           {/* ── Lines + Scan Log / Hourly Production ─────────────────────────── */}
           {scheduledLines > 0 && (
             <div className="grid grid-cols-12 gap-10">
-
               {/* Left: Assembly Line Cards + Scan Log */}
               <div className="col-span-12 xl:col-span-8 space-y-10">
-
                 {/* Assembly Line Cards */}
                 <div>
                   <div className="flex items-center justify-between mb-4 border-b border-border/10 pb-2">
-                    <h3 className="font-['Space_Grotesk',sans-serif] text-lg font-bold uppercase tracking-widest">Active Assembly Lines</h3>
-                    <span className={`text-xs px-2 py-0.5 rounded border font-bold uppercase ${
-                      running
-                        ? "text-status-green bg-status-green/10 border-status-green/20"
-                        : "text-[#e1e2ec]/40 bg-surface-highest border-border"
-                    }`}>
+                    <h3 className="font-['Space_Grotesk',sans-serif] text-lg font-bold uppercase tracking-widest">
+                      Active Assembly Lines
+                    </h3>
+                    <span
+                      className={`text-xs px-2 py-0.5 rounded border font-bold uppercase ${
+                        running
+                          ? "text-status-green bg-status-green/10 border-status-green/20"
+                          : "text-[#e1e2ec]/40 bg-surface-highest border-border"
+                      }`}
+                    >
                       {running ? "All Systems Running" : "Paused"}
                     </span>
                   </div>
@@ -439,18 +536,38 @@ export default function SimPage() {
                     {LINES.map(({ id, name, valueStream }) => {
                       const st = stateMap.get(id);
                       if (!st?.schedule) return null;
-                      const pct = st.schedule.totalTarget > 0
-                        ? Math.round((st.totalOutput / st.schedule.totalTarget) * 100)
-                        : 0;
+                      const pct =
+                        st.schedule.totalTarget > 0
+                          ? Math.round(
+                              (st.totalOutput / st.schedule.totalTarget) * 100,
+                            )
+                          : 0;
                       const isComplete = pct >= 100;
                       const isBehind = pct < 50 && st.totalOutput > 0;
-                      const statusColor = isComplete ? "bg-status-green" : isBehind ? "bg-status-amber" : "bg-accent";
-                      const statusLabel = isComplete ? "Complete" : isBehind ? "Behind" : "Nominal";
-                      const statusTextColor = isComplete ? "text-status-green" : isBehind ? "text-status-amber" : "text-accent";
+                      const statusColor = isComplete
+                        ? "bg-status-green"
+                        : isBehind
+                          ? "bg-status-amber"
+                          : "bg-accent";
+                      const statusLabel = isComplete
+                        ? "Complete"
+                        : isBehind
+                          ? "Behind"
+                          : "Nominal";
+                      const statusTextColor = isComplete
+                        ? "text-status-green"
+                        : isBehind
+                          ? "text-status-amber"
+                          : "text-accent";
 
                       return (
-                        <div key={id} className="bg-surface-low p-5 rounded-sm border border-border/5 hover:border-accent/20 transition-all group relative">
-                          <div className={`absolute top-0 left-0 w-1 h-full ${statusColor}`} />
+                        <div
+                          key={id}
+                          className="bg-surface-low p-5 rounded-sm border border-border/5 hover:border-accent/20 transition-all group relative"
+                        >
+                          <div
+                            className={`absolute top-0 left-0 w-1 h-full ${statusColor}`}
+                          />
                           <div className="flex justify-between items-start mb-4">
                             <div>
                               <h4 className="font-['Space_Grotesk',sans-serif] font-bold leading-none mb-1">
@@ -461,33 +578,57 @@ export default function SimPage() {
                               </p>
                               {st.completedOrders > 0 && (
                                 <div className="mt-2 flex items-center gap-2">
-                                  <span className="text-[9px] text-[#e1e2ec]/35 uppercase tracking-widest">Changeovers</span>
+                                  <span className="text-[9px] text-[#e1e2ec]/35 uppercase tracking-widest">
+                                    Changeovers
+                                  </span>
                                   <div className="flex items-end gap-1">
-                                    {Array.from({ length: Math.min(st.completedOrders, 8) }).map((_, idx) => (
-                                      <span key={idx} className="h-3 border-l border-dotted border-status-amber/80" />
+                                    {Array.from({
+                                      length: Math.min(st.completedOrders, 8),
+                                    }).map((_, idx) => (
+                                      <span
+                                        key={idx}
+                                        className="h-3 border-l border-dotted border-status-amber/80"
+                                      />
                                     ))}
                                   </div>
-                                  <span className="text-[10px] font-mono text-status-amber/80">{st.completedOrders}</span>
+                                  <span className="text-[10px] font-mono text-status-amber/80">
+                                    {st.completedOrders}
+                                  </span>
                                 </div>
                               )}
                             </div>
-                            <span className={`${statusTextColor} bg-current/10 text-[10px] font-black px-2 py-0.5 border rounded uppercase`}
-                              style={{ borderColor: "currentColor", backgroundColor: "transparent" }}>
-                              <span className={statusTextColor}>{statusLabel}</span>
+                            <span
+                              className={`${statusTextColor} bg-current/10 text-[10px] font-black px-2 py-0.5 border rounded uppercase`}
+                              style={{
+                                borderColor: "currentColor",
+                                backgroundColor: "transparent",
+                              }}
+                            >
+                              <span className={statusTextColor}>
+                                {statusLabel}
+                              </span>
                             </span>
                           </div>
                           <div className="space-y-3 mb-4">
                             <div className="flex justify-between text-xs font-mono">
-                              <span className="text-[#e1e2ec]/40">Progress</span>
-                              <span>{st.totalOutput} / {st.schedule.totalTarget}</span>
+                              <span className="text-[#e1e2ec]/40">
+                                Progress
+                              </span>
+                              <span>
+                                {st.totalOutput} / {st.schedule.totalTarget}
+                              </span>
                             </div>
                             <div className="w-full h-1.5 bg-surface-highest rounded-full overflow-hidden">
-                              <div className={`h-full ${statusColor} transition-all duration-500`} style={{ width: `${Math.min(pct, 100)}%` }} />
+                              <div
+                                className={`h-full ${statusColor} transition-all duration-500`}
+                                style={{ width: `${Math.min(pct, 100)}%` }}
+                              />
                             </div>
                           </div>
                           {st.remainingOnOrder > 0 && (
                             <div className="text-[10px] text-[#e1e2ec]/30 font-mono">
-                              {st.remainingOnOrder} remaining on order · {st.remainingOnRunSheet} on sheet
+                              {st.remainingOnOrder} remaining on order ·{" "}
+                              {st.remainingOnRunSheet} on sheet
                             </div>
                           )}
                         </div>
@@ -500,11 +641,19 @@ export default function SimPage() {
                 <div className="bg-surface-low rounded-sm overflow-hidden border border-border/10">
                   <div className="bg-surface-highest px-6 py-3 flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                      <span className="material-symbols-outlined text-sm text-accent">analytics</span>
-                      <h3 className="text-xs font-black uppercase tracking-[0.2em]">Hourly Output Summary</h3>
+                      <span className="material-symbols-outlined text-sm text-accent">
+                        analytics
+                      </span>
+                      <h3 className="text-xs font-black uppercase tracking-[0.2em]">
+                        Hourly Output Summary
+                      </h3>
                     </div>
                     <div className="flex gap-4">
-                      {running && <span className="text-[10px] font-mono text-status-green uppercase">Scanning...</span>}
+                      {running && (
+                        <span className="text-[10px] font-mono text-status-green uppercase">
+                          Scanning...
+                        </span>
+                      )}
                       <span className="text-[10px] font-mono text-[#e1e2ec]/40 uppercase">
                         {totalOutput} total scans
                       </span>
@@ -518,7 +667,6 @@ export default function SimPage() {
 
               {/* Right: Hourly Production Bars + Sim Info */}
               <div className="col-span-12 xl:col-span-4 space-y-6">
-
                 {/* Hourly Production Bars */}
                 <div className="bg-surface rounded-sm p-6 border border-border/10">
                   <h3 className="font-['Space_Grotesk',sans-serif] text-lg font-bold uppercase tracking-widest mb-6">
@@ -532,9 +680,14 @@ export default function SimPage() {
                     ) : (
                       hourlyBars.hours.map((hour, i) => {
                         const actual = hourlyBars.hourMap[hour];
-                        const pct = Math.round((actual / hourlyBars.maxHourly) * 100);
-                        const nextHour = String((parseInt(hour) + 1) % 24).padStart(2, "0") + ":00";
-                        const isCurrent = i === hourlyBars.hours.length - 1 && running;
+                        const pct = Math.round(
+                          (actual / hourlyBars.maxHourly) * 100,
+                        );
+                        const nextHour =
+                          String((parseInt(hour) + 1) % 24).padStart(2, "0") +
+                          ":00";
+                        const isCurrent =
+                          i === hourlyBars.hours.length - 1 && running;
 
                         return (
                           <div key={hour} className="relative">
@@ -543,7 +696,13 @@ export default function SimPage() {
                                 {hour} – {nextHour}
                                 {isCurrent && " (Current)"}
                               </span>
-                              <span className={isCurrent ? "text-accent" : "text-status-green"}>
+                              <span
+                                className={
+                                  isCurrent
+                                    ? "text-accent"
+                                    : "text-status-green"
+                                }
+                              >
                                 Actual: {actual}
                               </span>
                             </div>
@@ -552,7 +711,9 @@ export default function SimPage() {
                                 className={`h-6 ${isCurrent ? "bg-accent/20 border-r-2 border-accent" : "bg-status-green/20 border-r-2 border-status-green"} flex items-center px-3 transition-all duration-500`}
                                 style={{ width: `${Math.max(pct, 5)}%` }}
                               >
-                                <span className={`text-[10px] font-mono ${isCurrent ? "text-accent" : "text-status-green"}`}>
+                                <span
+                                  className={`text-[10px] font-mono ${isCurrent ? "text-accent" : "text-status-green"}`}
+                                >
                                   {isCurrent ? "IN PROGRESS" : "COMPLETE"}
                                 </span>
                               </div>
@@ -566,13 +727,18 @@ export default function SimPage() {
                   {totalTarget > 0 && (
                     <div className="mt-8 pt-6 border-t border-border/10">
                       <div className="flex items-center justify-between mb-2">
-                        <span className="text-[10px] font-bold uppercase text-[#e1e2ec]/40">Output vs Target</span>
+                        <span className="text-[10px] font-bold uppercase text-[#e1e2ec]/40">
+                          Output vs Target
+                        </span>
                         <span className="text-xs font-mono">{efficiency}%</span>
                       </div>
                       <div className="w-full h-1 bg-surface-low rounded-full overflow-hidden">
                         <div
                           className="h-full bg-status-green transition-all duration-500"
-                          style={{ width: `${Math.min(efficiency, 100)}%`, boxShadow: "0 0 10px rgba(34,197,94,0.5)" }}
+                          style={{
+                            width: `${Math.min(efficiency, 100)}%`,
+                            boxShadow: "0 0 10px rgba(34,197,94,0.5)",
+                          }}
                         />
                       </div>
                     </div>
@@ -582,7 +748,9 @@ export default function SimPage() {
                 {/* Simulation Info Card */}
                 <div className="glass-panel rounded-sm p-6 border border-white/5 relative overflow-hidden">
                   <div className="absolute -right-4 -bottom-4 opacity-5">
-                    <span className="material-symbols-outlined text-[120px]">science</span>
+                    <span className="material-symbols-outlined text-[120px]">
+                      science
+                    </span>
                   </div>
                   <h4 className="font-['Space_Grotesk',sans-serif] font-bold text-sm uppercase tracking-widest mb-2">
                     Simulation Details
@@ -590,16 +758,23 @@ export default function SimPage() {
                   <p className="text-xs text-[#e1e2ec]/50 leading-relaxed mb-4">
                     Running MES Simulation. Speed:{" "}
                     <span className="text-accent font-mono">{speedLabel}</span>.{" "}
-                    {scheduledLines} line{scheduledLines !== 1 ? "s" : ""} with active schedules.
+                    {scheduledLines} line{scheduledLines !== 1 ? "s" : ""} with
+                    active schedules.
                   </p>
                   <div className="grid grid-cols-2 gap-4">
                     <div className="bg-black/20 p-3 rounded-sm">
-                      <p className="text-[9px] uppercase text-[#e1e2ec]/40 font-bold mb-1">Speed</p>
+                      <p className="text-[9px] uppercase text-[#e1e2ec]/40 font-bold mb-1">
+                        Speed
+                      </p>
                       <p className="text-sm font-mono">{speedDesc}</p>
                     </div>
                     <div className="bg-black/20 p-3 rounded-sm">
-                      <p className="text-[9px] uppercase text-[#e1e2ec]/40 font-bold mb-1">Tick Rate</p>
-                      <p className="text-sm font-mono">{unitsForSpeed(speed).toFixed(1)} units/tick</p>
+                      <p className="text-[9px] uppercase text-[#e1e2ec]/40 font-bold mb-1">
+                        Tick Rate
+                      </p>
+                      <p className="text-sm font-mono">
+                        {unitsForSpeed(speed).toFixed(1)} units/tick
+                      </p>
                     </div>
                   </div>
                 </div>
@@ -610,12 +785,20 @@ export default function SimPage() {
                   className="block bg-surface-low rounded-sm p-5 border border-border/10 hover:border-accent/20 transition-all group"
                 >
                   <div className="flex items-center gap-3">
-                    <span className="material-symbols-outlined text-accent/40 group-hover:text-accent transition-colors">upload_file</span>
+                    <span className="material-symbols-outlined text-accent/40 group-hover:text-accent transition-colors">
+                      upload_file
+                    </span>
                     <div>
-                      <p className="text-xs font-bold uppercase tracking-widest">Admin Panel</p>
-                      <p className="text-[10px] text-[#e1e2ec]/30">Upload run sheets & configure lines</p>
+                      <p className="text-xs font-bold uppercase tracking-widest">
+                        Admin Panel
+                      </p>
+                      <p className="text-[10px] text-[#e1e2ec]/30">
+                        Upload run sheets & configure lines
+                      </p>
                     </div>
-                    <span className="material-symbols-outlined text-[#e1e2ec]/20 ml-auto text-sm">arrow_forward</span>
+                    <span className="material-symbols-outlined text-[#e1e2ec]/20 ml-auto text-sm">
+                      arrow_forward
+                    </span>
                   </div>
                 </Link>
               </div>

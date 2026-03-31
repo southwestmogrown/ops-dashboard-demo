@@ -16,10 +16,16 @@ export default function TeamLeadPage() {
   const [metrics, setMetrics] = useState<ShiftMetrics | null>(null);
   const [mesStates, setMesStates] = useState<LineState[]>([]);
   const [selectedLineId, setSelectedLineId] = useState<string | null>(null);
-  const [comments, setComments] = useState<Record<string, Record<string, string>>>({});
+  const [comments, setComments] = useState<
+    Record<string, Record<string, string>>
+  >({});
   const [allScrapEntries, setAllScrapEntries] = useState<ScrapEntry[]>([]);
-  const [allDowntimeEntries, setAllDowntimeEntries] = useState<DowntimeEntry[]>([]);
-  const [adminConfig, setAdminConfig] = useState<Record<string, AdminLineConfig>>({});
+  const [allDowntimeEntries, setAllDowntimeEntries] = useState<DowntimeEntry[]>(
+    [],
+  );
+  const [adminConfig, setAdminConfig] = useState<
+    Record<string, AdminLineConfig>
+  >({});
   const [isLoading, setIsLoading] = useState(true);
   const [now, setNow] = useState<Date>(new Date());
   const [filter, setFilter] = useState("");
@@ -29,7 +35,14 @@ export default function TeamLeadPage() {
 
   const fetchData = useCallback(async () => {
     const requestId = ++fetchRequestId.current;
-    const [metricsRes, mesRes, clockRes, allScrapRes, allDowntimeRes, configRes] = await Promise.all([
+    const [
+      metricsRes,
+      mesRes,
+      clockRes,
+      allScrapRes,
+      allDowntimeRes,
+      configRes,
+    ] = await Promise.all([
       fetch(`/api/metrics?shift=${shift}`, { cache: "no-store" }),
       fetch("/api/mes/state", { cache: "no-store" }),
       fetch("/api/sim/clock", { cache: "no-store" }),
@@ -76,18 +89,21 @@ export default function TeamLeadPage() {
       });
   }, [selectedLineId]);
 
-  const saveComment = useCallback(async (hour: string, comment: string) => {
-    if (!selectedLineId) return;
-    await fetch("/api/line/comments", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ lineId: selectedLineId, hour, comment }),
-    });
-    setComments((prev) => ({
-      ...prev,
-      [selectedLineId]: { ...prev[selectedLineId], [hour]: comment },
-    }));
-  }, [selectedLineId]);
+  const saveComment = useCallback(
+    async (hour: string, comment: string) => {
+      if (!selectedLineId) return;
+      await fetch("/api/line/comments", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ lineId: selectedLineId, hour, comment }),
+      });
+      setComments((prev) => ({
+        ...prev,
+        [selectedLineId]: { ...prev[selectedLineId], [hour]: comment },
+      }));
+    },
+    [selectedLineId],
+  );
 
   const refreshScrap = useCallback(() => {
     fetch(`/api/scrap?lineId=all&shift=${shift}`)
@@ -108,11 +124,15 @@ export default function TeamLeadPage() {
 
   const selectedDowntimeEntries = useMemo(() => {
     if (!selectedLineId) return [];
-    return allDowntimeEntries.filter((entry) => entry.lineId === selectedLineId);
+    return allDowntimeEntries.filter(
+      (entry) => entry.lineId === selectedLineId,
+    );
   }, [selectedLineId, allDowntimeEntries]);
 
   const scrapStats = useMemo<ScrapStats>(() => {
-    let kickedLids = 0, scrappedPanels = 0, totalBoughtIn = 0;
+    let kickedLids = 0,
+      scrappedPanels = 0,
+      totalBoughtIn = 0;
     for (const e of selectedScrapEntries) {
       if (e.kind === "kicked-lid") kickedLids++;
       else if (e.kind === "scrapped-panel") scrappedPanels++;
@@ -130,7 +150,8 @@ export default function TeamLeadPage() {
   }, [shift, refreshScrap, refreshDowntime]);
 
   const { lines, selectedLine, selectedMesState } = useMemo(() => {
-    if (!metrics) return { lines: [], selectedLine: null, selectedMesState: null };
+    if (!metrics)
+      return { lines: [], selectedLine: null, selectedMesState: null };
     const lines = metrics.lines;
     return {
       lines,
@@ -138,7 +159,7 @@ export default function TeamLeadPage() {
         ? (lines.find((l) => l.id === selectedLineId) ?? null)
         : null,
       selectedMesState: selectedLineId
-        ? mesStates.find((s) => s.lineId === selectedLineId) ?? null
+        ? (mesStates.find((s) => s.lineId === selectedLineId) ?? null)
         : null,
     };
   }, [metrics, selectedLineId, mesStates]);
@@ -146,14 +167,18 @@ export default function TeamLeadPage() {
   const hourlyTargets = useMemo(
     () =>
       selectedLine
-        ? getHourlyTargets(selectedLine.target, shift, selectedMesState?.hourlyOutput ?? {})
+        ? getHourlyTargets(
+            selectedLine.target,
+            shift,
+            selectedMesState?.hourlyOutput ?? {},
+          )
         : [],
-    [selectedLine, selectedMesState, shift]
+    [selectedLine, selectedMesState, shift],
   );
 
   const stateMap = useMemo(
     () => new Map(mesStates.map((s) => [s.lineId, s])),
-    [mesStates]
+    [mesStates],
   );
 
   const filteredLines = useMemo(() => {
@@ -163,7 +188,7 @@ export default function TeamLeadPage() {
       (l) =>
         l.name.toLowerCase().startsWith(q) ||
         l.valueStream.toLowerCase().startsWith(q) ||
-        l.id.toLowerCase().startsWith(q)
+        l.id.toLowerCase().startsWith(q),
     );
   }, [lines, filter]);
 
@@ -180,10 +205,29 @@ export default function TeamLeadPage() {
       };
     }
 
-    if (!state?.schedule) return { label: "IDLE", color: "text-[#e1e2ec]/40", dot: "bg-[#e1e2ec]/20" };
-    if (line && line.output === 0) return { label: "STOPPED", color: "text-status-red", dot: "bg-status-red shadow-[0_0_8px_rgba(239,68,68,0.5)]" };
-    if (line && line.output / line.target < 0.75) return { label: "BEHIND", color: "text-accent", dot: "bg-accent shadow-[0_0_8px_rgba(249,115,22,0.5)]" };
-    return { label: "RUNNING", color: "text-status-green", dot: "bg-status-green shadow-[0_0_8px_rgba(34,197,94,0.5)]" };
+    if (!state?.schedule)
+      return {
+        label: "IDLE",
+        color: "text-[#e1e2ec]/40",
+        dot: "bg-[#e1e2ec]/20",
+      };
+    if (line && line.output === 0)
+      return {
+        label: "STOPPED",
+        color: "text-status-red",
+        dot: "bg-status-red shadow-[0_0_8px_rgba(239,68,68,0.5)]",
+      };
+    if (line && line.output / line.target < 0.75)
+      return {
+        label: "BEHIND",
+        color: "text-accent",
+        dot: "bg-accent shadow-[0_0_8px_rgba(249,115,22,0.5)]",
+      };
+    return {
+      label: "RUNNING",
+      color: "text-status-green",
+      dot: "bg-status-green shadow-[0_0_8px_rgba(34,197,94,0.5)]",
+    };
   }
 
   return (
@@ -202,16 +246,28 @@ export default function TeamLeadPage() {
               KINETIC COMMAND
             </span>
             <div className="hidden md:flex items-center space-x-6">
-              <Link href="/eos" className="text-base text-[#e1e2ec]/75 hover:text-[#f8f8fb] transition-colors">
+              <Link
+                href="/eos"
+                className="text-base text-[#e1e2ec]/75 hover:text-[#f8f8fb] transition-colors"
+              >
                 EOS
               </Link>
-              <Link href="/admin" className="text-base text-[#e1e2ec]/75 hover:text-[#f8f8fb] transition-colors">
+              <Link
+                href="/admin"
+                className="text-base text-[#e1e2ec]/75 hover:text-[#f8f8fb] transition-colors"
+              >
                 Admin
               </Link>
-              <Link href="/team-lead" className="text-accent border-b-2 border-accent pb-0.5 font-bold text-base">
+              <Link
+                href="/team-lead"
+                className="text-accent border-b-2 border-accent pb-0.5 font-bold text-base"
+              >
                 Team Lead
               </Link>
-              <Link href="/sim" className="text-base text-[#e1e2ec]/75 hover:text-[#f8f8fb] transition-colors">
+              <Link
+                href="/sim"
+                className="text-base text-[#e1e2ec]/75 hover:text-[#f8f8fb] transition-colors"
+              >
                 SIM
               </Link>
             </div>
@@ -233,22 +289,27 @@ export default function TeamLeadPage() {
                   </button>
                 ))}
               </div>
-              <span className="text-[#e1e2ec]/60 tabular-nums text-[11px]">{now.toLocaleTimeString("en-GB")} UTC</span>
+              <span className="text-[#e1e2ec]/60 tabular-nums text-[11px]">
+                {now.toLocaleTimeString("en-GB")} UTC
+              </span>
             </div>
           </div>
         </div>
       </nav>
 
       <div className="flex flex-1 overflow-hidden">
-
         {/* ── Sidebar: Line Selector ── */}
         <aside className="w-72 shrink-0 bg-surface border-r border-border/80 flex flex-col">
           <div className="p-4 border-b border-border/80">
             <div className="flex items-center justify-between mb-4">
               <div>
-                <h2 className="font-black text-xl text-accent font-['Space_Grotesk',sans-serif]">OP-CENTER</h2>
+                <h2 className="font-black text-xl text-accent font-['Space_Grotesk',sans-serif]">
+                  OP-CENTER
+                </h2>
               </div>
-              <span className="material-symbols-outlined text-accent">factory</span>
+              <span className="material-symbols-outlined text-accent">
+                factory
+              </span>
             </div>
             <div className="relative">
               <input
@@ -258,7 +319,9 @@ export default function TeamLeadPage() {
                 placeholder="FILTER LINES..."
                 type="text"
               />
-              <span className="material-symbols-outlined absolute right-2.5 top-2.5 text-[16px] text-[#e1e2ec]/45">search</span>
+              <span className="material-symbols-outlined absolute right-2.5 top-2.5 text-[16px] text-[#e1e2ec]/45">
+                search
+              </span>
             </div>
           </div>
 
@@ -285,16 +348,20 @@ export default function TeamLeadPage() {
                   }`}
                 >
                   <div>
-                    <span className={`block text-xs font-bold ${
-                      !isRunning
-                        ? "text-[#94a3b8]"
-                        : isSelected
-                          ? "text-accent"
-                          : "text-[#e1e2ec]/65"
-                    }`}>
+                    <span
+                      className={`block text-xs font-bold ${
+                        !isRunning
+                          ? "text-[#94a3b8]"
+                          : isSelected
+                            ? "text-accent"
+                            : "text-[#e1e2ec]/65"
+                      }`}
+                    >
                       {line.valueStream} — {line.name}
                     </span>
-                    <span className={`block text-sm ${!isRunning ? "text-[#94a3b8]/80" : "text-[#e1e2ec]/80"}`}>
+                    <span
+                      className={`block text-sm ${!isRunning ? "text-[#94a3b8]/80" : "text-[#e1e2ec]/80"}`}
+                    >
                       {line.output}/{line.target}
                     </span>
                     {!isRunning && (
@@ -314,7 +381,9 @@ export default function TeamLeadPage() {
                     )}
                   </div>
                   <div className="flex flex-col items-end gap-1">
-                    <span className={`w-2.5 h-2.5 rounded-full ${status.dot}`} />
+                    <span
+                      className={`w-2.5 h-2.5 rounded-full ${status.dot}`}
+                    />
                     <span className={`text-[10px] font-mono ${status.color}`}>
                       {status.label}
                     </span>
@@ -323,7 +392,6 @@ export default function TeamLeadPage() {
               );
             })}
           </div>
-
         </aside>
 
         {/* ── Main Content ── */}
@@ -373,12 +441,15 @@ export default function TeamLeadPage() {
             />
           ) : viewMode === "detail" ? (
             <div className="h-full flex flex-col items-center justify-center text-center">
-              <span className="material-symbols-outlined text-[#e1e2ec]/10 text-7xl mb-4">factory</span>
+              <span className="material-symbols-outlined text-[#e1e2ec]/10 text-7xl mb-4">
+                factory
+              </span>
               <h2 className="font-['Space_Grotesk',sans-serif] text-3xl font-bold text-[#e1e2ec]/35 mb-2">
                 No Line Selected
               </h2>
               <p className="text-[#e1e2ec]/50 text-base max-w-sm mb-6">
-                Choose an assembly line from the sidebar, or switch to Floor Overview to see all lines at a glance.
+                Choose an assembly line from the sidebar, or switch to Floor
+                Overview to see all lines at a glance.
               </p>
               <button
                 onClick={() => setViewMode("floor")}
@@ -407,7 +478,9 @@ export default function TeamLeadPage() {
             </>
           ) : (
             <div className="h-full flex flex-col items-center justify-center text-center">
-              <span className="material-symbols-outlined text-[#e1e2ec]/10 text-7xl mb-4">factory</span>
+              <span className="material-symbols-outlined text-[#e1e2ec]/10 text-7xl mb-4">
+                factory
+              </span>
               <h2 className="font-['Space_Grotesk',sans-serif] text-2xl font-bold text-[#e1e2ec]/20 mb-2">
                 Loading...
               </h2>

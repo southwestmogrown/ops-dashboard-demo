@@ -23,7 +23,13 @@ interface OutputChartProps {
   currentTime?: Date | null;
 }
 
-export default function OutputChart({ lines, trend, totalTarget, shift, currentTime }: OutputChartProps) {
+export default function OutputChart({
+  lines,
+  trend,
+  totalTarget,
+  shift,
+  currentTime,
+}: OutputChartProps) {
   const data = lines.map((line: LineData) => ({
     line: `${line.valueStream} L${line.name.slice(-1)}`,
     output: line.output,
@@ -33,14 +39,22 @@ export default function OutputChart({ lines, trend, totalTarget, shift, currentT
 
   const chartNow = currentTime ?? new Date();
   const shiftWindow = getShiftWindows(shift);
-  const currentHour = chartNow.getUTCHours() + chartNow.getUTCMinutes() / 60 + chartNow.getUTCSeconds() / 3600;
-  const elapsedHours = currentHour >= shiftWindow.startHour
-    ? currentHour - shiftWindow.startHour
-    : currentHour + 24 - shiftWindow.startHour;
-  const clampedElapsedMinutes = Math.max(0, Math.min(shiftWindow.totalClockMinutes, Math.floor(elapsedHours * 60)));
-  const visibleTrendIndex = trend && trend.length > 0
-    ? Math.min(trend.length - 1, Math.floor(clampedElapsedMinutes / 30))
-    : -1;
+  const currentHour =
+    chartNow.getUTCHours() +
+    chartNow.getUTCMinutes() / 60 +
+    chartNow.getUTCSeconds() / 3600;
+  const elapsedHours =
+    currentHour >= shiftWindow.startHour
+      ? currentHour - shiftWindow.startHour
+      : currentHour + 24 - shiftWindow.startHour;
+  const clampedElapsedMinutes = Math.max(
+    0,
+    Math.min(shiftWindow.totalClockMinutes, Math.floor(elapsedHours * 60)),
+  );
+  const visibleTrendIndex =
+    trend && trend.length > 0
+      ? Math.min(trend.length - 1, Math.floor(clampedElapsedMinutes / 30))
+      : -1;
   const trendData = (trend ?? []).map((tp, i) => {
     const visible = i <= visibleTrendIndex;
     return {
@@ -50,7 +64,9 @@ export default function OutputChart({ lines, trend, totalTarget, shift, currentT
       ...(totalTarget && totalTarget > 0
         ? {
             targetLine: visible
-              ? Math.round((i / Math.max(1, (trend?.length ?? 1) - 1)) * totalTarget)
+              ? Math.round(
+                  (i / Math.max(1, (trend?.length ?? 1) - 1)) * totalTarget,
+                )
               : null,
           }
         : {}),
@@ -63,7 +79,8 @@ export default function OutputChart({ lines, trend, totalTarget, shift, currentT
     if (vsLines.length < 2) return false;
     const outputs = vsLines.map((l) => l.output);
     const avg = outputs.reduce((a, b) => a + b, 0) / outputs.length;
-    const variance = outputs.reduce((s, v) => s + (v - avg) ** 2, 0) / outputs.length;
+    const variance =
+      outputs.reduce((s, v) => s + (v - avg) ** 2, 0) / outputs.length;
     const stdDev = Math.sqrt(variance);
     if (stdDev === 0) return false;
     return vsLines.some((l) => l.output < avg - 2 * stdDev);
@@ -91,7 +108,12 @@ export default function OutputChart({ lines, trend, totalTarget, shift, currentT
               VS1 (Folding)
             </span>
             {vs1Warn && (
-              <span title="One or more VS1 lines are dramatically underperforming" className="text-status-amber text-sm leading-none">⚠</span>
+              <span
+                title="One or more VS1 lines are dramatically underperforming"
+                className="text-status-amber text-sm leading-none"
+              >
+                ⚠
+              </span>
             )}
           </div>
           <div className="flex items-center space-x-2">
@@ -100,7 +122,12 @@ export default function OutputChart({ lines, trend, totalTarget, shift, currentT
               VS2 (Revolver)
             </span>
             {vs2Warn && (
-              <span title="One or more VS2 lines are dramatically underperforming" className="text-status-amber text-sm leading-none">⚠</span>
+              <span
+                title="One or more VS2 lines are dramatically underperforming"
+                className="text-status-amber text-sm leading-none"
+              >
+                ⚠
+              </span>
             )}
           </div>
         </div>
@@ -129,7 +156,13 @@ export default function OutputChart({ lines, trend, totalTarget, shift, currentT
             axisLine={false}
             tickLine={false}
             width={40}
-            label={{ value: "Units", angle: -90, position: "insideLeft", fill: "#aeb8c8", fontSize: 10 }}
+            label={{
+              value: "Units",
+              angle: -90,
+              position: "insideLeft",
+              fill: "#aeb8c8",
+              fontSize: 10,
+            }}
           />
           <Tooltip
             cursor={{ fill: "rgba(255,255,255,0.03)" }}

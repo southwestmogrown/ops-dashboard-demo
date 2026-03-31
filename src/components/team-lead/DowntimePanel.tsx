@@ -19,8 +19,8 @@ function formatTime(iso: string): string {
 
 function formatDuration(startIso: string, endIso: string | null): string {
   const start = new Date(startIso).getTime();
-  const end   = endIso ? new Date(endIso).getTime() : Date.now();
-  const mins  = Math.floor((end - start) / 60000);
+  const end = endIso ? new Date(endIso).getTime() : Date.now();
+  const mins = Math.floor((end - start) / 60000);
   if (mins < 60) return `${mins}m`;
   const h = Math.floor(mins / 60);
   const m = mins % 60;
@@ -29,19 +29,23 @@ function formatDuration(startIso: string, endIso: string | null): string {
 
 function getReasonBadge(reason: DowntimeEntry["reason"]): string {
   const map: Record<string, string> = {
-    "machine-failure":    "bg-status-red/20 text-status-red",
-    "material-shortage":  "bg-status-amber/20 text-status-amber",
-    "quality-hold":       "bg-status-amber/20 text-status-amber",
-    "planned-maintenance":"bg-blue-500/20 text-blue-400",
-    "operator-break":     "bg-slate-500/20 text-slate-400",
-    "safety-stop":        "bg-red-600/20 text-red-500",
-    "changeover":         "bg-purple-500/20 text-purple-400",
-    "other":             "bg-slate-500/20 text-slate-400",
+    "machine-failure": "bg-status-red/20 text-status-red",
+    "material-shortage": "bg-status-amber/20 text-status-amber",
+    "quality-hold": "bg-status-amber/20 text-status-amber",
+    "planned-maintenance": "bg-blue-500/20 text-blue-400",
+    "operator-break": "bg-slate-500/20 text-slate-400",
+    "safety-stop": "bg-red-600/20 text-red-500",
+    changeover: "bg-purple-500/20 text-purple-400",
+    other: "bg-slate-500/20 text-slate-400",
   };
   return map[reason] ?? "bg-slate-500/20 text-slate-400";
 }
 
-export default function DowntimePanel({ entries, onLogStop, onResolve }: DowntimePanelProps) {
+export default function DowntimePanel({
+  entries,
+  onLogStop,
+  onResolve,
+}: DowntimePanelProps) {
   const [open, setOpen] = useState(false);
   const [now, setNow] = useState(() => Date.now());
 
@@ -54,13 +58,14 @@ export default function DowntimePanel({ entries, onLogStop, onResolve }: Downtim
 
   const totalMinutes = entries.reduce<number>((sum, e) => {
     const start = new Date(e.startTime).getTime();
-    const end   = e.endTime ? new Date(e.endTime).getTime() : now;
+    const end = e.endTime ? new Date(e.endTime).getTime() : now;
     return sum + Math.floor((end - start) / 60000);
   }, 0);
 
-  const totalLabel = totalMinutes < 60
-    ? `${totalMinutes} min`
-    : `${Math.floor(totalMinutes / 60)}h ${totalMinutes % 60 > 0 ? `${totalMinutes % 60}m` : ""}`.trim();
+  const totalLabel =
+    totalMinutes < 60
+      ? `${totalMinutes} min`
+      : `${Math.floor(totalMinutes / 60)}h ${totalMinutes % 60 > 0 ? `${totalMinutes % 60}m` : ""}`.trim();
 
   return (
     <div className="pt-2 border-t border-border/30">
@@ -69,21 +74,28 @@ export default function DowntimePanel({ entries, onLogStop, onResolve }: Downtim
         className="w-full flex items-center justify-between bg-transparent border-none cursor-pointer text-left hover:opacity-80 transition-opacity p-0"
       >
         <span className="text-[11px] text-[#e1e2ec]/55 uppercase tracking-widest font-bold flex items-center gap-1.5">
-          <span className="material-symbols-outlined text-[14px] text-status-red">flag</span>
-          {entries.length === 0
-            ? "No downtime"
-            : `${totalLabel} downtime`}
+          <span className="material-symbols-outlined text-[14px] text-status-red">
+            flag
+          </span>
+          {entries.length === 0 ? "No downtime" : `${totalLabel} downtime`}
         </span>
-        <span className="text-[#e1e2ec]/45 text-sm">{open ? "\u25B2" : "\u25BC"}</span>
+        <span className="text-[#e1e2ec]/45 text-sm">
+          {open ? "\u25B2" : "\u25BC"}
+        </span>
       </button>
 
       {open && (
         <div className="mt-2 space-y-2">
           {entries.length === 0 ? (
-            <p className="text-xs text-[#e1e2ec]/45 italic">No downtime logged this shift.</p>
+            <p className="text-xs text-[#e1e2ec]/45 italic">
+              No downtime logged this shift.
+            </p>
           ) : (
             entries.map((entry) => (
-              <div key={entry.id} className="bg-background/55 p-3 rounded-sm border border-border/30">
+              <div
+                key={entry.id}
+                className="bg-background/55 p-3 rounded-sm border border-border/30"
+              >
                 <div className="flex items-start justify-between gap-2">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-1.5 flex-wrap">
@@ -103,12 +115,20 @@ export default function DowntimePanel({ entries, onLogStop, onResolve }: Downtim
                       {entry.endTime ? (
                         <> &rarr; {formatTime(entry.endTime)}</>
                       ) : (
-                        <> &rarr; <span className="text-status-red">now</span></>
+                        <>
+                          {" "}
+                          &rarr; <span className="text-status-red">now</span>
+                        </>
                       )}
-                      <span className="text-[#e1e2ec]/45 ml-1">&middot; {formatDuration(entry.startTime, entry.endTime)}</span>
+                      <span className="text-[#e1e2ec]/45 ml-1">
+                        &middot;{" "}
+                        {formatDuration(entry.startTime, entry.endTime)}
+                      </span>
                     </div>
                     {entry.notes && (
-                      <p className="text-[10px] text-[#e1e2ec]/45 mt-0.5 italic truncate">{entry.notes}</p>
+                      <p className="text-[10px] text-[#e1e2ec]/45 mt-0.5 italic truncate">
+                        {entry.notes}
+                      </p>
                     )}
                   </div>
                   {entry.unitsLost > 0 && (

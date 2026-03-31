@@ -9,7 +9,14 @@ interface HourlyTableProps {
 }
 
 export default function HourlyTable({ states, lineLabels }: HourlyTableProps) {
-  const { hours, activeStates, colTotals, rowTotals, changeoverRowTotals, grandTotal } = useMemo(() => {
+  const {
+    hours,
+    activeStates,
+    colTotals,
+    rowTotals,
+    changeoverRowTotals,
+    grandTotal,
+  } = useMemo(() => {
     const hourSet = new Set<string>();
     for (const state of states) {
       Object.keys(state.hourlyOutput).forEach((h) => hourSet.add(h));
@@ -21,7 +28,10 @@ export default function HourlyTable({ states, lineLabels }: HourlyTableProps) {
     // Column totals: one pass
     const colTotals: Record<string, number> = {};
     for (const s of activeStates) {
-      colTotals[s.lineId] = Object.values(s.hourlyOutput).reduce((sum, v) => sum + v, 0);
+      colTotals[s.lineId] = Object.values(s.hourlyOutput).reduce(
+        (sum, v) => sum + v,
+        0,
+      );
     }
     const grandTotal = Object.values(colTotals).reduce((sum, v) => sum + v, 0);
 
@@ -31,7 +41,7 @@ export default function HourlyTable({ states, lineLabels }: HourlyTableProps) {
     for (const hour of hours) {
       rowTotals[hour] = activeStates.reduce(
         (sum, s) => sum + (s.hourlyOutput[hour] ?? 0),
-        0
+        0,
       );
       changeoverRowTotals[hour] = activeStates.reduce(
         (sum, s) => sum + (s.hourlyChangeovers?.[hour] ?? 0),
@@ -39,7 +49,14 @@ export default function HourlyTable({ states, lineLabels }: HourlyTableProps) {
       );
     }
 
-    return { hours, activeStates, colTotals, rowTotals, changeoverRowTotals, grandTotal };
+    return {
+      hours,
+      activeStates,
+      colTotals,
+      rowTotals,
+      changeoverRowTotals,
+      grandTotal,
+    };
   }, [states]);
 
   if (hours.length === 0) {
@@ -59,7 +76,10 @@ export default function HourlyTable({ states, lineLabels }: HourlyTableProps) {
               Hour
             </th>
             {activeStates.map((s) => (
-              <th key={s.lineId} className="px-4 py-3 text-right font-bold uppercase tracking-widest text-[10px] text-[#e1e2ec]/40">
+              <th
+                key={s.lineId}
+                className="px-4 py-3 text-right font-bold uppercase tracking-widest text-[10px] text-[#e1e2ec]/40"
+              >
                 {lineLabels[s.lineId] ?? s.lineId}
               </th>
             ))}
@@ -78,9 +98,14 @@ export default function HourlyTable({ states, lineLabels }: HourlyTableProps) {
                 const val = s.hourlyOutput[hour];
                 const changeovers = s.hourlyChangeovers?.[hour] ?? 0;
                 return (
-                  <td key={s.lineId} className="px-4 py-3 text-right text-[#e1e2ec]/80">
+                  <td
+                    key={s.lineId}
+                    className="px-4 py-3 text-right text-[#e1e2ec]/80"
+                  >
                     <div className="inline-flex items-center gap-1 justify-end">
-                      <span>{val ?? <span className="text-[#e1e2ec]/15">—</span>}</span>
+                      <span>
+                        {val ?? <span className="text-[#e1e2ec]/15">—</span>}
+                      </span>
                       {changeovers > 0 && (
                         <span className="text-[9px] font-bold px-1 py-0.5 rounded-sm bg-status-amber/20 text-status-amber border border-status-amber/30">
                           C{changeovers}
@@ -91,14 +116,14 @@ export default function HourlyTable({ states, lineLabels }: HourlyTableProps) {
                 );
               })}
               <td className="px-6 py-3 text-right text-accent font-semibold">
-                  <div className="inline-flex items-center gap-2 justify-end">
-                    <span>{rowTotals[hour]}</span>
-                    {changeoverRowTotals[hour] > 0 && (
-                      <span className="text-[9px] font-bold px-1 py-0.5 rounded-sm bg-status-amber/20 text-status-amber border border-status-amber/30">
-                        {changeoverRowTotals[hour]} chg
-                      </span>
-                    )}
-                  </div>
+                <div className="inline-flex items-center gap-2 justify-end">
+                  <span>{rowTotals[hour]}</span>
+                  {changeoverRowTotals[hour] > 0 && (
+                    <span className="text-[9px] font-bold px-1 py-0.5 rounded-sm bg-status-amber/20 text-status-amber border border-status-amber/30">
+                      {changeoverRowTotals[hour]} chg
+                    </span>
+                  )}
+                </div>
               </td>
             </tr>
           ))}
@@ -109,7 +134,10 @@ export default function HourlyTable({ states, lineLabels }: HourlyTableProps) {
               Total
             </td>
             {activeStates.map((s) => (
-              <td key={s.lineId} className="px-4 py-3 text-right font-semibold text-[#e1e2ec]/60">
+              <td
+                key={s.lineId}
+                className="px-4 py-3 text-right font-semibold text-[#e1e2ec]/60"
+              >
                 {colTotals[s.lineId] ?? 0}
               </td>
             ))}

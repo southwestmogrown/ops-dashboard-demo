@@ -1,6 +1,12 @@
 "use client";
 
-import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
+import {
+  forwardRef,
+  useEffect,
+  useImperativeHandle,
+  useRef,
+  useState,
+} from "react";
 import type { LineSchedule, RunSheetItem } from "@/lib/mesTypes";
 
 interface AdminLineCardProps {
@@ -14,20 +20,39 @@ interface AdminLineCardProps {
   savedSupervisorName: string | undefined;
   skippedItems: RunSheetItem[];
   onScheduleLoaded: (lineId: string, schedule: LineSchedule) => Promise<void>;
-  onConfigSaved: (lineId: string, target: number | undefined, headcount: number | undefined, isRunning: boolean, supervisorName: string) => void;
+  onConfigSaved: (
+    lineId: string,
+    target: number | undefined,
+    headcount: number | undefined,
+    isRunning: boolean,
+    supervisorName: string,
+  ) => void;
   onRemoveQueued: (lineId: string, index: number) => void;
   onClearSchedule: (lineId: string) => void;
   onSkipOrder: (lineId: string, model: string) => void;
   onUnskipOrder: (lineId: string, model: string) => void;
 }
 
-const AdminLineCardInner = forwardRef(function AdminLineCardInner({
-  lineId, label, schedule, queuedSchedules,
-  savedTarget, savedHeadcount, savedIsRunning,
-  savedSupervisorName, skippedItems,
-  onScheduleLoaded, onConfigSaved, onRemoveQueued, onClearSchedule,
-  onSkipOrder, onUnskipOrder,
-}: AdminLineCardProps, ref) {
+const AdminLineCardInner = forwardRef(function AdminLineCardInner(
+  {
+    lineId,
+    label,
+    schedule,
+    queuedSchedules,
+    savedTarget,
+    savedHeadcount,
+    savedIsRunning,
+    savedSupervisorName,
+    skippedItems,
+    onScheduleLoaded,
+    onConfigSaved,
+    onRemoveQueued,
+    onClearSchedule,
+    onSkipOrder,
+    onUnskipOrder,
+  }: AdminLineCardProps,
+  ref,
+) {
   const inputRef = useRef<HTMLInputElement>(null);
 
   const [parsing, setParsing] = useState(false);
@@ -37,12 +62,22 @@ const AdminLineCardInner = forwardRef(function AdminLineCardInner({
   const [queueOpen, setQueueOpen] = useState(false);
   const [skippedOpen, setSkippedOpen] = useState(false);
   /** Schedule parsed from the latest PDF drop, shown immediately while the API round-trips */
-  const [pendingSchedule, setPendingSchedule] = useState<LineSchedule | null>(null);
+  const [pendingSchedule, setPendingSchedule] = useState<LineSchedule | null>(
+    null,
+  );
 
-  const [target, setTarget] = useState(savedTarget !== undefined ? String(savedTarget) : "");
-  const [headcount, setHeadcount] = useState(savedHeadcount !== undefined ? String(savedHeadcount) : "");
-  const [isRunning, setIsRunning] = useState(savedIsRunning !== undefined ? savedIsRunning : true);
-  const [supervisorName, setSupervisorName] = useState(savedSupervisorName ?? "");
+  const [target, setTarget] = useState(
+    savedTarget !== undefined ? String(savedTarget) : "",
+  );
+  const [headcount, setHeadcount] = useState(
+    savedHeadcount !== undefined ? String(savedHeadcount) : "",
+  );
+  const [isRunning, setIsRunning] = useState(
+    savedIsRunning !== undefined ? savedIsRunning : true,
+  );
+  const [supervisorName, setSupervisorName] = useState(
+    savedSupervisorName ?? "",
+  );
   const [saved, setSaved] = useState(false);
 
   useEffect(() => {
@@ -62,24 +97,34 @@ const AdminLineCardInner = forwardRef(function AdminLineCardInner({
   }, [savedSupervisorName]);
 
   // Expose a save() method so the parent can trigger save-all
-  useImperativeHandle(ref, () => ({
-    save: async () => {
-      const t = target !== "" ? Number(target) : undefined;
-      const hc = headcount !== "" ? Number(headcount) : undefined;
-      await onConfigSaved(lineId, t, hc, isRunning, supervisorName);
-      setSaved(true);
-      setTimeout(() => setSaved(false), 1500);
-    },
-  }), [target, headcount, isRunning, supervisorName, lineId, onConfigSaved]);
+  useImperativeHandle(
+    ref,
+    () => ({
+      save: async () => {
+        const t = target !== "" ? Number(target) : undefined;
+        const hc = headcount !== "" ? Number(headcount) : undefined;
+        await onConfigSaved(lineId, t, hc, isRunning, supervisorName);
+        setSaved(true);
+        setTimeout(() => setSaved(false), 1500);
+      },
+    }),
+    [target, headcount, isRunning, supervisorName, lineId, onConfigSaved],
+  );
 
   async function handleFile(file: File) {
-    if (!file.name.endsWith(".pdf")) { setParseError("Must be a PDF"); return; }
+    if (!file.name.endsWith(".pdf")) {
+      setParseError("Must be a PDF");
+      return;
+    }
     setParsing(true);
     setParseError(null);
     try {
       const { parseRunSheet } = await import("@/lib/pdfParser");
       const s = await parseRunSheet(file, lineId);
-      if (s.items.length === 0) { setParseError("No orders found"); return; }
+      if (s.items.length === 0) {
+        setParseError("No orders found");
+        return;
+      }
       // Show preview immediately — the API call is just persistence
       setPendingSchedule(s);
       setLoadedFlash(true);
@@ -117,7 +162,9 @@ const AdminLineCardInner = forwardRef(function AdminLineCardInner({
   const activeSchedule = pendingSchedule !== null ? pendingSchedule : schedule;
 
   // Clear pending once the server-confirmed schedule catches up to what we're showing
-  const serverConfirmed = schedule !== null && pendingSchedule !== null &&
+  const serverConfirmed =
+    schedule !== null &&
+    pendingSchedule !== null &&
     schedule.lineId === pendingSchedule.lineId &&
     schedule.date === pendingSchedule.date;
 
@@ -127,27 +174,39 @@ const AdminLineCardInner = forwardRef(function AdminLineCardInner({
 
   const pct = activeSchedule
     ? Math.round(
-        (activeSchedule.items.reduce((s, i) => s + i.completed, 0) / activeSchedule.totalTarget) * 100
+        (activeSchedule.items.reduce((s, i) => s + i.completed, 0) /
+          activeSchedule.totalTarget) *
+          100,
       )
     : 0;
 
   const queuedCount = queuedSchedules.length;
   const hasSchedule = activeSchedule !== null;
-  const statusLabel = hasSchedule ? (queuedCount > 0 ? `QUEUED (${queuedCount})` : "ACTIVE") : "IDLE";
+  const statusLabel = hasSchedule
+    ? queuedCount > 0
+      ? `QUEUED (${queuedCount})`
+      : "ACTIVE"
+    : "IDLE";
 
   return (
-    <section className={`bg-surface-low rounded-sm border-t-2 overflow-hidden ${hasSchedule ? "border-vs2" : "border-accent/40"}`}>
+    <section
+      className={`bg-surface-low rounded-sm border-t-2 overflow-hidden ${hasSchedule ? "border-vs2" : "border-accent/40"}`}
+    >
       {/* Header bar */}
       <div className="p-5 flex justify-between items-center bg-surface">
         <div className="flex items-center gap-3">
-          <span className={`font-['Space_Grotesk',sans-serif] font-bold text-lg ${hasSchedule ? "text-vs2" : ""}`}>
+          <span
+            className={`font-['Space_Grotesk',sans-serif] font-bold text-lg ${hasSchedule ? "text-vs2" : ""}`}
+          >
             {label}
           </span>
-          <span className={`text-[10px] px-2 py-0.5 rounded-full border ${
-            hasSchedule
-              ? "bg-vs2/15 text-vs2 border-vs2/25"
-              : "bg-surface-highest text-[#e1e2ec]/40 border-border"
-          }`}>
+          <span
+            className={`text-[10px] px-2 py-0.5 rounded-full border ${
+              hasSchedule
+                ? "bg-vs2/15 text-vs2 border-vs2/25"
+                : "bg-surface-highest text-[#e1e2ec]/40 border-border"
+            }`}
+          >
             {statusLabel}
           </span>
         </div>
@@ -167,7 +226,13 @@ const AdminLineCardInner = forwardRef(function AdminLineCardInner({
                   headers: { "Content-Type": "application/json" },
                   body: JSON.stringify({ lineId, isRunning: next }),
                 });
-                onConfigSaved(lineId, undefined, undefined, next, supervisorName);
+                onConfigSaved(
+                  lineId,
+                  undefined,
+                  undefined,
+                  next,
+                  supervisorName,
+                );
               }}
               className="sr-only peer"
             />
@@ -179,7 +244,6 @@ const AdminLineCardInner = forwardRef(function AdminLineCardInner({
 
       {/* Content Grid */}
       <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-8">
-
         {/* Left: Upload & Config */}
         <div className="space-y-6">
           {/* Drop Zone */}
@@ -191,35 +255,62 @@ const AdminLineCardInner = forwardRef(function AdminLineCardInner({
                   ? "border-status-green bg-status-green/5"
                   : "border-border bg-background/50 hover:border-accent/40"
             } ${!isRunning ? "pointer-events-none" : "cursor-pointer"}`}
-            onDragOver={(e) => { if (isRunning) { e.preventDefault(); setIsDragOver(true); } }}
+            onDragOver={(e) => {
+              if (isRunning) {
+                e.preventDefault();
+                setIsDragOver(true);
+              }
+            }}
             onDragLeave={() => setIsDragOver(false)}
             onDrop={onDrop}
-            onClick={() => { if (isRunning) inputRef.current?.click(); }}
+            onClick={() => {
+              if (isRunning) inputRef.current?.click();
+            }}
           >
-            <span className={`material-symbols-outlined text-4xl mb-2 transition-transform group-hover:scale-110 ${
-              loadedFlash ? "text-status-green" : isDragOver ? "text-accent" : "text-accent/40"
-            }`}>
+            <span
+              className={`material-symbols-outlined text-4xl mb-2 transition-transform group-hover:scale-110 ${
+                loadedFlash
+                  ? "text-status-green"
+                  : isDragOver
+                    ? "text-accent"
+                    : "text-accent/40"
+              }`}
+            >
               {loadedFlash ? "check_circle" : "upload_file"}
             </span>
             <p className="text-xs font-bold text-[#e1e2ec]/70 uppercase tracking-widest">
-              {parsing ? "Parsing..." : loadedFlash ? "Loaded!" : "Drop Schedule PDF"}
+              {parsing
+                ? "Parsing..."
+                : loadedFlash
+                  ? "Loaded!"
+                  : "Drop Schedule PDF"}
             </p>
-            <p className="text-[10px] text-[#e1e2ec]/30 mt-1">MAX 5MB &bull; .PDF ONLY</p>
-            {parseError && <p className="text-[10px] text-status-red mt-1">{parseError}</p>}
+            <p className="text-[10px] text-[#e1e2ec]/30 mt-1">
+              MAX 5MB &bull; .PDF ONLY
+            </p>
+            {parseError && (
+              <p className="text-[10px] text-status-red mt-1">{parseError}</p>
+            )}
             <input
               ref={inputRef}
               type="file"
               accept=".pdf"
               disabled={!isRunning}
               className="absolute inset-0 opacity-0 cursor-pointer"
-              onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFile(f); e.target.value = ""; }}
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                if (f) handleFile(f);
+                e.target.value = "";
+              }}
             />
           </div>
 
           {/* Target & Headcount */}
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1">
-              <label className="text-[10px] uppercase font-black text-[#e1e2ec]/40 tracking-widest">Daily Target</label>
+              <label className="text-[10px] uppercase font-black text-[#e1e2ec]/40 tracking-widest">
+                Daily Target
+              </label>
               <input
                 type="number"
                 min={0}
@@ -231,7 +322,9 @@ const AdminLineCardInner = forwardRef(function AdminLineCardInner({
               />
             </div>
             <div className="space-y-1">
-              <label className="text-[10px] uppercase font-black text-[#e1e2ec]/40 tracking-widest">Headcount</label>
+              <label className="text-[10px] uppercase font-black text-[#e1e2ec]/40 tracking-widest">
+                Headcount
+              </label>
               <input
                 type="number"
                 min={0}
@@ -246,7 +339,9 @@ const AdminLineCardInner = forwardRef(function AdminLineCardInner({
 
           {/* Supervisor */}
           <div className="space-y-1">
-            <label className="text-[10px] uppercase font-black text-[#e1e2ec]/40 tracking-widest">Supervisor</label>
+            <label className="text-[10px] uppercase font-black text-[#e1e2ec]/40 tracking-widest">
+              Supervisor
+            </label>
             <input
               type="text"
               disabled={!isRunning}
@@ -273,11 +368,16 @@ const AdminLineCardInner = forwardRef(function AdminLineCardInner({
 
         {/* Right: RunSheet Preview */}
         {hasSchedule ? (
-          <div className={`bg-background p-4 border border-border/40 rounded-sm flex flex-col ${!isRunning ? "opacity-40 grayscale" : ""}`}>
+          <div
+            className={`bg-background p-4 border border-border/40 rounded-sm flex flex-col ${!isRunning ? "opacity-40 grayscale" : ""}`}
+          >
             <div className="flex items-center justify-between mb-4 pb-2 border-b border-border/40">
-              <span className="text-[10px] uppercase font-black tracking-widest">RunSheet Preview</span>
+              <span className="text-[10px] uppercase font-black tracking-widest">
+                RunSheet Preview
+              </span>
               <span className="text-[10px] text-[#e1e2ec]/40">
-                {activeSchedule.items.filter(i => !i.skipped).length} BATCHES PENDING
+                {activeSchedule.items.filter((i) => !i.skipped).length} BATCHES
+                PENDING
               </span>
             </div>
 
@@ -315,18 +415,25 @@ const AdminLineCardInner = forwardRef(function AdminLineCardInner({
                     >
                       <div className="flex flex-col min-w-0">
                         <div className="flex items-center gap-2">
-                          <span className="text-[10px] font-black text-accent truncate">{item.model}</span>
+                          <span className="text-[10px] font-black text-accent truncate">
+                            {item.model}
+                          </span>
                           {!done && (
                             <button
                               title="Skip this order"
-                              onClick={(e) => { e.stopPropagation(); onSkipOrder(lineId, item.model); }}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onSkipOrder(lineId, item.model);
+                              }}
                               className="text-[#e1e2ec]/30 hover:text-status-amber bg-transparent border-none cursor-pointer text-[10px] transition-colors shrink-0"
                             >
                               skip
                             </button>
                           )}
                         </div>
-                        <span className="text-[8px] text-[#e1e2ec]/40">{item.qty} units</span>
+                        <span className="text-[8px] text-[#e1e2ec]/40">
+                          {item.qty} units
+                        </span>
                       </div>
                       <span className="font-['Space_Grotesk',sans-serif] text-lg font-bold tabular-nums">
                         {item.completed}/{item.qty}
@@ -343,13 +450,19 @@ const AdminLineCardInner = forwardRef(function AdminLineCardInner({
                   onClick={() => setSkippedOpen((o) => !o)}
                   className="flex items-center gap-1.5 text-[10px] text-status-amber/70 hover:text-status-amber bg-transparent border-none cursor-pointer transition-colors mb-1 uppercase tracking-widest font-bold"
                 >
-                  {skippedItems.length} skipped {skippedOpen ? "\u25B2" : "\u25BC"}
+                  {skippedItems.length} skipped{" "}
+                  {skippedOpen ? "\u25B2" : "\u25BC"}
                 </button>
                 {skippedOpen && (
                   <div className="flex flex-col gap-1">
                     {skippedItems.map((item) => (
-                      <div key={item.model} className="flex items-center justify-between text-[10px] text-[#e1e2ec]/40 italic">
-                        <span className="font-mono">{item.model} &middot; {item.qty} units</span>
+                      <div
+                        key={item.model}
+                        className="flex items-center justify-between text-[10px] text-[#e1e2ec]/40 italic"
+                      >
+                        <span className="font-mono">
+                          {item.model} &middot; {item.qty} units
+                        </span>
                         <button
                           title="Unskip"
                           onClick={() => onUnskipOrder(lineId, item.model)}
@@ -376,9 +489,13 @@ const AdminLineCardInner = forwardRef(function AdminLineCardInner({
                 {queueOpen && (
                   <div className="flex flex-col gap-1">
                     {queuedSchedules.map((sched, i) => (
-                      <div key={i} className="flex items-center justify-between gap-2 text-[10px]">
+                      <div
+                        key={i}
+                        className="flex items-center justify-between gap-2 text-[10px]"
+                      >
                         <span className="text-[#e1e2ec]/60 font-mono">
-                          {sched.date} &middot; {sched.items.length} orders &middot; {sched.totalTarget} units
+                          {sched.date} &middot; {sched.items.length} orders
+                          &middot; {sched.totalTarget} units
                         </span>
                         <button
                           onClick={() => onRemoveQueued(lineId, i + 1)}
@@ -403,7 +520,10 @@ const AdminLineCardInner = forwardRef(function AdminLineCardInner({
                 Load PDF
               </button>
               <button
-                onClick={() => { setPendingSchedule(null); onClearSchedule(lineId); }}
+                onClick={() => {
+                  setPendingSchedule(null);
+                  onClearSchedule(lineId);
+                }}
                 className="flex-1 text-[10px] text-status-red/60 hover:text-status-red bg-surface/30 hover:bg-status-red/10 transition-colors py-2 rounded-sm font-bold uppercase tracking-widest"
               >
                 Clear
@@ -411,9 +531,15 @@ const AdminLineCardInner = forwardRef(function AdminLineCardInner({
             </div>
           </div>
         ) : (
-          <div className={`bg-background p-4 border border-border/40 rounded-sm flex flex-col items-center justify-center min-h-[200px] ${!isRunning ? "opacity-40 grayscale" : ""}`}>
-            <span className="material-symbols-outlined text-[#e1e2ec]/10 text-5xl">inventory</span>
-            <p className="text-[10px] uppercase font-black tracking-widest text-[#e1e2ec]/20 mt-2">No Active RunSheet</p>
+          <div
+            className={`bg-background p-4 border border-border/40 rounded-sm flex flex-col items-center justify-center min-h-[200px] ${!isRunning ? "opacity-40 grayscale" : ""}`}
+          >
+            <span className="material-symbols-outlined text-[#e1e2ec]/10 text-5xl">
+              inventory
+            </span>
+            <p className="text-[10px] uppercase font-black tracking-widest text-[#e1e2ec]/20 mt-2">
+              No Active RunSheet
+            </p>
           </div>
         )}
       </div>

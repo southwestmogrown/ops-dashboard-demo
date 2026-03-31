@@ -51,10 +51,17 @@ function randomChoice<T>(arr: readonly T[]): T {
  * Last 30 min   → 75% rate (wind-down)
  * Middle        → 100% rate
  */
-function getRateMultiplier(simClock: Date): { multiplier: number; actualUnits: number; shiftMinutes: number } {
-  const hour      = simClock.getUTCHours() + simClock.getUTCMinutes() / 60 + simClock.getUTCSeconds() / 3600;
+function getRateMultiplier(simClock: Date): {
+  multiplier: number;
+  actualUnits: number;
+  shiftMinutes: number;
+} {
+  const hour =
+    simClock.getUTCHours() +
+    simClock.getUTCMinutes() / 60 +
+    simClock.getUTCSeconds() / 3600;
   const shiftName: ShiftName = hour >= 6 && hour < 18 ? "day" : "night";
-  const win       = getShiftWindows(shiftName);
+  const win = getShiftWindows(shiftName);
   const totalWorkMinutes = win.totalWorkMinutes;
 
   let elapsedMinutes: number;
@@ -66,8 +73,8 @@ function getRateMultiplier(simClock: Date): { multiplier: number; actualUnits: n
   elapsedMinutes = Math.max(0, Math.min(totalWorkMinutes, elapsedMinutes));
 
   let multiplier = 1;
-  if (elapsedMinutes < 30)                            multiplier = 0.6;
-  else if (elapsedMinutes > totalWorkMinutes - 30)    multiplier = 0.75;
+  if (elapsedMinutes < 30) multiplier = 0.6;
+  else if (elapsedMinutes > totalWorkMinutes - 30) multiplier = 0.75;
 
   return { multiplier, actualUnits: 0, shiftMinutes: elapsedMinutes };
 }
@@ -77,27 +84,27 @@ function getRateMultiplier(simClock: Date): { multiplier: number; actualUnits: n
 const AFFECTED_AREAS: Array<"panel" | "extrusion"> = ["panel", "extrusion"];
 
 async function maybeInjectDefect(
-  activeLines: { lineId: string; currentOrder: string | null }[]
+  activeLines: { lineId: string; currentOrder: string | null }[],
 ): Promise<void> {
   if (activeLines.length === 0) return;
 
-  const line  = randomChoice(activeLines);
-  const now   = (await getSimClock()) ?? new Date();
-  const hour  = now.getUTCHours();
+  const line = randomChoice(activeLines);
+  const now = (await getSimClock()) ?? new Date();
+  const hour = now.getUTCHours();
   const shift: ShiftName = hour >= 6 && hour < 18 ? "day" : "night";
   const isVS2 = line.lineId.toLowerCase().includes("vs2");
 
   if (Math.random() < KICKED_LID_INJECTION_PROBABILITY) {
     await addScrapEntry({
-      kind:            "kicked-lid",
-      lineId:          line.lineId,
+      kind: "kicked-lid",
+      lineId: line.lineId,
       shift,
-      model:           line.currentOrder ?? "UNKNOWN",
-      panel:           randomChoice(PANEL_OPTIONS),
-      damageType:      "kicked-lid",
-      affectedArea:    randomChoice(AFFECTED_AREAS),
+      model: line.currentOrder ?? "UNKNOWN",
+      panel: randomChoice(PANEL_OPTIONS),
+      damageType: "kicked-lid",
+      affectedArea: randomChoice(AFFECTED_AREAS),
       auditorInitials: "SYS",
-      boughtIn:        false,
+      boughtIn: false,
     });
     return;
   }
@@ -110,15 +117,15 @@ async function maybeInjectDefect(
   }
 
   await addScrapEntry({
-    kind:         "scrapped-panel",
-    lineId:       line.lineId,
+    kind: "scrapped-panel",
+    lineId: line.lineId,
     shift,
-    model:        line.currentOrder ?? "UNKNOWN",
-    panel:        randomChoice(PANEL_OPTIONS),
-    damageType:   defectType,
+    model: line.currentOrder ?? "UNKNOWN",
+    panel: randomChoice(PANEL_OPTIONS),
+    damageType: defectType,
     stationFound: "Final Inspection",
-    howDamaged:   `Simulated defect: ${defectType}`,
-    boughtIn:     false,
+    howDamaged: `Simulated defect: ${defectType}`,
+    boughtIn: false,
   });
 }
 
@@ -126,7 +133,7 @@ async function maybeInjectDowntime(
   lineId: string,
   shift: ShiftName,
   simClock: Date,
-  targetOutput: number
+  targetOutput: number,
 ): Promise<void> {
   if (Math.random() >= DOWNTIME_EVENT_PROBABILITY) return;
 
@@ -136,10 +143,12 @@ async function maybeInjectDowntime(
   const durationMinutes = 2 + Math.floor(Math.random() * 7); // 2-8 min
   const end = new Date(simClock.getTime() + durationMinutes * 60_000);
   const { totalWorkMinutes } = getShiftWindows(shift);
-  const unitsPerWorkMinute = targetOutput > 0 ? targetOutput / totalWorkMinutes : 0;
-  const unitsLost = targetOutput > 0
-    ? Math.max(1, Math.round(unitsPerWorkMinute * durationMinutes))
-    : 0;
+  const unitsPerWorkMinute =
+    targetOutput > 0 ? targetOutput / totalWorkMinutes : 0;
+  const unitsLost =
+    targetOutput > 0
+      ? Math.max(1, Math.round(unitsPerWorkMinute * durationMinutes))
+      : 0;
 
   const entry = await addDowntimeEntry({
     lineId,
@@ -167,22 +176,26 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   // If the clock advance just stopped the sim (shift end), tell the client immediately.
   const stillRunning = await getSimRunning();
 
-  const body = await request.json() as TickBody;
+  const body = (await request.json()) as TickBody;
 
   if (body.all) {
-    if (!stillRunning) return NextResponse.json({ scansAdded: 0, stopped: true });
+    if (!stillRunning)
+      return NextResponse.json({ scansAdded: 0, stopped: true });
 
-    const states      = await getAllLineStates();
+    const states = await getAllLineStates();
     const activeLines = states.filter((s) => s.schedule !== null);
     let scansAdded = 0;
 
     const simClock = (await getSimClock()) ?? new Date();
     const shift: ShiftName =
-      simClock.getUTCHours() >= 6 && simClock.getUTCHours() < 18 ? "day" : "night";
+      simClock.getUTCHours() >= 6 && simClock.getUTCHours() < 18
+        ? "day"
+        : "night";
     const { multiplier } = getRateMultiplier(simClock);
 
     const simSpeed = await getSimSpeed();
-    const requestedUnits = body.units > 0 ? body.units : unitsForSpeed(simSpeed);
+    const requestedUnits =
+      body.units > 0 ? body.units : unitsForSpeed(simSpeed);
     const requestedTickUnits = requestedUnits * multiplier;
 
     if (requestedTickUnits <= 0) {
@@ -209,20 +222,31 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       scansAdded += actualUnits;
     }
 
-    await maybeInjectDefect(activeLines.map((s) => ({ lineId: s.lineId, currentOrder: s.currentOrder })));
+    await maybeInjectDefect(
+      activeLines.map((s) => ({
+        lineId: s.lineId,
+        currentOrder: s.currentOrder,
+      })),
+    );
 
     return NextResponse.json({ scansAdded });
   }
 
   if (!body.lineId) {
-    return NextResponse.json({ error: "lineId or all=true required" }, { status: 400 });
+    return NextResponse.json(
+      { error: "lineId or all=true required" },
+      { status: 400 },
+    );
   }
 
   const simClock = (await getSimClock()) ?? new Date();
   const { multiplier } = getRateMultiplier(simClock);
   const simSpeed = await getSimSpeed();
   const requestedUnits = body.units > 0 ? body.units : unitsForSpeed(simSpeed);
-  const actualUnits = await claimSimUnits(body.lineId, requestedUnits * multiplier);
+  const actualUnits = await claimSimUnits(
+    body.lineId,
+    requestedUnits * multiplier,
+  );
 
   if (actualUnits <= 0) {
     return NextResponse.json({ scansAdded: 0 });

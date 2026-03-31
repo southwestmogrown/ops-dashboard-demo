@@ -15,7 +15,7 @@ export interface FloorAlert {
 function computeAlerts(
   lines: Line[],
   mesStates: LineState[],
-  adminConfig: Record<string, AdminLineConfig>
+  adminConfig: Record<string, AdminLineConfig>,
 ): FloorAlert[] {
   const alerts: FloorAlert[] = [];
   const stateMap = new Map(mesStates.map((s) => [s.lineId, s]));
@@ -28,12 +28,27 @@ function computeAlerts(
     const pct = line.target > 0 ? line.output / line.target : 0;
 
     if (line.output === 0 && state?.schedule) {
-      alerts.push({ lineId: line.id, lineName: line.name, issue: "Zero Output", severity: "critical" });
+      alerts.push({
+        lineId: line.id,
+        lineName: line.name,
+        issue: "Zero Output",
+        severity: "critical",
+      });
     } else if (pct < 0.75) {
-      alerts.push({ lineId: line.id, lineName: line.name, issue: "Behind Pace", severity: "warning" });
+      alerts.push({
+        lineId: line.id,
+        lineName: line.name,
+        issue: "Behind Pace",
+        severity: "warning",
+      });
     }
     if (line.fpy < 90) {
-      alerts.push({ lineId: line.id, lineName: line.name, issue: `FPY ${line.fpy.toFixed(1)}%`, severity: line.fpy < 85 ? "critical" : "warning" });
+      alerts.push({
+        lineId: line.id,
+        lineName: line.name,
+        issue: `FPY ${line.fpy.toFixed(1)}%`,
+        severity: line.fpy < 85 ? "critical" : "warning",
+      });
     }
   }
 
@@ -55,9 +70,15 @@ export default function FloorAlertStrip({
   const [dismissed, setDismissed] = useState<Set<string>>(new Set());
 
   const allAlerts = computeAlerts(lines, mesStates, adminConfig);
-  const visibleAlerts = allAlerts.filter((a) => !dismissed.has(a.lineId + "|" + a.issue));
-  const criticalCount = visibleAlerts.filter((a) => a.severity === "critical").length;
-  const warningCount = visibleAlerts.filter((a) => a.severity === "warning").length;
+  const visibleAlerts = allAlerts.filter(
+    (a) => !dismissed.has(a.lineId + "|" + a.issue),
+  );
+  const criticalCount = visibleAlerts.filter(
+    (a) => a.severity === "critical",
+  ).length;
+  const warningCount = visibleAlerts.filter(
+    (a) => a.severity === "warning",
+  ).length;
 
   if (visibleAlerts.length === 0) return null;
 
@@ -73,7 +94,9 @@ export default function FloorAlertStrip({
         }`}
       >
         <div className="flex items-center gap-3">
-          <span className="material-symbols-outlined text-base text-status-red">warning</span>
+          <span className="material-symbols-outlined text-base text-status-red">
+            warning
+          </span>
           <span className="text-sm font-bold text-[#f3f4f8]">
             {visibleAlerts.length === 1
               ? `${visibleAlerts[0].lineName}: ${visibleAlerts[0].issue}`
@@ -112,14 +135,20 @@ export default function FloorAlertStrip({
               <div className="flex items-center gap-2">
                 <span
                   className={`w-1.5 h-1.5 rounded-full shrink-0 ${
-                    alert.severity === "critical" ? "bg-status-red" : "bg-status-amber"
+                    alert.severity === "critical"
+                      ? "bg-status-red"
+                      : "bg-status-amber"
                   }`}
                 />
-                <span className="text-sm font-bold text-[#f3f4f8]">{alert.lineName}</span>
+                <span className="text-sm font-bold text-[#f3f4f8]">
+                  {alert.lineName}
+                </span>
                 <span className="text-sm text-[#e1e2ec]/55">&middot;</span>
                 <span
                   className={`text-sm font-medium ${
-                    alert.severity === "critical" ? "text-status-red" : "text-status-amber"
+                    alert.severity === "critical"
+                      ? "text-status-red"
+                      : "text-status-amber"
                   }`}
                 >
                   {alert.issue}
@@ -128,12 +157,17 @@ export default function FloorAlertStrip({
               <button
                 onClick={(e) => {
                   e.stopPropagation();
-                  setDismissed((prev) => new Set([...prev, `${alert.lineId}|${alert.issue}`]));
+                  setDismissed(
+                    (prev) =>
+                      new Set([...prev, `${alert.lineId}|${alert.issue}`]),
+                  );
                 }}
                 className="text-[#e1e2ec]/40 hover:text-[#f3f4f8]/80 transition-colors text-sm"
                 title="Dismiss"
               >
-                <span className="material-symbols-outlined text-[14px]">close</span>
+                <span className="material-symbols-outlined text-[14px]">
+                  close
+                </span>
               </button>
             </div>
           ))}

@@ -44,14 +44,22 @@ export default function LineDetailCard({
 }: LineDetailCardProps) {
   const [showScrapForm, setShowScrapForm] = useState(false);
   const [showDowntimeForm, setShowDowntimeForm] = useState(false);
-  const [resolveDowntime, setResolveDowntime] = useState<DowntimeEntry | null>(null);
+  const [resolveDowntime, setResolveDowntime] = useState<DowntimeEntry | null>(
+    null,
+  );
   const changeoverCount = mesState?.completedOrders ?? line.changeovers;
 
   // Single pass over schedule items — avoids double-reduce over the same array
   const { orderPct, completed } = (() => {
     if (!mesState?.schedule) return { orderPct: 0, completed: 0 };
-    const completed = mesState.schedule.items.reduce((sum, item) => sum + item.completed, 0);
-    const orderPct = Math.min(100, Math.round((completed / mesState.schedule.totalTarget) * 100));
+    const completed = mesState.schedule.items.reduce(
+      (sum, item) => sum + item.completed,
+      0,
+    );
+    const orderPct = Math.min(
+      100,
+      Math.round((completed / mesState.schedule.totalTarget) * 100),
+    );
     return { orderPct, completed };
   })();
 
@@ -61,7 +69,6 @@ export default function LineDetailCard({
 
   return (
     <div className="space-y-6">
-
       {/* Header & KPI Strip */}
       <section className="grid grid-cols-12 gap-4">
         <div className="col-span-12 lg:col-span-4 flex flex-col justify-end">
@@ -69,55 +76,82 @@ export default function LineDetailCard({
             onClick={onBack}
             className="text-[#e1e2ec]/60 hover:text-[#f8f8fb] transition-colors text-[11px] uppercase tracking-widest mb-2 bg-transparent border-none p-0 cursor-pointer text-left flex items-center gap-1"
           >
-            <span className="material-symbols-outlined text-[14px]">arrow_back</span>
+            <span className="material-symbols-outlined text-[14px]">
+              arrow_back
+            </span>
             All Lines
           </button>
           <h1 className="text-4xl font-black font-['Space_Grotesk',sans-serif] leading-none mb-1">
             {line.valueStream} — {line.name}
           </h1>
           <p className="text-base font-medium text-accent tracking-widest flex items-center gap-2">
-            <span className="material-symbols-outlined text-[14px]" style={{ fontVariationSettings: "'FILL' 1" }}>radio_button_checked</span>
+            <span
+              className="material-symbols-outlined text-[14px]"
+              style={{ fontVariationSettings: "'FILL' 1" }}
+            >
+              radio_button_checked
+            </span>
             LIVE PRODUCTION TELEMETRY
           </p>
         </div>
 
         <div className="col-span-12 lg:col-span-8 grid grid-cols-2 md:grid-cols-5 gap-4">
           <div className="bg-surface p-4 border-t-2 border-status-green">
-            <span className="block text-[11px] font-bold text-[#e1e2ec]/55 uppercase mb-1">Current Output</span>
+            <span className="block text-[11px] font-bold text-[#e1e2ec]/55 uppercase mb-1">
+              Current Output
+            </span>
             <div className="flex items-baseline gap-2">
-              <span className={`text-3xl font-['Space_Grotesk',sans-serif] font-bold tabular-nums ${getOutputColor(line.output, line.target)}`}>
+              <span
+                className={`text-3xl font-['Space_Grotesk',sans-serif] font-bold tabular-nums ${getOutputColor(line.output, line.target)}`}
+              >
                 {line.output.toLocaleString()}
               </span>
-              <span className="text-sm text-[#e1e2ec]/55">/ {line.target.toLocaleString()}</span>
+              <span className="text-sm text-[#e1e2ec]/55">
+                / {line.target.toLocaleString()}
+              </span>
             </div>
           </div>
           <div className="bg-surface p-4 border-t-2 border-status-green">
-            <span className="block text-[11px] font-bold text-[#e1e2ec]/55 uppercase mb-1">First Pass Yield</span>
+            <span className="block text-[11px] font-bold text-[#e1e2ec]/55 uppercase mb-1">
+              First Pass Yield
+            </span>
             <div className="flex items-baseline gap-2">
-              <span className={`text-3xl font-['Space_Grotesk',sans-serif] font-bold tabular-nums ${getFpyColor(line.fpy)}`}>
+              <span
+                className={`text-3xl font-['Space_Grotesk',sans-serif] font-bold tabular-nums ${getFpyColor(line.fpy)}`}
+              >
                 {line.fpy.toFixed(1)}%
               </span>
             </div>
           </div>
           <div className="bg-surface p-4 border-t-2 border-accent">
-            <span className="block text-[11px] font-bold text-[#e1e2ec]/55 uppercase mb-1">Hours Per Unit</span>
+            <span className="block text-[11px] font-bold text-[#e1e2ec]/55 uppercase mb-1">
+              Hours Per Unit
+            </span>
             <div className="flex items-baseline gap-2">
-              <span className={`text-3xl font-['Space_Grotesk',sans-serif] font-bold tabular-nums ${getHpuColor(line.hpu)}`}>
+              <span
+                className={`text-3xl font-['Space_Grotesk',sans-serif] font-bold tabular-nums ${getHpuColor(line.hpu)}`}
+              >
                 {line.hpu.toFixed(2)}
               </span>
             </div>
           </div>
           <div className="bg-surface p-4 border-t-2 border-status-green">
-            <span className="block text-[11px] font-bold text-[#e1e2ec]/55 uppercase mb-1">Headcount</span>
+            <span className="block text-[11px] font-bold text-[#e1e2ec]/55 uppercase mb-1">
+              Headcount
+            </span>
             <div className="flex items-baseline gap-2">
               <span className="text-3xl font-['Space_Grotesk',sans-serif] font-bold tabular-nums">
                 {line.headcount}
               </span>
-              <span className="material-symbols-outlined text-[16px] text-[#e1e2ec]/40">group</span>
+              <span className="material-symbols-outlined text-[16px] text-[#e1e2ec]/40">
+                group
+              </span>
             </div>
           </div>
           <div className="bg-surface p-4 border-t-2 border-status-amber">
-            <span className="block text-[11px] font-bold text-[#e1e2ec]/55 uppercase mb-1">Changeovers</span>
+            <span className="block text-[11px] font-bold text-[#e1e2ec]/55 uppercase mb-1">
+              Changeovers
+            </span>
             <div className="flex items-baseline gap-2">
               <span className="text-3xl font-['Space_Grotesk',sans-serif] font-bold tabular-nums text-status-amber">
                 {changeoverCount}
@@ -125,11 +159,18 @@ export default function LineDetailCard({
             </div>
             <div className="mt-2 flex items-center gap-1.5 min-h-3">
               {changeoverCount > 0 ? (
-                Array.from({ length: Math.min(changeoverCount, 8) }).map((_, idx) => (
-                  <span key={idx} className="h-3 border-l border-dotted border-status-amber/80" />
-                ))
+                Array.from({ length: Math.min(changeoverCount, 8) }).map(
+                  (_, idx) => (
+                    <span
+                      key={idx}
+                      className="h-3 border-l border-dotted border-status-amber/80"
+                    />
+                  ),
+                )
               ) : (
-                <span className="text-[11px] text-[#e1e2ec]/45 uppercase tracking-widest">None yet</span>
+                <span className="text-[11px] text-[#e1e2ec]/45 uppercase tracking-widest">
+                  None yet
+                </span>
               )}
             </div>
           </div>
@@ -138,25 +179,28 @@ export default function LineDetailCard({
 
       {/* Order Progress & Hourly Performance */}
       <div className="grid grid-cols-12 gap-6">
-
         {/* Left Column: Progress & Rework */}
         <div className="col-span-12 xl:col-span-4 space-y-6">
-
           {/* Current Order Progress */}
           {mesState?.schedule && (
             <div className="bg-surface p-6 relative overflow-hidden">
               <div className="flex justify-between items-start mb-6">
                 <div>
-                  <span className="text-[11px] font-bold text-accent block mb-1">CURRENT JOB</span>
+                  <span className="text-[11px] font-bold text-accent block mb-1">
+                    CURRENT JOB
+                  </span>
                   <h3 className="text-2xl font-bold font-['Space_Grotesk',sans-serif] uppercase">
                     {mesState.currentOrder ?? "All Complete"}
                   </h3>
                   <p className="text-sm text-[#e1e2ec]/55 mt-1">
-                    {mesState.remainingOnOrder} remaining on order &middot; {mesState.remainingOnRunSheet} on sheet
+                    {mesState.remainingOnOrder} remaining on order &middot;{" "}
+                    {mesState.remainingOnRunSheet} on sheet
                   </p>
                 </div>
                 <div className="text-right">
-                  <span className="text-3xl font-bold font-['Space_Grotesk',sans-serif] tabular-nums">{orderPct}%</span>
+                  <span className="text-3xl font-bold font-['Space_Grotesk',sans-serif] tabular-nums">
+                    {orderPct}%
+                  </span>
                 </div>
               </div>
               <div className="w-full bg-background h-1.5 rounded-full overflow-hidden">
@@ -170,7 +214,9 @@ export default function LineDetailCard({
               </div>
               <div className="flex justify-between mt-3 text-[11px] font-mono tracking-tighter">
                 <span>PROD: {completed.toLocaleString()}</span>
-                <span className="text-[#e1e2ec]/55">TARGET: {mesState.schedule.totalTarget.toLocaleString()}</span>
+                <span className="text-[#e1e2ec]/55">
+                  TARGET: {mesState.schedule.totalTarget.toLocaleString()}
+                </span>
               </div>
             </div>
           )}
@@ -179,7 +225,9 @@ export default function LineDetailCard({
           <div className="bg-surface-low border border-border/40">
             <div className="p-4 border-b border-border/40 flex justify-between items-center">
               <h3 className="text-sm font-bold uppercase tracking-widest flex items-center gap-2">
-                <span className="material-symbols-outlined text-[18px] text-status-red">dangerous</span>
+                <span className="material-symbols-outlined text-[18px] text-status-red">
+                  dangerous
+                </span>
                 Scrap &amp; Quality
               </h3>
               <button
@@ -192,8 +240,12 @@ export default function LineDetailCard({
             <div className="p-4 space-y-4">
               <div className="flex justify-between items-center bg-background/40 p-3">
                 <div>
-                  <span className="block text-sm font-bold">Scrapped Panels</span>
-                  <span className="text-[11px] text-[#e1e2ec]/55 font-mono">No FPY impact</span>
+                  <span className="block text-sm font-bold">
+                    Scrapped Panels
+                  </span>
+                  <span className="text-[11px] text-[#e1e2ec]/55 font-mono">
+                    No FPY impact
+                  </span>
                 </div>
                 <span className="text-xl font-['Space_Grotesk',sans-serif] font-bold text-status-red tabular-nums">
                   {String(scrapStats.scrappedPanels).padStart(2, "0")}
@@ -202,7 +254,9 @@ export default function LineDetailCard({
               <div className="flex justify-between items-center bg-background/40 p-3">
                 <div>
                   <span className="block text-sm font-bold">Kicked Lids</span>
-                  <span className="text-[11px] text-[#e1e2ec]/55 font-mono">Reduces FPY</span>
+                  <span className="text-[11px] text-[#e1e2ec]/55 font-mono">
+                    Reduces FPY
+                  </span>
                 </div>
                 <span className="text-xl font-['Space_Grotesk',sans-serif] font-bold text-status-amber tabular-nums">
                   {String(scrapStats.kickedLids).padStart(2, "0")}
@@ -225,7 +279,9 @@ export default function LineDetailCard({
           <div className="bg-surface-low border border-border/40">
             <div className="p-4 border-b border-border/40 flex justify-between items-center">
               <h3 className="text-sm font-bold uppercase tracking-widest flex items-center gap-2">
-                <span className="material-symbols-outlined text-[18px] text-status-red">flag</span>
+                <span className="material-symbols-outlined text-[18px] text-status-red">
+                  flag
+                </span>
                 Line Downtime
               </h3>
               <button
