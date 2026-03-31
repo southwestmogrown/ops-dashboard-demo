@@ -19,11 +19,8 @@ interface DowntimeFormProps {
 const REASONS: DowntimeReason[] = [
   "machine-failure",
   "material-shortage",
-  "quality-hold",
   "planned-maintenance",
-  "operator-break",
   "safety-stop",
-  "changeover",
   "other",
 ];
 
@@ -48,10 +45,12 @@ export default function DowntimeForm({
   const isResolve = !!existingEntryId;
   const { role } = useAuth();
   const [reason, setReason] = useState<DowntimeReason>(
-    isResolve ? "other" : "machine-failure"
+    isResolve ? "other" : "machine-failure",
   );
   const [startTime, setStartTime] = useState(
-    isResolve && existingStartTime ? toDateTimeLocal(existingStartTime) : nowLocal()
+    isResolve && existingStartTime
+      ? toDateTimeLocal(existingStartTime)
+      : nowLocal(),
   );
   const [endTime, setEndTime] = useState("");
   const [unitsLost, setUnitsLost] = useState(0);
@@ -117,9 +116,12 @@ export default function DowntimeForm({
     }
   }
 
-  const inputClass  = "w-full bg-surface-highest border-0 border-l-2 border-accent rounded-sm px-3.5 py-2.5 text-[#e1e2ec] text-sm outline-none focus:ring-1 focus:ring-accent/40 placeholder:text-[#e1e2ec]/20";
-  const labelClass  = "block text-[10px] text-[#e1e2ec]/40 uppercase tracking-widest font-bold mb-1";
-  const selectClass = "w-full bg-surface-highest border-0 border-l-2 border-accent rounded-sm px-3.5 py-2.5 text-[#e1e2ec] text-sm outline-none focus:ring-1 focus:ring-accent/40 appearance-none cursor-pointer";
+  const inputClass =
+    "w-full bg-surface-highest border-0 border-l-2 border-accent rounded-sm px-3.5 py-2.5 text-[#e1e2ec] text-sm outline-none focus:ring-1 focus:ring-accent/40 placeholder:text-[#e1e2ec]/20";
+  const labelClass =
+    "block text-[10px] text-[#e1e2ec]/40 uppercase tracking-widest font-bold mb-1";
+  const selectClass =
+    "w-full bg-surface-highest border-0 border-l-2 border-accent rounded-sm px-3.5 py-2.5 text-[#e1e2ec] text-sm outline-none focus:ring-1 focus:ring-accent/40 appearance-none cursor-pointer";
 
   return (
     <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
@@ -127,7 +129,9 @@ export default function DowntimeForm({
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-border">
           <div className="flex items-center gap-2">
-            <span className="material-symbols-outlined text-status-red text-xl">flag</span>
+            <span className="material-symbols-outlined text-status-red text-xl">
+              flag
+            </span>
             <h3 className="font-['Space_Grotesk',sans-serif] font-bold text-lg">
               {isResolve ? "Resolve Downtime" : "Log Line Stop"}
             </h3>
@@ -162,7 +166,10 @@ export default function DowntimeForm({
             {/* Optional custom end time */}
             <div>
               <label className={labelClass}>
-                End Time <span className="text-[#e1e2ec]/20 font-normal">(leave blank for now)</span>
+                End Time{" "}
+                <span className="text-[#e1e2ec]/20 font-normal">
+                  (leave blank for now)
+                </span>
               </label>
               <input
                 type="datetime-local"
@@ -170,7 +177,9 @@ export default function DowntimeForm({
                 onChange={(e) => setEndTime(e.target.value)}
                 className={inputClass}
               />
-              <p className="text-[9px] text-[#e1e2ec]/20 mt-1">Defaults to the current time if left blank.</p>
+              <p className="text-[9px] text-[#e1e2ec]/20 mt-1">
+                Defaults to the current time if left blank.
+              </p>
             </div>
 
             {error && <p className="text-status-red text-xs">{error}</p>}
@@ -195,7 +204,9 @@ export default function DowntimeForm({
                   className={selectClass}
                 >
                   {REASONS.map((r) => (
-                    <option key={r} value={r}>{DOWNTIME_REASON_LABELS[r]}</option>
+                    <option key={r} value={r}>
+                      {DOWNTIME_REASON_LABELS[r]}
+                    </option>
                   ))}
                 </select>
                 <span className="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 text-[#e1e2ec]/30 text-[16px] pointer-events-none">

@@ -25,13 +25,16 @@ function EditEntryForm({
   onCancel,
 }: {
   entry: ScrapEntry;
-  onSave: (updates: { model?: string; panel?: string; damageType?: string; boughtIn?: boolean }) => void;
+  onSave: (updates: {
+    model?: string;
+    panel?: string;
+    damageType?: string;
+  }) => void;
   onCancel: () => void;
 }) {
   const [model, setModel] = useState(entry.model);
   const [panel, setPanel] = useState(entry.panel);
   const [damageType, setDamageType] = useState(entry.damageType);
-  const [boughtIn, setBoughtIn] = useState(entry.boughtIn);
   const [saving, setSaving] = useState(false);
 
   async function handleSave() {
@@ -40,9 +43,13 @@ function EditEntryForm({
       await fetch("/api/scrap", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id: entry.id, void: false, updates: { model, panel, damageType, boughtIn } }),
+        body: JSON.stringify({
+          id: entry.id,
+          void: false,
+          updates: { model, panel, damageType },
+        }),
       });
-      onSave({ model, panel, damageType, boughtIn });
+      onSave({ model, panel, damageType });
     } finally {
       setSaving(false);
     }
@@ -52,7 +59,9 @@ function EditEntryForm({
     <div className="bg-surface-high rounded-sm p-2 mt-1 border border-accent/20 space-y-2">
       <div className="grid grid-cols-2 gap-2">
         <div>
-          <label className="text-[9px] text-[#e1e2ec]/40 uppercase tracking-widest font-bold block mb-0.5">Model</label>
+          <label className="text-[9px] text-[#e1e2ec]/40 uppercase tracking-widest font-bold block mb-0.5">
+            Model
+          </label>
           <input
             value={model}
             onChange={(e) => setModel(e.target.value)}
@@ -60,39 +69,41 @@ function EditEntryForm({
           />
         </div>
         <div>
-          <label className="text-[9px] text-[#e1e2ec]/40 uppercase tracking-widest font-bold block mb-0.5">Panel</label>
+          <label className="text-[9px] text-[#e1e2ec]/40 uppercase tracking-widest font-bold block mb-0.5">
+            Panel
+          </label>
           <select
             value={panel}
-            onChange={(e) => setPanel(e.target.value as typeof PANEL_OPTIONS[number])}
+            onChange={(e) =>
+              setPanel(e.target.value as (typeof PANEL_OPTIONS)[number])
+            }
             className="w-full bg-background border-none rounded-sm px-2 py-1 text-[10px] text-[#e1e2ec] outline-none font-mono"
           >
             {PANEL_OPTIONS.map((p) => (
-              <option key={p} value={p}>{p}</option>
+              <option key={p} value={p}>
+                {p}
+              </option>
             ))}
           </select>
         </div>
       </div>
       <div>
-        <label className="text-[9px] text-[#e1e2ec]/40 uppercase tracking-widest font-bold block mb-0.5">Damage Type</label>
+        <label className="text-[9px] text-[#e1e2ec]/40 uppercase tracking-widest font-bold block mb-0.5">
+          Damage Type
+        </label>
         <select
           value={damageType}
-          onChange={(e) => setDamageType(e.target.value as typeof DAMAGE_TYPES[number])}
+          onChange={(e) =>
+            setDamageType(e.target.value as (typeof DAMAGE_TYPES)[number])
+          }
           className="w-full bg-background border-none rounded-sm px-2 py-1 text-[10px] text-[#e1e2ec] outline-none font-mono"
         >
           {DAMAGE_TYPES.map((d) => (
-            <option key={d} value={d}>{d}</option>
+            <option key={d} value={d}>
+              {d}
+            </option>
           ))}
         </select>
-      </div>
-      <div className="flex items-center gap-2">
-        <input
-          type="checkbox"
-          id={`boughtin-${entry.id}`}
-          checked={boughtIn}
-          onChange={(e) => setBoughtIn(e.target.checked)}
-          className="accent-accent"
-        />
-        <label htmlFor={`boughtin-${entry.id}`} className="text-[10px] text-[#e1e2ec]/60">Bought In</label>
       </div>
       <div className="flex gap-2 justify-end">
         <button
@@ -176,10 +187,7 @@ export default function ReworkPanel({
     }
   }, [entries, localEntries, open]);
 
-  function applyUpdate(
-    id: string,
-    fn: (e: ScrapEntry) => ScrapEntry
-  ) {
+  function applyUpdate(id: string, fn: (e: ScrapEntry) => ScrapEntry) {
     setLocalEntries((prev) => prev.map((e) => (e.id === id ? fn(e) : e)));
     onEntryChange?.();
   }
@@ -211,13 +219,17 @@ export default function ReworkPanel({
             ? ` (${activeEntries.length} active, ${voidedEntries.length} voided)`
             : ""}
         </span>
-        <span className="text-[#e1e2ec]/30 text-xs">{open ? "\u25B2" : "\u25BC"}</span>
+        <span className="text-[#e1e2ec]/30 text-xs">
+          {open ? "\u25B2" : "\u25BC"}
+        </span>
       </button>
 
       {open && (
         <div className="mt-2 space-y-1">
           {localEntries.length === 0 ? (
-            <p className="text-[10px] text-[#e1e2ec]/30 italic">No entries this shift.</p>
+            <p className="text-[10px] text-[#e1e2ec]/30 italic">
+              No entries this shift.
+            </p>
           ) : (
             <>
               {localEntries.map((entry) => {
@@ -253,9 +265,15 @@ export default function ReworkPanel({
                           >
                             {entry.model}
                           </span>
-                          <span className="text-[#e1e2ec]/30 text-[10px]">Panel {entry.panel}</span>
-                          <span className="text-[#e1e2ec]/30 text-[10px]">&middot;</span>
-                          <span className={`text-[10px] truncate ${isVoided ? "line-through text-[#e1e2ec]/30" : "text-[#e1e2ec]/40"}`}>
+                          <span className="text-[#e1e2ec]/30 text-[10px]">
+                            Panel {entry.panel}
+                          </span>
+                          <span className="text-[#e1e2ec]/30 text-[10px]">
+                            &middot;
+                          </span>
+                          <span
+                            className={`text-[10px] truncate ${isVoided ? "line-through text-[#e1e2ec]/30" : "text-[#e1e2ec]/40"}`}
+                          >
                             {entry.damageType}
                           </span>
                           {entry.boughtIn && (
@@ -271,7 +289,9 @@ export default function ReworkPanel({
                           {" \u00B7 "}
                           {formatTime(entry.timestamp)}
                           {" \u00B7 "}
-                          <span className="font-mono text-[#e1e2ec]/20">{entry.id}</span>
+                          <span className="font-mono text-[#e1e2ec]/20">
+                            {entry.id}
+                          </span>
                         </div>
                       </div>
 
@@ -280,19 +300,27 @@ export default function ReworkPanel({
                         <div className="shrink-0 flex gap-1">
                           {/* Edit */}
                           <button
-                            onClick={() => setEditingId(isEditing ? null : entry.id)}
+                            onClick={() =>
+                              setEditingId(isEditing ? null : entry.id)
+                            }
                             title="Edit"
                             className="w-5 h-5 flex items-center justify-center text-[#e1e2ec]/30 hover:text-[#e1e2ec]/60 transition-colors"
                           >
-                            <span className="material-symbols-outlined text-[12px]">edit</span>
+                            <span className="material-symbols-outlined text-[12px]">
+                              edit
+                            </span>
                           </button>
                           {/* Void */}
                           <button
-                            onClick={() => setVoidingId(isVoiding ? null : entry.id)}
+                            onClick={() =>
+                              setVoidingId(isVoiding ? null : entry.id)
+                            }
                             title="Void"
                             className="w-5 h-5 flex items-center justify-center text-[#e1e2ec]/30 hover:text-status-red/80 transition-colors"
                           >
-                            <span className="material-symbols-outlined text-[12px]">close</span>
+                            <span className="material-symbols-outlined text-[12px]">
+                              close
+                            </span>
                           </button>
                         </div>
                       )}

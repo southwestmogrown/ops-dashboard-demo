@@ -49,19 +49,12 @@ export default function LineDetailCard({
   );
   const changeoverCount = mesState?.completedOrders ?? line.changeovers;
 
-  // Single pass over schedule items — avoids double-reduce over the same array
-  const { orderPct, completed } = (() => {
-    if (!mesState?.schedule) return { orderPct: 0, completed: 0 };
-    const completed = mesState.schedule.items.reduce(
-      (sum, item) => sum + item.completed,
-      0,
-    );
-    const orderPct = Math.min(
-      100,
-      Math.round((completed / mesState.schedule.totalTarget) * 100),
-    );
-    return { orderPct, completed };
-  })();
+  // Team-lead progress tracks actual output vs configured line target.
+  const orderPct =
+    line.target > 0
+      ? Math.min(100, Math.round((line.output / line.target) * 100))
+      : 0;
+  const completed = line.output;
 
   const handleScrapCreated = useCallback(() => {
     onRefreshScrap();
@@ -215,7 +208,7 @@ export default function LineDetailCard({
               <div className="flex justify-between mt-3 text-[11px] font-mono tracking-tighter">
                 <span>PROD: {completed.toLocaleString()}</span>
                 <span className="text-[#e1e2ec]/55">
-                  TARGET: {mesState.schedule.totalTarget.toLocaleString()}
+                  TARGET: {line.target.toLocaleString()}
                 </span>
               </div>
             </div>
