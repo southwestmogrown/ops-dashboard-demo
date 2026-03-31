@@ -3,6 +3,7 @@ import {
   addScrapEntry,
   getScrapEntries,
   getAllScrapEntries,
+  refreshCacheFromDb,
   voidScrapEntry,
   updateScrapEntry,
 } from "@/lib/mesStore";
@@ -10,6 +11,8 @@ import type { ScrapEntry, ScrappedPanel, KickedLid } from "@/lib/reworkTypes";
 import type { ShiftName } from "@/lib/types";
 
 export async function GET(request: NextRequest): Promise<NextResponse> {
+  await refreshCacheFromDb();
+
   const { searchParams } = new URL(request.url);
   const lineId = searchParams.get("lineId");
   const shift  = searchParams.get("shift") as ShiftName | null;

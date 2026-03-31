@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { setAdminConfig, getAllAdminConfig } from "@/lib/mesStore";
+import { setAdminConfig, getAllAdminConfig, refreshCacheFromDb } from "@/lib/mesStore";
 import type { AdminLineConfig } from "@/lib/mesTypes";
 
 export async function GET(): Promise<NextResponse> {
+  await refreshCacheFromDb();
   return NextResponse.json(await getAllAdminConfig());
 }
 

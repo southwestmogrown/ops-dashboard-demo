@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { generateMetrics, getDefaultHeadcount, getDefaultTarget } from "@/lib/generateMetrics";
 import { ShiftName } from "@/lib/types";
-import { getOutputForLine, getAdminConfig, getKickedLidsForLineShift, getAllLineStates, getDowntimeEntries } from "@/lib/mesStore";
+import { getOutputForLine, getAdminConfig, getKickedLidsForLineShift, getAllLineStates, getDowntimeEntries, refreshCacheFromDb } from "@/lib/mesStore";
 import { getShiftProgress, getShiftWindows } from "@/lib/shiftTime";
 import type { TimePoint } from "@/lib/types";
 
@@ -10,6 +10,8 @@ export const dynamic = "force-dynamic";
 const VALID_SHIFTS: ShiftName[] = ["day", "night"];
 
 export async function GET(request: NextRequest): Promise<NextResponse> {
+  await refreshCacheFromDb();
+
   const { searchParams } = new URL(request.url);
   const shiftParam = searchParams.get("shift");
 

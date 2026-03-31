@@ -7,6 +7,7 @@ import {
   getSimClock,
   addScrapEntry,
   getSimSpeed,
+  refreshCacheFromDb,
 } from "@/lib/mesStore";
 import { getShiftWindows } from "@/lib/shiftTime";
 import type { ShiftName } from "@/lib/types";
@@ -87,6 +88,8 @@ async function maybeInjectDefect(
 // ─────────────────────────────────────────────────────────────────────────────
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
+  await refreshCacheFromDb();
+
   if (await getSimRunning()) {
     await advanceSimClock();
   }

@@ -91,9 +91,8 @@ function _c(): MesCache {
 const MTBF_VS1 = 4;
 const MTBF_VS2 = 5;
 
-async function _doInit(): Promise<void> {
+async function _hydrateFromDb(): Promise<void> {
   const c = _c();
-  await runMigrations();
 
   const [allScans, allQueues, allConfig, allComments, allScrap, sim, allDowntime, scrapSerial, downtimeSerial] =
     await Promise.all([
@@ -119,6 +118,12 @@ async function _doInit(): Promise<void> {
   c.simClock       = sim.clock;
   c.simRunning     = sim.running;
   c.simSpeed       = sim.speed;
+}
+
+async function _doInit(): Promise<void> {
+  const c = _c();
+  await runMigrations();
+  await _hydrateFromDb();
 
   c.initialized = true;
 }
@@ -129,6 +134,11 @@ async function ensureInit(): Promise<void> {
   if (c.initPromise) return c.initPromise;
   c.initPromise = _doInit();
   return c.initPromise;
+}
+
+export async function refreshCacheFromDb(): Promise<void> {
+  await ensureInit();
+  await _hydrateFromDb();
 }
 
 // ── Serial helpers ─────────────────────────────────────────────────────────────

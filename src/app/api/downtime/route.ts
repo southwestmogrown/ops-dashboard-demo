@@ -4,6 +4,7 @@ import {
   getDowntimeEntries,
   closeDowntimeEntry,
   getAllDowntimeEntriesForShift,
+  refreshCacheFromDb,
 } from "@/lib/mesStore";
 import type { DowntimeReason, DowntimeEntry } from "@/lib/downtimeTypes";
 import type { ShiftName } from "@/lib/types";
@@ -20,6 +21,8 @@ const VALID_REASONS: DowntimeReason[] = [
 ];
 
 export async function GET(request: NextRequest): Promise<NextResponse> {
+  await refreshCacheFromDb();
+
   const { searchParams } = new URL(request.url);
   const lineId = searchParams.get("lineId");
   const shift  = searchParams.get("shift") as ShiftName | null;

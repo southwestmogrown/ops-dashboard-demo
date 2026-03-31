@@ -3,6 +3,7 @@ import {
   getSimClock,
   getSimRunning,
   getSimSpeed,
+  refreshCacheFromDb,
   setSimClock,
   setSimRunning,
 } from "@/lib/mesStore";
@@ -10,6 +11,7 @@ import {
 export const dynamic = "force-dynamic";
 
 export async function GET(): Promise<NextResponse> {
+  await refreshCacheFromDb();
   return NextResponse.json({
     clock:   (await getSimClock())?.toISOString() ?? null,
     running: await getSimRunning(),
