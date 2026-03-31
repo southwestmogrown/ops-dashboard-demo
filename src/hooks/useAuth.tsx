@@ -1,7 +1,13 @@
 "use client";
 
-import { createContext, useCallback, useContext, useEffect, useState } from "react";
-import { UserRole, AUTH_PIN } from "@/lib/authTypes";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useState,
+} from "react";
+import { UserRole, SUPERVISOR_PIN, TEAM_LEAD_PIN } from "@/lib/authTypes";
 
 interface AuthState {
   role: UserRole | null;
@@ -16,7 +22,8 @@ interface AuthContextValue extends AuthState {
 const AuthContext = createContext<AuthContextValue | null>(null);
 
 function readStorage(): AuthState {
-  if (typeof window === "undefined") return { role: null, isAuthenticated: false };
+  if (typeof window === "undefined")
+    return { role: null, isAuthenticated: false };
   try {
     const raw = localStorage.getItem("ops-auth");
     if (!raw) return { role: null, isAuthenticated: false };
@@ -30,7 +37,10 @@ function readStorage(): AuthState {
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   // Start null to avoid hydration mismatch — server always renders with no auth,
   // client reads localStorage after mount via useEffect.
-  const [auth, setAuth] = useState<AuthState>({ role: null, isAuthenticated: false });
+  const [auth, setAuth] = useState<AuthState>({
+    role: null,
+    isAuthenticated: false,
+  });
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
@@ -39,22 +49,30 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const login = useCallback((pin: string, role: UserRole): boolean => {
-    if (pin !== AUTH_PIN) return false;
+    const expectedPin = role === "supervisor" ? SUPERVISOR_PIN : TEAM_LEAD_PIN;
+    if (pin !== expectedPin) return false;
     const state = { role, isAuthenticated: true };
     localStorage.setItem("ops-auth", JSON.stringify({ pin, role }));
-    document.cookie = `ops-role=${role}; path=/`;
+    document.cookie = `ops-role=${role}; path=/; max-age=86400`;
     setAuth(state);
     return true;
   }, []);
 
   const logout = useCallback(() => {
     localStorage.removeItem("ops-auth");
-    document.cookie = "ops-role=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
+    document.cookie = "ops-role=; path=/; max-age=0";
     setAuth({ role: null, isAuthenticated: false });
   }, []);
 
   // Suppress children until mounted — prevents flash of PinGate for authenticated users
-  if (!mounted) return <AuthContext.Provider value={{ role: null, isAuthenticated: false, login, logout }}>{null}</AuthContext.Provider>;
+  if (!mounted)
+    return (
+      <AuthContext.Provider
+        value={{ role: null, isAuthenticated: false, login, logout }}
+      >
+        {null}
+      </AuthContext.Provider>
+    );
 
   return (
     <AuthContext.Provider value={{ ...auth, login, logout }}>

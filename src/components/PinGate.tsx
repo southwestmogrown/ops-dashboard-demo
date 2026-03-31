@@ -45,7 +45,9 @@ export default function PinGate() {
               type="password"
               value={pin}
               onChange={(e) => setPin(e.target.value)}
-              onKeyDown={(e) => { if (e.key === "Enter") handleSubmit(); }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") handleSubmit();
+              }}
               className="w-full bg-background border border-border rounded-lg px-4 py-3 text-center text-slate-200 text-lg tracking-widest tracking-wider focus:outline-none focus:border-accent transition-colors"
               placeholder="••••••"
               maxLength={20}
@@ -53,7 +55,9 @@ export default function PinGate() {
               autoFocus
             />
             {error && (
-              <p className="mt-2 text-status-red text-xs text-center">{error}</p>
+              <p className="mt-2 text-status-red text-xs text-center">
+                {error}
+              </p>
             )}
           </div>
 
@@ -95,6 +99,12 @@ export default function PinGate() {
           >
             Sign In
           </button>
+
+          <p className="text-xs text-slate-600 text-center mt-4">
+            {role === "supervisor"
+              ? "Supervisor PIN: bak2026"
+              : "Team Lead PIN: lead2026"}
+          </p>
         </div>
       </div>
     </div>
