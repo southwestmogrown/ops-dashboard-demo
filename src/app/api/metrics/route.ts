@@ -110,11 +110,18 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     let vs1Output = 0;
     let vs2Output = 0;
 
+    // Accumulate all completed hours up to this point in the shift (cumulative total).
+    // For 30-min marks the current full-hour bucket is already completed, so include it.
+    // For mid-hour marks we include all hours strictly before the current one.
+    const cutoffHourIndex = minutes === 0 ? i / 2 : Math.floor(i / 2); // how many full hours done
     for (const state of states) {
-      const hourKey    = `${String(hours).padStart(2, "0")}:00`;
-      const hourOutput = state.hourlyOutput?.[hourKey] ?? 0;
-      if (state.lineId.startsWith("vs1-"))      vs1Output += hourOutput;
-      else if (state.lineId.startsWith("vs2-")) vs2Output += hourOutput;
+      for (let h = 0; h <= cutoffHourIndex; h++) {
+        const shiftHour = Math.floor(win.startHour + h) % 24;
+        const hourKey   = `${String(shiftHour).padStart(2, "0")}:00`;
+        const hourOutput = state.hourlyOutput?.[hourKey] ?? 0;
+        if (state.lineId.startsWith("vs1-"))      vs1Output += hourOutput;
+        else if (state.lineId.startsWith("vs2-")) vs2Output += hourOutput;
+      }
     }
 
     realTrend.push({ time, vs1Output, vs2Output });

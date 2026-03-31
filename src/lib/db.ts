@@ -224,11 +224,10 @@ export async function dbGetAdminConfig(lineId: string): Promise<AdminLineConfig>
   } | undefined;
   if (!row) return {};
   return {
-    ...(row.target           !== null ? { target:           row.target }              : {}),
-    ...(row.headcount        !== null ? { headcount:        row.headcount }           : {}),
-    ...(row.is_running       !== null ? { isRunning:        row.is_running !== 0 }    : {}),
-    ...(row.operator_name    !== null ? { operatorName:     row.operator_name }       : {}),
-    ...(row.team_lead_contact !== null ? { teamLeadContact: row.team_lead_contact }   : {}),
+    ...(row.target           !== null ? { target:          row.target }              : {}),
+    ...(row.headcount        !== null ? { headcount:       row.headcount }           : {}),
+    ...(row.is_running       !== null ? { isRunning:       row.is_running !== 0 }    : {}),
+    ...(row.operator_name    !== null ? { supervisorName:  row.operator_name }       : {}),
   };
 }
 
@@ -243,11 +242,10 @@ export async function dbGetAllAdminConfig(): Promise<Record<string, AdminLineCon
   const out: Record<string, AdminLineConfig> = {};
   for (const r of rows) {
     out[r.line_id] = {
-      ...(r.target           !== null ? { target:           r.target }            : {}),
-      ...(r.headcount        !== null ? { headcount:        r.headcount }         : {}),
-      ...(r.is_running       !== null ? { isRunning:        r.is_running !== 0 }  : {}),
-      ...(r.operator_name    !== null ? { operatorName:     r.operator_name }     : {}),
-      ...(r.team_lead_contact !== null ? { teamLeadContact: r.team_lead_contact } : {}),
+      ...(r.target           !== null ? { target:          r.target }            : {}),
+      ...(r.headcount        !== null ? { headcount:       r.headcount }         : {}),
+      ...(r.is_running       !== null ? { isRunning:       r.is_running !== 0 }  : {}),
+      ...(r.operator_name    !== null ? { supervisorName:  r.operator_name }     : {}),
     };
   }
   return out;
@@ -263,8 +261,8 @@ export async function dbSetAdminConfig(lineId: string, config: AdminLineConfig):
       merged.target          ?? null,
       merged.headcount       ?? null,
       merged.isRunning !== undefined ? (merged.isRunning ? 1 : 0) : null,
-      merged.operatorName    ?? null,
-      merged.teamLeadContact ?? null,
+      merged.supervisorName  ?? null,
+      null,
     ],
   });
 }

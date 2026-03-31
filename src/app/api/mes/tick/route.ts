@@ -108,9 +108,14 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     await advanceSimClock();
   }
 
+  // If the clock advance just stopped the sim (shift end), tell the client immediately.
+  const stillRunning = await getSimRunning();
+
   const body = await request.json() as TickBody;
 
   if (body.all) {
+    if (!stillRunning) return NextResponse.json({ scansAdded: 0, stopped: true });
+
     const states      = await getAllLineStates();
     const activeLines = states.filter((s) => s.schedule !== null);
     let scansAdded = 0;

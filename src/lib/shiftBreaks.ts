@@ -24,14 +24,16 @@ export function getHourlyTargets(
   const rows: HourlyTargetRow[] = [];
 
   const startH = Math.ceil(win.startHour);
-  const endH   = Math.floor(win.endHour);
+  const endH   = Math.ceil(win.endHour);  // include partial final hour (e.g. 16:00–16:30)
 
   for (let h = startH; h < endH; h++) {
     const clockHour = h >= 24 ? h - 24 : h;
     const hourKey = `${String(Math.floor(clockHour)).padStart(2, "0")}:00`;
 
     // Working minutes in this shift hour (raw timeline axis, supports overnight windows).
-    let workingMins = 60;
+    // Cap at the actual portion of this hour that falls within the shift.
+    const hourEnd = Math.min(h + 1, win.endHour);
+    let workingMins = (hourEnd - h) * 60;
     for (const bw of win.breakWindows) {
       let bStart = bw.start;
       let bEnd = bw.end;

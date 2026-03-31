@@ -5,12 +5,11 @@ export type LineComments = Record<string, string>;
 
 /** Per-line admin configuration overrides */
 export interface AdminLineConfig {
-  target?:           number;
+  target?:          number;
   headcount?:       number;
   /** false = line not running today; hidden from dashboard */
   isRunning?:       boolean;
-  operatorName?:    string;
-  teamLeadContact?: string; // name, phone, or both
+  supervisorName?:  string;
 }
 
 /** One work order on a run sheet */

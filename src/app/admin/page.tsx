@@ -67,13 +67,12 @@ function AdminPageContent() {
     target: number | undefined,
     headcount: number | undefined,
     isRunning: boolean,
-    operatorName: string,
-    teamLeadContact: string
+    supervisorName: string
   ) {
     await fetch("/api/admin/config", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ lineId, target, headcount, isRunning, operatorName, teamLeadContact }),
+      body: JSON.stringify({ lineId, target, headcount, isRunning, supervisorName }),
     });
     await refresh();
   }
@@ -254,8 +253,7 @@ function AdminPageContent() {
                 savedTarget={adminConfig[id]?.target}
                 savedHeadcount={adminConfig[id]?.headcount}
                 savedIsRunning={adminConfig[id]?.isRunning}
-                savedOperatorName={adminConfig[id]?.operatorName}
-                savedTeamLeadContact={adminConfig[id]?.teamLeadContact}
+                savedSupervisorName={adminConfig[id]?.supervisorName}
                 skippedItems={stateFor(id)?.skippedItems ?? []}
                 onScheduleLoaded={handleScheduleLoaded}
                 onConfigSaved={handleConfigSaved}

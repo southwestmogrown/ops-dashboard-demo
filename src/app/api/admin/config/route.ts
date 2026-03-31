@@ -18,8 +18,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   if (body.target           !== undefined) config.target           = Number(body.target);
   if (body.headcount        !== undefined) config.headcount        = Number(body.headcount);
   if (body.isRunning        !== undefined) config.isRunning        = Boolean(body.isRunning);
-  if (body.operatorName     !== undefined) config.operatorName     = String(body.operatorName);
-  if (body.teamLeadContact  !== undefined) config.teamLeadContact  = String(body.teamLeadContact);
+  if (body.supervisorName   !== undefined) config.supervisorName   = String(body.supervisorName);
 
   await setAdminConfig(body.lineId, config);
   return NextResponse.json({ ok: true });

@@ -11,11 +11,10 @@ interface AdminLineCardProps {
   savedTarget: number | undefined;
   savedHeadcount: number | undefined;
   savedIsRunning: boolean | undefined;
-  savedOperatorName: string | undefined;
-  savedTeamLeadContact: string | undefined;
+  savedSupervisorName: string | undefined;
   skippedItems: RunSheetItem[];
   onScheduleLoaded: (lineId: string, schedule: LineSchedule) => Promise<void>;
-  onConfigSaved: (lineId: string, target: number | undefined, headcount: number | undefined, isRunning: boolean, operatorName: string, teamLeadContact: string) => void;
+  onConfigSaved: (lineId: string, target: number | undefined, headcount: number | undefined, isRunning: boolean, supervisorName: string) => void;
   onRemoveQueued: (lineId: string, index: number) => void;
   onClearSchedule: (lineId: string) => void;
   onSkipOrder: (lineId: string, model: string) => void;
@@ -25,7 +24,7 @@ interface AdminLineCardProps {
 const AdminLineCardInner = forwardRef(function AdminLineCardInner({
   lineId, label, schedule, queuedSchedules,
   savedTarget, savedHeadcount, savedIsRunning,
-  savedOperatorName, savedTeamLeadContact, skippedItems,
+  savedSupervisorName, skippedItems,
   onScheduleLoaded, onConfigSaved, onRemoveQueued, onClearSchedule,
   onSkipOrder, onUnskipOrder,
 }: AdminLineCardProps, ref) {
@@ -43,8 +42,7 @@ const AdminLineCardInner = forwardRef(function AdminLineCardInner({
   const [target, setTarget] = useState(savedTarget !== undefined ? String(savedTarget) : "");
   const [headcount, setHeadcount] = useState(savedHeadcount !== undefined ? String(savedHeadcount) : "");
   const [isRunning, setIsRunning] = useState(savedIsRunning !== undefined ? savedIsRunning : true);
-  const [operatorName, setOperatorName] = useState(savedOperatorName ?? "");
-  const [teamLeadContact, setTeamLeadContact] = useState(savedTeamLeadContact ?? "");
+  const [supervisorName, setSupervisorName] = useState(savedSupervisorName ?? "");
   const [saved, setSaved] = useState(false);
 
   // Expose a save() method so the parent can trigger save-all
@@ -52,11 +50,11 @@ const AdminLineCardInner = forwardRef(function AdminLineCardInner({
     save: async () => {
       const t = target !== "" ? Number(target) : undefined;
       const hc = headcount !== "" ? Number(headcount) : undefined;
-      await onConfigSaved(lineId, t, hc, isRunning, operatorName, teamLeadContact);
+      await onConfigSaved(lineId, t, hc, isRunning, supervisorName);
       setSaved(true);
       setTimeout(() => setSaved(false), 1500);
     },
-  }), [target, headcount, isRunning, operatorName, teamLeadContact, lineId, onConfigSaved]);
+  }), [target, headcount, isRunning, supervisorName, lineId, onConfigSaved]);
 
   async function handleFile(file: File) {
     if (!file.name.endsWith(".pdf")) { setParseError("Must be a PDF"); return; }
@@ -94,7 +92,7 @@ const AdminLineCardInner = forwardRef(function AdminLineCardInner({
   async function handleSave() {
     const t = target !== "" ? Number(target) : undefined;
     const hc = headcount !== "" ? Number(headcount) : undefined;
-    onConfigSaved(lineId, t, hc, isRunning, operatorName, teamLeadContact);
+    onConfigSaved(lineId, t, hc, isRunning, supervisorName);
     setSaved(true);
     setTimeout(() => setSaved(false), 1500);
   }
@@ -150,7 +148,7 @@ const AdminLineCardInner = forwardRef(function AdminLineCardInner({
                   headers: { "Content-Type": "application/json" },
                   body: JSON.stringify({ lineId, isRunning: next }),
                 });
-                onConfigSaved(lineId, undefined, undefined, next, operatorName, teamLeadContact);
+                onConfigSaved(lineId, undefined, undefined, next, supervisorName);
               }}
               className="sr-only peer"
             />
@@ -227,30 +225,17 @@ const AdminLineCardInner = forwardRef(function AdminLineCardInner({
             </div>
           </div>
 
-          {/* Operator & Team Lead Contact */}
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-1">
-              <label className="text-[10px] uppercase font-black text-[#e1e2ec]/40 tracking-widest">Operator</label>
-              <input
-                type="text"
-                disabled={!isRunning}
-                value={operatorName}
-                onChange={(e) => setOperatorName(e.target.value)}
-                placeholder="Name"
-                className="w-full bg-surface-highest border-0 border-l-2 border-vs2/50 rounded-sm px-3 py-2.5 text-sm font-['Space_Grotesk',sans-serif] font-bold outline-none focus:ring-1 focus:ring-vs2/30 disabled:opacity-50 disabled:cursor-not-allowed placeholder:text-[#e1e2ec]/20"
-              />
-            </div>
-            <div className="space-y-1">
-              <label className="text-[10px] uppercase font-black text-[#e1e2ec]/40 tracking-widest">Team Lead</label>
-              <input
-                type="text"
-                disabled={!isRunning}
-                value={teamLeadContact}
-                onChange={(e) => setTeamLeadContact(e.target.value)}
-                placeholder="Name or phone"
-                className="w-full bg-surface-highest border-0 border-l-2 border-vs2/50 rounded-sm px-3 py-2.5 text-sm font-['Space_Grotesk',sans-serif] font-bold outline-none focus:ring-1 focus:ring-vs2/30 disabled:opacity-50 disabled:cursor-not-allowed placeholder:text-[#e1e2ec]/20"
-              />
-            </div>
+          {/* Supervisor */}
+          <div className="space-y-1">
+            <label className="text-[10px] uppercase font-black text-[#e1e2ec]/40 tracking-widest">Supervisor</label>
+            <input
+              type="text"
+              disabled={!isRunning}
+              value={supervisorName}
+              onChange={(e) => setSupervisorName(e.target.value)}
+              placeholder="Name"
+              className="w-full bg-surface-highest border-0 border-l-2 border-vs2/50 rounded-sm px-3 py-2.5 text-sm font-['Space_Grotesk',sans-serif] font-bold outline-none focus:ring-1 focus:ring-vs2/30 disabled:opacity-50 disabled:cursor-not-allowed placeholder:text-[#e1e2ec]/20"
+            />
           </div>
 
           {/* Save Button */}

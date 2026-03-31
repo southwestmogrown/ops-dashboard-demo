@@ -88,11 +88,20 @@ export default function SimPage() {
       // Scale units with speed so production stays in a realistic band while
       // still accelerating smoothly at higher sim speeds.
       const units = unitsForSpeed(speedRef.current);
-      await fetch("/api/mes/tick", {
+      const res = await fetch("/api/mes/tick", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ all: true, units }),
       });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.stopped) {
+          // Server reached shift end — stop the client interval.
+          if (tickInterval.current) { clearInterval(tickInterval.current); tickInterval.current = null; }
+          setRunning(false);
+          await pollState();
+        }
+      }
     }, 1000);
     await pollState();
   }
