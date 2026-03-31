@@ -9,6 +9,7 @@ import { useAuth } from "@/hooks/useAuth";
 import type { ShiftName } from "@/lib/types";
 import { LINES, LINE_LABELS, getDefaultTarget } from "@/lib/lines";
 import { getShiftWindows } from "@/lib/shiftTime";
+import Header from "@/components/Header";
 
 const HourlyTable = dynamic(() => import("@/components/sim/HourlyTable"), {
   ssr: false,
