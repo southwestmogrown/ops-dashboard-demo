@@ -28,15 +28,18 @@ export default function TeamLeadPage() {
   const [filter, setFilter] = useState("");
   const [viewMode, setViewMode] = useState<"floor" | "detail">("floor");
   const prevDataRef = useRef<string>("");
+  const fetchRequestId = useRef(0);
 
   const fetchData = useCallback(async () => {
+    const requestId = ++fetchRequestId.current;
     const [metricsRes, mesRes, clockRes, allScrapRes, configRes] = await Promise.all([
-      fetch(`/api/metrics?shift=${shift}`),
-      fetch("/api/mes/state"),
-      fetch("/api/sim/clock"),
-      fetch(`/api/scrap?lineId=all&shift=${shift}`),
-      fetch("/api/admin/config"),
+      fetch(`/api/metrics?shift=${shift}`, { cache: "no-store" }),
+      fetch("/api/mes/state", { cache: "no-store" }),
+      fetch("/api/sim/clock", { cache: "no-store" }),
+      fetch(`/api/scrap?lineId=all&shift=${shift}`, { cache: "no-store" }),
+      fetch("/api/admin/config", { cache: "no-store" }),
     ]);
+    if (requestId !== fetchRequestId.current) return;
     if (metricsRes.ok) {
       const data: ShiftMetrics = await metricsRes.json();
       // Use generatedAt timestamp as a cheap change detector instead of JSON.stringify

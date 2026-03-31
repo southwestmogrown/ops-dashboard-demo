@@ -103,6 +103,7 @@ export default function Home() {
   const [adminConfig, setAdminConfig] = useState<Record<string, AdminLineConfig>>({});
   const [simClock, setSimClock] = useState<Date | null>(null);
   const lastOutputRef = useRef<Record<string, number>>({});
+  const fetchRequestId = useRef(0);
   const [openDowntimeByLine, setOpenDowntimeByLine] = useState<Record<string, boolean>>({});
 
   const {
@@ -151,14 +152,16 @@ export default function Home() {
   );
 
   const fetchMetrics = async () => {
+    const requestId = ++fetchRequestId.current;
     try {
       const [metricsRes, mesRes, configRes, clockRes, downtimeRes] = await Promise.all([
-        fetch(`/api/metrics?shift=${shift}`),
-        fetch("/api/mes/state"),
-        fetch("/api/admin/config"),
-        fetch("/api/sim/clock"),
-        fetch(`/api/downtime?shift=${shift}`),
+        fetch(`/api/metrics?shift=${shift}`, { cache: "no-store" }),
+        fetch("/api/mes/state", { cache: "no-store" }),
+        fetch("/api/admin/config", { cache: "no-store" }),
+        fetch("/api/sim/clock", { cache: "no-store" }),
+        fetch(`/api/downtime?shift=${shift}`, { cache: "no-store" }),
       ]);
+      if (requestId !== fetchRequestId.current) return;
       if (!metricsRes.ok) throw new Error(`HTTP ${metricsRes.status}`);
       const data: ShiftMetrics = await metricsRes.json();
       setMetrics(data);

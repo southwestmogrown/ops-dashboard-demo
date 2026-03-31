@@ -7,6 +7,8 @@ import {
   setSimRunning,
 } from "@/lib/mesStore";
 
+export const dynamic = "force-dynamic";
+
 export async function GET(): Promise<NextResponse> {
   return NextResponse.json({
     clock:   (await getSimClock())?.toISOString() ?? null,

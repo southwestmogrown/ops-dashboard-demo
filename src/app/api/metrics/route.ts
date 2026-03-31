@@ -5,6 +5,8 @@ import { getOutputForLine, getAdminConfig, getKickedLidsForLineShift, getAllLine
 import { getShiftProgress, getShiftWindows } from "@/lib/shiftTime";
 import type { TimePoint } from "@/lib/types";
 
+export const dynamic = "force-dynamic";
+
 const VALID_SHIFTS: ShiftName[] = ["day", "night"];
 
 export async function GET(request: NextRequest): Promise<NextResponse> {

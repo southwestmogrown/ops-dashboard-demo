@@ -35,6 +35,7 @@ export default function SimPage() {
   const [now, setNow] = useState(new Date());
   const tickInterval = useRef<ReturnType<typeof setInterval> | null>(null);
   const pollInterval = useRef<ReturnType<typeof setInterval> | null>(null);
+  const pollRequestId = useRef(0);
 
   // ── Clock ─────────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -44,10 +45,12 @@ export default function SimPage() {
 
   // ── Polling ─────────────────────────────────────────────────────────────────
   const pollState = useCallback(async () => {
+    const requestId = ++pollRequestId.current;
     const [stateRes, clockRes] = await Promise.all([
-      fetch("/api/mes/state"),
-      fetch("/api/sim/clock"),
+      fetch("/api/mes/state", { cache: "no-store" }),
+      fetch("/api/sim/clock", { cache: "no-store" }),
     ]);
+    if (requestId !== pollRequestId.current) return;
     if (stateRes.ok) setStates(await stateRes.json());
     if (clockRes.ok) {
       const c = await clockRes.json();
@@ -85,7 +88,8 @@ export default function SimPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ all: true, units }),
       });
-    }, 108000); // 108 sec/tick — sim completes ~350 ticks over a 10.5-hr shift
+    }, 1000);
+    await pollState();
   }
 
   async function pauseSim() {
@@ -96,6 +100,7 @@ export default function SimPage() {
       body: JSON.stringify({ running: false }),
     });
     setRunning(false);
+    await pollState();
   }
 
   async function resetSim() {
