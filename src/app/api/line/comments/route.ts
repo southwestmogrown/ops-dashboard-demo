@@ -1,7 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getLineComments, setLineComment } from "@/lib/mesStore";
+import { requireRole } from "@/lib/apiAuth";
 
 export async function GET(request: NextRequest): Promise<NextResponse> {
+  const authError = requireRole(request, ["supervisor", "team-lead"]);
+  if (authError) return authError;
+
   const { searchParams } = new URL(request.url);
   const lineId = searchParams.get("lineId");
 
@@ -13,6 +17,9 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 }
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
+  const authError = requireRole(request, ["supervisor", "team-lead"]);
+  if (authError) return authError;
+
   const body = await request.json() as { lineId: string; hour: string; comment: string };
 
   if (!body.lineId || !body.hour) {

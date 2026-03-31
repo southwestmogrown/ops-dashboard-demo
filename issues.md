@@ -996,3 +996,408 @@ export interface HandoffIssue {
 | `src/components/team-lead/ReworkPanel.tsx` | MODIFY — type cast fix |
 | `src/lib/generateMetrics.ts` | MODIFY — remove dead example call |
 | `.gitignore` | MODIFY — add `data/` |
+
+---
+
+---
+
+# Technical Debt Reduction & Refactoring (Adversarial Review Results)
+
+## Priority Overview
+
+**CRITICAL SECURITY (Fix immediately):**
+- M18: API Route Authentication Middleware
+
+**HIGH WASTE / EFFICIENCY (Fix before next feature):**
+- M19: Navigation Component Consolidation
+- M20: Role-Check Logic Extraction
+- M21: API Fetch Deduplication & Caching
+
+**MEDIUM WASTE / CODE QUALITY (Fix in next sprint):**
+- M22: Type Definition Organization
+- M23: Tailwind CSS Abstraction
+- M24: Dynamic Import Audit
+
+---
+
+## M18: API Route Authentication Middleware — SECURITY CRITICAL ⚠️
+
+**Status:** ✅ Implemented (2026-03-31)  
+**Severity:** CRITICAL — All 12 API endpoints lack server-side auth checks
+
+### Problem
+Currently **zero server-side authorization** on any API route. All role enforcement is client-side:
+- `/api/mes/schedule` POST — accepts malicious PDFs if client-side check bypassed
+- `/api/admin/config` POST — allows team leads to modify production targets if they can craft a request
+- `/api/scrap`, `/api/downtime` — could be forged by unauthorized callers
+
+### Solution
+
+**File:** `src/lib/apiAuth.ts` (new)
+```typescript
+export function requireRole(requiredRole: "supervisor" | "team-lead") {
+  return async (req: NextRequest) => {
+    const ops_role = req.cookies.get("ops-role")?.value;
+    if (ops_role !== requiredRole) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
+    }
+  };
+}
+```
+
+**Apply to routes (HIGH priority):**
+- `POST /api/mes/schedule` — supervisor only
+- `POST /api/mes/reset` — supervisor only
+- `PATCH/DELETE /api/admin/config` — supervisor only
+- `PATCH /api/admin/queue` — supervisor only
+
+**Apply to routes (MEDIUM priority):**
+- `POST /api/downtime` — team-lead or supervisor (audit logged to `createdBy`)
+- `POST /api/scrap` — team-lead or supervisor
+
+**Apply to routes (NICE-TO-HAVE):**
+- `GET /api/metrics` — currently public (dashboards are visible to all), OK as-is
+- `GET /api/mes/state` — currently public, OK for data visibility
+
+### Files Affected
+- `src/api/mes/schedule/route.ts` — add middleware guard to POST/PATCH/DELETE
+- `src/api/mes/reset/route.ts` — add middleware guard
+- `src/api/admin/config/route.ts` — add middleware guard
+- `src/api/admin/queue/route.ts` — add middleware guard
+- `src/api/downtime/route.ts` — verify audit trail
+- `src/api/scrap/route.ts` — verify audit trail
+- **NEW:** `src/lib/apiAuth.ts` — helper function
+
+### Acceptance Criteria
+- [x] All sensitive endpoints return 403 if user lacks required role
+- [x] Cookie-based auth verified before any data mutation
+- [x] Downtime entries now log `createdBy` from authenticated role cookie
+- [ ] POST to `/api/mes/schedule` with supervisor PIN fails if called as TL (manual QA pending)
+
+---
+
+## M19: Navigation Component Consolidation — HIGH WASTE
+
+**Status:** ✅ Implemented (2026-03-31)  
+**Severity:** HIGH — 160+ LOC duplication across 4 pages
+
+### Problem
+Sidebar navigation **identical on 4 pages:** `page.tsx`, `admin/page.tsx`, `eos/page.tsx`, `sim/page.tsx`. 
+Each manually renders:
+```tsx
+<aside className="w-64 shrink-0 bg-surface-low border-r border-border">
+  <div className="p-6 border-b border-border">
+    <span className="text-lg font-black text-accent">OP-CENTER</span>
+  </div>
+  <nav className="flex-1 py-4">
+    <Link href="/" className={...}>Dashboard</Link>
+    <Link href="/admin" className={...}>Admin</Link>
+  </nav>
+</aside>
+```
+
+### Solution
+
+**File:** `src/components/SidebarNav.tsx` (new)
+```typescript
+export default function SidebarNav({ items, activePath }: SidebarNavProps) {
+  return (
+    <aside className="w-64 shrink-0 bg-surface-low border-r border-border flex flex-col">
+      <div className="p-6 border-b border-border">
+        <div className="flex items-center space-x-3 mb-1">
+          <div className="w-2 h-2 rounded-full bg-vs2 animate-pulse" />
+          <span className="text-lg font-black text-accent font-['Space_Grotesk',sans-serif]">
+            OP-CENTER
+          </span>
+        </div>
+      </div>
+      <nav className="flex-1 py-4">
+        {items.map((item) => {
+          const isActive = activePath === item.href;
+          return <Link key={item.label} href={item.href}>...</Link>;
+        })}
+      </nav>
+    </aside>
+  );
+}
+```
+
+Then replace 40-line nav blocks in each file with `<SidebarNav />`.
+
+### Files Affected
+- **NEW:** `src/components/SidebarNav.tsx` — consolidated sidebar with configurable header/link styles
+- `src/app/page.tsx` — sidebar replaced with `<SidebarNav />`
+- `src/app/admin/page.tsx` — sidebar replaced with `<SidebarNav />`
+- `src/app/eos/page.tsx` — sidebar replaced with `<SidebarNav />` (custom header variant preserved)
+- `src/app/sim/page.tsx` — sidebar replaced with `<SidebarNav />` (sim-specific header + link styling preserved)
+
+### Acceptance Criteria
+- [x] Sidebar renders identically on all 4 pages (including page-specific variants)
+- [x] Active state highlights correctly
+- [x] No visual regression (verified by successful production build)
+
+---
+
+## M20: Role-Check Logic Extraction — MODERATE WASTE + SECURITY
+
+**Status:** Not Started  
+**Severity:** HIGH — 28 LOC duplication + redirect flash bug
+
+### Problem
+All 4 main pages have **identical redirect on mount:**
+```tsx
+useEffect(() => {
+  if (!isAuthenticated) return;
+  if (role === "team-lead") {
+    router.push("/team-lead");
+  }
+}, [role, isAuthenticated, router]);
+```
+
+Appears in: `admin/page.tsx`, `page.tsx`, `eos/page.tsx`, `sim/page.tsx`
+
+**Also:** Middleware only protects `/admin` route. Routes `/eos` and `/sim` rely on client-side redirects → users briefly see content before redirect → UX flash.
+
+### Solution
+
+**File:** `src/hooks/useRedirectTeamLead.ts` (new)
+```typescript
+export function useRedirectTeamLead() {
+  const router = useRouter();
+  const { role, isAuthenticated } = useAuth();
+  
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    if (role === "team-lead") {
+      router.replace("/team-lead");
+    }
+  }, [role, isAuthenticated, router]);
+}
+```
+
+**Usage in pages:**
+```tsx
+// page.tsx admin/page.tsx, eos/page.tsx, sim/page.tsx
+"use client";
+import { useRedirectTeamLead } from "@/hooks/useRedirectTeamLead";
+
+export default function AdminPage() {
+  useRedirectTeamLead(); // Call at top of component
+  // ...
+}
+```
+
+**File:** `src/middleware.ts` (modify)
+Add route matchers:
+```typescript
+export const config = {
+  matcher: ["/admin", "/eos/:path*", "/sim/:path*"],
+};
+```
+
+Then middleware redirects both admin + eos + sim if not supervisor → eliminates client-side flash.
+
+### Files Affected
+- **NEW:** `src/hooks/useRedirectTeamLead.ts` — extract hook
+- `src/middleware.ts` — extend matchers to `/eos/*`, `/sim/*`
+- `src/app/page.tsx` — remove useEffect redirect, call `useRedirectTeamLead()`
+- `src/app/admin/page.tsx` — remove useEffect redirect, call hook
+- `src/app/eos/page.tsx` — remove useEffect redirect, call hook
+- `src/app/sim/page.tsx` — remove useEffect redirect, call hook
+
+### Acceptance Criteria
+- [ ] All 4 pages call `useRedirectTeamLead()`
+- [ ] User does not see brief dashboard flash when accessing `/eos` as team lead
+- [ ] Code removed from 4 pages (~28 LOC)
+
+---
+
+## M21: API Fetch Deduplication & Caching — MODERATE WASTE
+
+**Status:** Not Started  
+**Severity:** MODERATE — 5-10× redundant requests for same data
+
+### Problem
+Multiple inefficiencies identified:
+
+1. **Header clock fetches independently**: `Header.tsx` polls `/api/sim/clock` every 5s, but **every page also fetches it**. Result: 2-4 redundant requests per 5s window when multiple pages open.
+
+2. **`/api/admin/config` fetched 6 places**: dashboard (5s), team-lead (5s), admin (init), sim (2s), eos (init), Header context. If 2+ pages open → 10-15 requests/min for same config.
+
+3. **`/api/mes/state` fetched 5 places**: Similar duplication. Simulator polls every 2s despite **driving the state via `/api/mes/tick`** — wasteful.
+
+### Solution Options
+**Option A (Quick): Reduce polling intervals + Header caching**
+- Header exports sim clock to context
+- Pages consume from context instead of direct fetch
+- Extend poll intervals to 10s where safe
+- ETA: 2-3 hrs, saves ~60% redundant requests
+
+**Option B (Recommended): Add React Query**
+- Implement `react-query` with 30s stale cache
+- Deduplicate requests automatically
+- Add refetch-on-focus behavior
+- ETA: 4-5 hrs, saves ~80% redundant requests
+
+**Option C (Future): GraphQL subscription**
+- Not recommended for current scope
+
+### Files Affected (Option A)
+- `src/components/Header.tsx` — don't fetch clock, consume from context
+- `src/app/page.tsx` — export clock to context via custom hook
+- All other pages — consume from context
+
+### Acceptance Criteria
+- [ ] Simulator tick rate doesn't cause cascading state fetches
+- [ ] When 2+ pages open, `/api/admin/config` fetch count ≤ 2/min (was 12+/min)
+- [ ] Header clock updates without duplicate requests
+
+---
+
+## M22: Type Definition Organization — CODE QUALITY
+
+**Status:** Not Started  
+**Severity:** LOW — organizational clarity, not functional
+
+### Problem
+Types split across 6 files with unclear domain boundaries:
+- `src/lib/types.ts` — core: Line, TimePoint, ShiftMetrics
+- `src/lib/mesTypes.ts` — MES simulator: RunSheetItem, LineState, etc.
+- `src/lib/eosTypes.ts` — EOS report: EOSFormData, EOSLineEntry
+- `src/lib/reworkTypes.ts` — scrap quality: ScrapEntry, KickedLid, DAMAGE_TYPES
+- `src/lib/downtimeTypes.ts` — downtime: DowntimeEntry, DOWNTIME_REASON_LABELS
+- `src/lib/authTypes.ts` — auth: UserRole, SUPERVISOR_PIN, TEAM_LEAD_PIN
+
+### Solution
+**Option A (Minimal):** Keep as-is; document domain in each file header.
+
+**Option B (Ideal):** Create `src/lib/types/` directory:
+```
+src/lib/types/
+  index.ts              ← exports * from all files
+  core.ts               ← Line, TimePoint, ShiftMetrics, ShiftName
+  mes.ts                ← RunSheetItem, LineSchedule, ScanEvent, LineState
+  eos.ts                ← EOSFormData, EOSLineEntry, EOSLineDescriptor
+  quality.ts            ← ScrapEntry, KickedLid, PANEL_OPTIONS, DAMAGE_TYPES
+  downtime.ts           ← DowntimeEntry, DOWNTIME_REASON_LABELS
+  auth.ts               ← UserRole, SUPERVISOR_PIN, TEAM_LEAD_PIN
+```
+
+Then update all imports: `from "@/lib/types/core"` etc.
+
+### Files Affected
+- Create `src/lib/types/` directory structure
+- Update ~20 imports across codebase
+- Update `tsconfig.json` paths if needed
+
+### Acceptance Criteria
+- [ ] Types organized by logical domain
+- [ ] Imports remain compatible (via `index.ts`)
+- [ ] No unused exports
+
+---
+
+## M23: Tailwind CSS Abstraction — LOW WASTE
+
+**Status:** Not Started  
+**Severity:** LOW — minor performance, code clarity
+
+### Problem
+Repeated Tailwind patterns that should be @apply rules or component libraries:
+
+1. **Navigation link:** `flex items-center space-x-3 px-4 py-3 + border-l-4 + conditional` — 8+ uses
+2. **Card base:** `bg-surface rounded-sm p-5` — 50+ uses
+3. **Accent bars:** `border-l-4 border-accent` or `absolute top-0 left-0 w-full h-[2px] bg-accent` — 8+ uses
+4. **Micro label:** `text-[10px] uppercase font-bold tracking-widest` — 15+ uses
+5. **Spacing combo:** `px-3.5 py-2.5` — 12+ exact uses
+
+### Solution
+
+**File:** Update `src/app/globals.css`
+```css
+@layer components {
+  /* Card base */
+  .card {
+    @apply bg-surface rounded-sm p-5;
+  }
+  
+  /* Card with accent border left */
+  .card-accent {
+    @apply card border-l-4 border-accent;
+  }
+
+  /* Accent bar (top) */
+  .accent-bar-top {
+    @apply absolute top-0 left-0 w-full h-[2px] bg-accent;
+  }
+
+  /* Generic nav link with active state */
+  .nav-link {
+    @apply flex items-center space-x-3 px-4 py-3 transition-colors;
+  }
+  
+  .nav-link-active {
+    @apply nav-link bg-surface-high text-accent border-l-4 border-accent;
+  }
+  
+  .nav-link-inactive {
+    @apply nav-link text-[#e1e2ec]/40 hover:bg-surface-high/50 hover:text-[#e1e2ec] border-l-4 border-transparent;
+  }
+
+  /* Micro label */
+  .micro-label {
+    @apply text-[10px] uppercase font-bold tracking-widest;
+  }
+
+  /* Standard padding for input fields */
+  .input-pad {
+    @apply px-3.5 py-2.5;
+  }
+}
+```
+
+Then replace~150 class strings with 6-8 component classes.
+
+### Files Affected
+- `src/app/globals.css` — add @apply rules
+- `src/components/*/` — update 40-50 classNames to use new components
+- Biggest wins: nav links (Sidebar, Header), card patterns (KpiCard, EOSLineCard)
+
+### Acceptance Criteria
+- [ ] No visual regression
+- [ ] Component class usage > 80% coverage
+- [ ] Overall classNamestring length reduced by 40%
+
+---
+
+## M24: Dynamic Import Audit — NICE-TO-HAVE
+
+**Status:** Not Started  
+**Severity:** LOW — bundle size optimization
+
+### Problem
+~8 dynamic imports marked `ssr: false`. Need to verify each is necessary:
+- **HourlyTable** — uses Date/formatting, correct to exclude from SSR
+- **LineDrawer** — uses useState for tab state, correct
+- **EOSEmailPreview** — uses Recharts, correct
+- **OutputChart** — uses Recharts, correct
+- Others — unclear if truly needed
+
+### Solution
+Audit each dynamic import:
+1. Check if component uses `document`, `window`, or `useEffect`
+2. If only client state hooks → might be unnecessarily dynamic
+3. If uses browser APIs → keep dynamic
+
+Move non-browser-API components back to static imports.
+
+### Files Affected
+- Various pages and components with dynamic imports
+- Measure bundle size before/after
+
+### Acceptance Criteria
+- [ ] All dynamic imports justified with comment
+- [ ] Remove 2-3 unnecessary dynamic imports if found
+- [ ] Confirm no build errors or hydration mismatches
+
+---

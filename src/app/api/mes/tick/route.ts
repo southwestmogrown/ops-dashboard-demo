@@ -17,6 +17,7 @@ import { getShiftWindows } from "@/lib/shiftTime";
 import type { ShiftName } from "@/lib/types";
 import { PANEL_OPTIONS, pickDefectType } from "@/lib/reworkTypes";
 import type { DowntimeReason } from "@/lib/downtimeTypes";
+import { requireRole } from "@/lib/apiAuth";
 
 interface TickBody {
   lineId?: string;
@@ -167,6 +168,9 @@ async function maybeInjectDowntime(
 // ─────────────────────────────────────────────────────────────────────────────
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
+  const authError = requireRole(request, "supervisor");
+  if (authError) return authError;
+
   await refreshCacheFromDb();
 
   if (await getSimRunning()) {

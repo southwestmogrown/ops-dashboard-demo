@@ -329,6 +329,29 @@ Full feature specs live in **`issues.md`**. Items marked ✅ are complete.
 - **M15: Team Lead Floor Overview + Scrap Speed** ✅ — floor overview grid with live KPIs, quick-log scrap form, comment save feedback toast, floor alert strip
 - **M16: LineTable Readability + LineDrawer Completion** ✅ — sortable columns, wider progress bars, dynamic status label, downtime tab in drawer, target reference line on chart, operator contact field
 - **M17: Simulation Fidelity** ✅ — tick rate fix, changeover penalty on completed orders, multi-defect scrap model, ramp-up/wind-down, equipment failure injection
+### Technical Debt & Refactoring (Adversarial Review Results)
+
+Comprehensive code review identified 7 key waste/redundancy issues. See detailed specs in **`issues.md` M18–M24**.
+
+- **M18: API Route Authentication Middleware** ✅ COMPLETE (2026-03-31) — Server-side cookie-role guards added for sensitive mutation routes and operational logging routes (`schedule`, `reset`, `queue`, `config`, `tick`, `scrap`, `downtime`, `comments`).
+
+- **M19: Navigation Component Consolidation** ✅ COMPLETE (2026-03-31) — Extracted reusable `SidebarNav` component and replaced duplicated sidebar markup across dashboard, admin, EOS, and sim pages.
+
+- **M20: Role-Check Logic Extraction** 🟡 HIGH — Identical redirect pattern in 4 pages (28 LOC waste). Extract `useRedirectTeamLead()` hook. Also: extend middleware to `/eos/*`, `/sim/*` to eliminate client-side render flash.
+
+- **M21: API Fetch Deduplication & Caching** 🟡 MODERATE — Header polls `/api/sim/clock` independently (every page also does → 2-4× redundant). `/api/admin/config` fetched by 6 places. Option A (quick): Header-level caching via context. Option B (ideal): React Query for automatic deduplication & 30s stale cache.
+
+- **M22: Type Definition Organization** 🟢 LOW — Types fragmented across 6 files (types.ts, mesTypes.ts, eosTypes.ts, reworkTypes.ts, downtimeTypes.ts, authTypes.ts). Consolidate to `src/lib/types/` directory for clarity (no functional impact).
+
+- **M23: Tailwind CSS Abstraction** 🟢 LOW — Repeated class patterns (nav-link 8×, card-base 50×, micro-label 15×). Add @apply rules to `globals.css` to save ~150 class strings.
+
+- **M24: Dynamic Import Audit** 🟢 NICE-TO-HAVE — 8 dynamic imports; verify each truly needs SSR exclusion. Remove 2-3 unnecessary imports if found.
+
+**Priority order for implementation:**
+1. M20 (role-check extraction) — high impact on maintainability + UX
+2. M21 (performance) — moderate effort, good ROI if using React Query
+3. M22–M24 (housekeeping) — low priority, do when refactoring that area
+
 
 ### Remaining
 - **Bought-in ERP integration** — `boughtIn` boolean on scrap entries; future route queries external ERP for model# lookup and auto-tags entries

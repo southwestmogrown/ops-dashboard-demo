@@ -12,6 +12,7 @@ import type { DowntimeReason, DowntimeEntry } from "@/lib/downtimeTypes";
 import type { ShiftName } from "@/lib/types";
 import { getShiftWindows } from "@/lib/shiftTime";
 import { getDefaultTarget } from "@/lib/generateMetrics";
+import { getRequestRole, requireRole } from "@/lib/apiAuth";
 
 const VALID_REASONS: DowntimeReason[] = [
   "machine-failure",
@@ -25,6 +26,9 @@ const VALID_REASONS: DowntimeReason[] = [
 ];
 
 export async function GET(request: NextRequest): Promise<NextResponse> {
+  const authError = requireRole(request, ["supervisor", "team-lead"]);
+  if (authError) return authError;
+
   await refreshCacheFromDb();
 
   const { searchParams } = new URL(request.url);
@@ -52,6 +56,11 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 }
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
+  const authError = requireRole(request, ["supervisor", "team-lead"]);
+  if (authError) return authError;
+
+  const role = getRequestRole(request);
+
   let body: Record<string, unknown>;
   try {
     body = await request.json();
@@ -59,8 +68,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
   }
 
-  const { lineId, shift, reason, startTime, unitsLost, notes, createdBy } =
-    body;
+  const { lineId, shift, reason, startTime, unitsLost, notes } = body;
 
   if (!lineId || !shift || !reason || !startTime) {
     return NextResponse.json(
@@ -90,7 +98,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     endTime: null,
     unitsLost: typeof unitsLost === "number" ? unitsLost : 0,
     notes: typeof notes === "string" ? notes : "",
-    createdBy: typeof createdBy === "string" ? createdBy : undefined,
+    createdBy: role ?? undefined,
   };
 
   const saved = await addDowntimeEntry(entry);
@@ -98,6 +106,9 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 }
 
 export async function PATCH(request: NextRequest): Promise<NextResponse> {
+  const authError = requireRole(request, ["supervisor", "team-lead"]);
+  if (authError) return authError;
+
   await refreshCacheFromDb();
 
   let body: Record<string, unknown>;

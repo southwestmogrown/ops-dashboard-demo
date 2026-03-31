@@ -9,8 +9,12 @@ import {
 } from "@/lib/mesStore";
 import type { ScrapEntry, ScrappedPanel, KickedLid } from "@/lib/reworkTypes";
 import type { ShiftName } from "@/lib/types";
+import { requireRole } from "@/lib/apiAuth";
 
 export async function GET(request: NextRequest): Promise<NextResponse> {
+  const authError = requireRole(request, ["supervisor", "team-lead"]);
+  if (authError) return authError;
+
   await refreshCacheFromDb();
 
   const { searchParams } = new URL(request.url);
@@ -48,6 +52,9 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 }
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
+  const authError = requireRole(request, ["supervisor", "team-lead"]);
+  if (authError) return authError;
+
   let body: Record<string, unknown>;
   try {
     body = await request.json();
@@ -103,6 +110,9 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 }
 
 export async function PATCH(request: NextRequest): Promise<NextResponse> {
+  const authError = requireRole(request, ["supervisor", "team-lead"]);
+  if (authError) return authError;
+
   let body: Record<string, unknown>;
   try {
     body = await request.json();

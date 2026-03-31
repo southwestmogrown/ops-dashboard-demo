@@ -10,6 +10,12 @@ import type { ShiftName } from "@/lib/types";
 import { LINES, LINE_ADMIN_LABELS } from "@/lib/lines";
 import Header from "@/components/Header";
 import AdminLayout from "@/components/admin/AdminLayout";
+import SidebarNav, { SidebarNavItem } from "@/components/SidebarNav";
+
+const SIDE_NAV_ITEMS: SidebarNavItem[] = [
+  { href: "/", label: "Dashboard", icon: "dashboard" },
+  { href: "/admin", label: "Admin", icon: "factory" },
+];
 
 const AdminLineCard = dynamic(
   () => import("@/components/admin/AdminLineCard"),
@@ -164,51 +170,7 @@ function AdminPageContent() {
       />
 
       <div className="flex flex-1 overflow-hidden">
-        {/* ── Sidebar ── */}
-        <aside className="w-64 shrink-0 bg-surface-low border-r border-border flex-col overflow-y-auto custom-scrollbar hidden lg:flex">
-          <div className="p-6 border-b border-border">
-            <div className="flex items-center space-x-3 mb-1">
-              <div className="w-2 h-2 rounded-full bg-vs2 animate-pulse" />
-              <span className="text-lg font-black text-accent font-['Space_Grotesk',sans-serif]">
-                OP-CENTER
-              </span>
-            </div>
-          </div>
-
-          <nav className="flex-1 py-4">
-            <div className="space-y-1">
-              {/* Dashboard */}
-              <Link
-                href="/"
-                className={`flex items-center space-x-3 px-4 py-3 font-['Inter',sans-serif] text-sm font-medium uppercase tracking-widest transition-colors ${
-                  pathname === "/"
-                    ? "bg-surface-high text-accent border-l-4 border-accent"
-                    : "text-[#e1e2ec]/40 hover:bg-surface-high/50 hover:text-[#e1e2ec] border-l-4 border-transparent"
-                }`}
-              >
-                <span className="material-symbols-outlined text-[18px]">
-                  dashboard
-                </span>
-                <span>Dashboard</span>
-              </Link>
-
-              {/* Admin */}
-              <Link
-                href="/admin"
-                className={`flex items-center space-x-3 px-4 py-3 font-['Inter',sans-serif] text-sm font-medium uppercase tracking-widest transition-colors ${
-                  pathname === "/admin"
-                    ? "bg-surface-high text-accent border-l-4 border-accent"
-                    : "text-[#e1e2ec]/40 hover:bg-surface-high/50 hover:text-[#e1e2ec] border-l-4 border-transparent"
-                }`}
-              >
-                <span className="material-symbols-outlined text-[18px]">
-                  factory
-                </span>
-                <span>Admin</span>
-              </Link>
-            </div>
-          </nav>
-        </aside>
+        <SidebarNav items={SIDE_NAV_ITEMS} activePath={pathname} />
 
         {/* ── Main Content ── */}
         <main className="flex-1 overflow-y-auto custom-scrollbar p-8 bg-background">

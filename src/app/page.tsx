@@ -9,6 +9,7 @@ import type { AdminLineConfig, LineState } from "@/lib/mesTypes";
 import type { DowntimeEntry } from "@/lib/downtimeTypes";
 import { getShiftProgress } from "@/lib/shiftTime";
 import Header from "@/components/Header";
+import SidebarNav, { SidebarNavItem } from "@/components/SidebarNav";
 import { useAuth } from "@/hooks/useAuth";
 import KpiCard from "@/components/KpiCard";
 import LineTable from "@/components/LineTable";
@@ -24,6 +25,11 @@ const OutputChart = dynamic(() => import("@/components/OutputChart"), {
 const LineDrawer = dynamic(() => import("@/components/LineDrawer"), {
   ssr: false,
 });
+
+const SIDE_NAV_ITEMS: SidebarNavItem[] = [
+  { href: "/", label: "Dashboard", icon: "dashboard" },
+  { href: "/admin", label: "Admin", icon: "factory" },
+];
 
 // ── Sidebar nav items ─────────────────────────────────────────────────────────
 
@@ -235,50 +241,11 @@ export default function Home() {
       />
 
       <div className="flex flex-1 overflow-hidden">
-        {/* ── Sidebar ── */}
-        <aside className="w-64 shrink-0 bg-surface-low border-r border-border flex-col overflow-y-auto custom-scrollbar hidden md:flex">
-          {/* OP-CENTER heading */}
-          <div className="p-6 border-b border-border">
-            <div className="flex items-center space-x-3 mb-1">
-              <div className="w-2 h-2 rounded-full bg-vs2 animate-pulse" />
-              <span className="text-lg font-black text-accent font-['Space_Grotesk',sans-serif]">
-                OP-CENTER
-              </span>
-            </div>
-          </div>
-
-          {/* Nav */}
-          <nav className="flex-1 py-4">
-            <div className="space-y-1">
-              {/* Dashboard */}
-              <Link
-                href="/"
-                className={`flex items-center space-x-3 px-4 py-3 font-['Inter',sans-serif] text-sm font-medium uppercase tracking-widest transition-colors ${
-                  pathname === "/"
-                    ? "bg-surface-high text-accent border-l-4 border-accent"
-                    : "text-[#e1e2ec]/40 hover:bg-surface-high/50 hover:text-[#e1e2ec] border-l-4 border-transparent"
-                }`}
-              >
-                <span className="material-symbols-outlined text-[18px]">dashboard</span>
-                <span>Dashboard</span>
-              </Link>
-
-              {/* Admin */}
-              <Link
-                href="/admin"
-                className={`flex items-center space-x-3 px-4 py-3 font-['Inter',sans-serif] text-sm font-medium uppercase tracking-widest transition-colors ${
-                  pathname === "/admin"
-                    ? "bg-surface-high text-accent border-l-4 border-accent"
-                    : "text-[#e1e2ec]/40 hover:bg-surface-high/50 hover:text-[#e1e2ec] border-l-4 border-transparent"
-                }`}
-              >
-                <span className="material-symbols-outlined text-[18px]">factory</span>
-                <span>Admin</span>
-              </Link>
-
-            </div>
-          </nav>
-        </aside>
+        <SidebarNav
+          items={SIDE_NAV_ITEMS}
+          activePath={pathname}
+          hiddenClassName="hidden md:flex"
+        />
 
         {/* ── Main content ── */}
         <main className="flex-1 overflow-y-auto custom-scrollbar p-6 bg-background">

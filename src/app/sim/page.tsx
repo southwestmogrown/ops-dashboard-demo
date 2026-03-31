@@ -10,6 +10,7 @@ import type { ShiftName } from "@/lib/types";
 import { LINES, LINE_LABELS, getDefaultTarget } from "@/lib/lines";
 import { getShiftWindows } from "@/lib/shiftTime";
 import Header from "@/components/Header";
+import SidebarNav from "@/components/SidebarNav";
 
 const HourlyTable = dynamic(() => import("@/components/sim/HourlyTable"), {
   ssr: false,
@@ -248,46 +249,40 @@ export default function SimPage() {
       />
 
       <div className="flex flex-1 overflow-hidden">
-        {/* ── Sidebar ────────────────────────────────────────────────────────── */}
-        <aside className="w-64 shrink-0 bg-surface-low flex flex-col border-r border-border/10 hidden lg:flex">
-          <div className="p-6 flex items-center space-x-3 border-b border-border/10">
-            <div className="w-10 h-10 rounded bg-accent/10 flex items-center justify-center border border-accent/20">
-              <span
-                className="material-symbols-outlined text-accent"
-                style={{ fontVariationSettings: "'FILL' 1" }}
-              >
-                precision_manufacturing
-              </span>
-            </div>
-            <div>
-              <h2 className="text-lg font-black text-accent font-['Space_Grotesk',sans-serif] uppercase leading-none">
-                OP-CENTER
-              </h2>
-              <p className="text-[10px] text-status-green font-medium tracking-tighter uppercase">
-                {running ? "Simulation Active" : "Standby"}
-              </p>
-            </div>
-          </div>
-          <nav className="flex-1 py-4 text-sm font-medium uppercase tracking-widest overflow-y-auto">
-            {SIDE_NAV.map((item) => {
-              const isActive = pathname === item.href;
-              return (
-                <Link
-                  key={item.label}
-                  href={item.href ?? "#"}
-                  className={`flex items-center space-x-3 px-4 py-3 ${
-                    isActive
-                      ? "text-accent bg-surface-high border-l-4 border-accent"
-                      : "text-[#e1e2ec]/40 hover:bg-surface-high/50 hover:text-[#e1e2ec] border-l-4 border-transparent transition-colors"
-                  }`}
+        <SidebarNav
+          items={SIDE_NAV.filter((item) => Boolean(item.href)) as Array<{
+            href: string;
+            label: string;
+            icon: string;
+          }>}
+          activePath={pathname}
+          asideClassName="bg-surface-low border-r border-border/10"
+          navClassName="flex-1 py-4 text-sm font-medium uppercase tracking-widest overflow-y-auto"
+          linkBaseClassName="flex items-center space-x-3 px-4 py-3"
+          activeLinkClassName="text-accent bg-surface-high border-l-4 border-accent"
+          inactiveLinkClassName="text-[#e1e2ec]/40 hover:bg-surface-high/50 hover:text-[#e1e2ec] border-l-4 border-transparent transition-colors"
+          iconClassName="material-symbols-outlined"
+          header={
+            <div className="p-6 flex items-center space-x-3 border-b border-border/10">
+              <div className="w-10 h-10 rounded bg-accent/10 flex items-center justify-center border border-accent/20">
+                <span
+                  className="material-symbols-outlined text-accent"
+                  style={{ fontVariationSettings: "'FILL' 1" }}
                 >
-                  <span className="material-symbols-outlined">{item.icon}</span>
-                  <span>{item.label}</span>
-                </Link>
-              );
-            })}
-          </nav>
-        </aside>
+                  precision_manufacturing
+                </span>
+              </div>
+              <div>
+                <h2 className="text-lg font-black text-accent font-['Space_Grotesk',sans-serif] uppercase leading-none">
+                  OP-CENTER
+                </h2>
+                <p className="text-[10px] text-status-green font-medium tracking-tighter uppercase">
+                  {running ? "Simulation Active" : "Standby"}
+                </p>
+              </div>
+            </div>
+          }
+        />
 
         {/* ── Main content ───────────────────────────────────────────────────── */}
         <main className="flex-1 overflow-y-auto p-6 custom-scrollbar bg-background">

@@ -1,6 +1,11 @@
+import { NextRequest } from "next/server";
 import { removeFromQueue } from "@/lib/mesStore";
+import { requireRole } from "@/lib/apiAuth";
 
-export async function DELETE(req: Request) {
+export async function DELETE(req: NextRequest) {
+  const authError = requireRole(req, "supervisor");
+  if (authError) return authError;
+
   const body = await req.json().catch(() => null);
   const { lineId, index } = body ?? {};
 

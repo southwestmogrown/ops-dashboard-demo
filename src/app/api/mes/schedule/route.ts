@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { setSchedule, enqueueSchedule, clearLine, skipOrder, unskipOrder } from "@/lib/mesStore";
 import type { LineSchedule } from "@/lib/mesTypes";
+import { requireRole } from "@/lib/apiAuth";
 
 interface ScheduleBody {
   lineId: string;
@@ -9,6 +10,9 @@ interface ScheduleBody {
 }
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
+  const authError = requireRole(request, "supervisor");
+  if (authError) return authError;
+
   const body = await request.json() as ScheduleBody;
 
   if (!body.lineId || !body.schedule) {
@@ -25,6 +29,9 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 }
 
 export async function DELETE(request: NextRequest): Promise<NextResponse> {
+  const authError = requireRole(request, "supervisor");
+  if (authError) return authError;
+
   const body = await request.json().catch(() => null);
   if (!body?.lineId) {
     return NextResponse.json({ error: "lineId required" }, { status: 400 });
@@ -40,6 +47,9 @@ interface SkipBody {
 }
 
 export async function PATCH(request: NextRequest): Promise<NextResponse> {
+  const authError = requireRole(request, "supervisor");
+  if (authError) return authError;
+
   const body = await request.json().catch(() => null) as SkipBody | null;
   if (!body?.lineId || !body?.model || !body?.action) {
     return NextResponse.json({ error: "lineId, model, and action (skip|unskip) are required" }, { status: 400 });

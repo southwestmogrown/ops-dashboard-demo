@@ -18,6 +18,7 @@ import EOSLineCard from "@/components/eos/EOSLineCard";
 import EOSMetaForm from "@/components/eos/EOSMetaForm";
 import EOSEmailPreview from "@/components/eos/EOSEmailPreview";
 import NoteCheckboxField from "@/components/eos/NoteCheckboxField";
+import SidebarNav, { SidebarNavItem } from "@/components/SidebarNav";
 
 // ── Draft types ────────────────────────────────────────────────────────────────
 
@@ -77,6 +78,11 @@ const ALL_LINES: EOSLineDescriptor[] = VALUE_STREAMS.flatMap((vs) =>
     lineKey: `${vs.id}:${line}`,
   })),
 );
+
+const SIDE_NAV_ITEMS: SidebarNavItem[] = [
+  { href: "/", label: "Dashboard", icon: "dashboard" },
+  { href: "/admin", label: "Admin", icon: "factory" },
+];
 
 const EMPTY_LINE: EOSLineEntry = {
   output: "",
@@ -355,51 +361,20 @@ export default function EOSPage() {
       <Header />
 
       <div className="flex flex-1 overflow-hidden">
-        {/* ── Sidebar ── */}
-        <aside className="w-64 shrink-0 bg-surface-low border-r border-border flex-col overflow-y-auto custom-scrollbar hidden lg:flex">
-          <div className="p-6">
-            <div className="flex items-center gap-3 mb-1">
-              <div className="w-2 h-2 rounded-full bg-vs2 animate-pulse" />
-              <span className="text-lg font-black text-accent font-['Space_Grotesk',sans-serif]">
-                OP-CENTER
-              </span>
-            </div>
-          </div>
-
-          <nav className="flex-1 py-4">
-            <div className="space-y-1">
-              {/* Dashboard */}
-              <Link
-                href="/"
-                className={`flex items-center space-x-3 px-4 py-3 font-['Inter',sans-serif] text-sm font-medium uppercase tracking-widest transition-colors ${
-                  pathname === "/"
-                    ? "bg-surface-high text-accent border-l-4 border-accent"
-                    : "text-[#e1e2ec]/40 hover:bg-surface-high/50 hover:text-[#e1e2ec] border-l-4 border-transparent"
-                }`}
-              >
-                <span className="material-symbols-outlined text-[18px]">
-                  dashboard
+        <SidebarNav
+          items={SIDE_NAV_ITEMS}
+          activePath={pathname}
+          header={
+            <div className="p-6">
+              <div className="flex items-center gap-3 mb-1">
+                <div className="w-2 h-2 rounded-full bg-vs2 animate-pulse" />
+                <span className="text-lg font-black text-accent font-['Space_Grotesk',sans-serif]">
+                  OP-CENTER
                 </span>
-                <span>Dashboard</span>
-              </Link>
-
-              {/* Admin */}
-              <Link
-                href="/admin"
-                className={`flex items-center space-x-3 px-4 py-3 font-['Inter',sans-serif] text-sm font-medium uppercase tracking-widest transition-colors ${
-                  pathname === "/admin"
-                    ? "bg-surface-high text-accent border-l-4 border-accent"
-                    : "text-[#e1e2ec]/40 hover:bg-surface-high/50 hover:text-[#e1e2ec] border-l-4 border-transparent"
-                }`}
-              >
-                <span className="material-symbols-outlined text-[18px]">
-                  factory
-                </span>
-                <span>Admin</span>
-              </Link>
+              </div>
             </div>
-          </nav>
-        </aside>
+          }
+        />
 
         {/* ── Main Content ── */}
         <main className="flex-1 overflow-y-auto custom-scrollbar bg-background">
