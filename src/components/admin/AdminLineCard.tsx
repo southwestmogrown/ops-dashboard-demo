@@ -308,7 +308,7 @@ const AdminLineCardInner = forwardRef(function AdminLineCardInner(
           {/* Target & Headcount */}
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1">
-              <label className="text-[10px] uppercase font-black text-[#e1e2ec]/40 tracking-widest">
+              <label className="kc-micro-label font-black">
                 Daily Target
               </label>
               <input
@@ -318,11 +318,11 @@ const AdminLineCardInner = forwardRef(function AdminLineCardInner(
                 value={target}
                 onChange={(e) => setTarget(e.target.value)}
                 placeholder="e.g. 215"
-                className="w-full bg-surface-highest border-0 border-l-2 border-accent rounded-sm px-3 py-2.5 text-sm font-['Space_Grotesk',sans-serif] font-bold outline-none focus:ring-1 focus:ring-accent/30 disabled:opacity-50 disabled:cursor-not-allowed placeholder:text-[#e1e2ec]/20"
+                className="kc-input-admin font-['Space_Grotesk',sans-serif] font-bold disabled:opacity-50 disabled:cursor-not-allowed"
               />
             </div>
             <div className="space-y-1">
-              <label className="text-[10px] uppercase font-black text-[#e1e2ec]/40 tracking-widest">
+              <label className="kc-micro-label font-black">
                 Headcount
               </label>
               <input
@@ -332,14 +332,14 @@ const AdminLineCardInner = forwardRef(function AdminLineCardInner(
                 value={headcount}
                 onChange={(e) => setHeadcount(e.target.value)}
                 placeholder="e.g. 8"
-                className="w-full bg-surface-highest border-0 border-l-2 border-accent rounded-sm px-3 py-2.5 text-sm font-['Space_Grotesk',sans-serif] font-bold outline-none focus:ring-1 focus:ring-accent/30 disabled:opacity-50 disabled:cursor-not-allowed placeholder:text-[#e1e2ec]/20"
+                className="kc-input-admin font-['Space_Grotesk',sans-serif] font-bold disabled:opacity-50 disabled:cursor-not-allowed"
               />
             </div>
           </div>
 
           {/* Supervisor */}
           <div className="space-y-1">
-            <label className="text-[10px] uppercase font-black text-[#e1e2ec]/40 tracking-widest">
+            <label className="kc-micro-label font-black">
               Supervisor
             </label>
             <input
@@ -356,7 +356,7 @@ const AdminLineCardInner = forwardRef(function AdminLineCardInner(
           <button
             onClick={handleSave}
             disabled={!isRunning}
-            className={`w-full font-black py-3 rounded-sm text-xs uppercase tracking-[0.2em] transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed ${
+            className={`kc-btn-primary-wide ${
               saved
                 ? "bg-status-green text-black"
                 : "bg-accent text-black hover:opacity-90"
@@ -448,7 +448,7 @@ const AdminLineCardInner = forwardRef(function AdminLineCardInner(
               <div className="mt-3 pt-3 border-t border-border/30">
                 <button
                   onClick={() => setSkippedOpen((o) => !o)}
-                  className="flex items-center gap-1.5 text-[10px] text-status-amber/70 hover:text-status-amber bg-transparent border-none cursor-pointer transition-colors mb-1 uppercase tracking-widest font-bold"
+                  className="kc-disclosure-btn text-status-amber/70 hover:text-status-amber"
                 >
                   {skippedItems.length} skipped{" "}
                   {skippedOpen ? "\u25B2" : "\u25BC"}
@@ -482,7 +482,7 @@ const AdminLineCardInner = forwardRef(function AdminLineCardInner(
               <div className="mt-3 pt-3 border-t border-border/30">
                 <button
                   onClick={() => setQueueOpen((o) => !o)}
-                  className="flex items-center gap-1.5 text-[10px] text-accent/70 hover:text-accent bg-transparent border-none cursor-pointer transition-colors mb-1 uppercase tracking-widest font-bold"
+                  className="kc-disclosure-btn text-accent/70 hover:text-accent"
                 >
                   +{queuedCount} queued {queueOpen ? "\u25B2" : "\u25BC"}
                 </button>
@@ -515,7 +515,7 @@ const AdminLineCardInner = forwardRef(function AdminLineCardInner(
             <div className="flex gap-2 mt-4 pt-3 border-t border-border/30">
               <button
                 onClick={() => inputRef.current?.click()}
-                className="flex-1 text-[10px] text-[#e1e2ec]/60 hover:text-[#e1e2ec] bg-surface/30 hover:bg-surface-high transition-colors py-2 rounded-sm font-bold uppercase tracking-widest"
+                className="kc-btn-compact-neutral"
               >
                 Load PDF
               </button>
@@ -524,7 +524,7 @@ const AdminLineCardInner = forwardRef(function AdminLineCardInner(
                   setPendingSchedule(null);
                   onClearSchedule(lineId);
                 }}
-                className="flex-1 text-[10px] text-status-red/60 hover:text-status-red bg-surface/30 hover:bg-status-red/10 transition-colors py-2 rounded-sm font-bold uppercase tracking-widest"
+                className="kc-btn-compact-danger"
               >
                 Clear
               </button>

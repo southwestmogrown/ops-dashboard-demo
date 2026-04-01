@@ -184,27 +184,27 @@ function AdminPageContent() {
             </div>
             <div className="flex gap-4 items-center bg-surface-low p-4 rounded-sm border-l-2 border-accent">
               <div className="flex flex-col pr-6 border-r border-border">
-                <span className="text-[10px] uppercase font-bold tracking-widest text-accent mb-1">
+                <span className="kc-micro-label-base text-accent mb-1">
                   Shift Targets
                 </span>
                 <div className="flex items-baseline gap-1">
                   <span className="font-['Space_Grotesk',sans-serif] text-2xl font-bold tabular-nums">
                     {totalTarget.toLocaleString()}
                   </span>
-                  <span className="text-[10px] text-[#e1e2ec]/40 font-medium">
+                  <span className="kc-micro-label font-medium normal-case">
                     units
                   </span>
                 </div>
               </div>
               <div className="flex flex-col pl-2">
-                <span className="text-[10px] uppercase font-bold tracking-widest text-status-green mb-1">
+                <span className="kc-micro-label-base text-status-green mb-1">
                   Global Headcount
                 </span>
                 <div className="flex items-baseline gap-1">
                   <span className="font-['Space_Grotesk',sans-serif] text-2xl font-bold tabular-nums">
                     {totalHeadcount}
                   </span>
-                  <span className="text-[10px] text-[#e1e2ec]/40 font-medium">
+                  <span className="kc-micro-label font-medium normal-case">
                     OPS
                   </span>
                 </div>
@@ -254,7 +254,7 @@ function AdminPageContent() {
               <button
                 onClick={handleSaveAll}
                 disabled={savingAll}
-                className="flex-1 bg-accent text-black font-black py-4 rounded-sm text-xs uppercase tracking-[0.2em] hover:opacity-90 transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="kc-btn-primary-wide flex-1 py-4"
               >
                 {savingAll ? "Saving…" : "Save All Config"}
               </button>
@@ -270,7 +270,7 @@ function AdminPageContent() {
                 info
               </span>
               <div>
-                <p className="text-[10px] font-bold text-[#e1e2ec]/60 uppercase mb-1">
+                <p className="kc-micro-label-base text-[#e1e2ec]/60 mb-1">
                   Last Configuration Sync
                 </p>
                 <p className="text-xs text-[#e1e2ec]/40 tabular-nums">

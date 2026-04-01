@@ -330,35 +330,35 @@ export default function LineTable({
         <table className="w-full border-collapse">
           <thead>
             <tr className="bg-surface-high text-left">
-              <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-[#e1e2ec]/50">
+              <th className="kc-table-th px-6">
                 Line Identification
               </th>
-              <th className="px-4 py-4 text-[10px] font-black uppercase tracking-widest text-[#e1e2ec]/50">
+              <th className="kc-table-th">
                 Output / Target
               </th>
               <th
-                className="px-4 py-4 text-[10px] font-black uppercase tracking-widest text-[#e1e2ec]/50 text-center cursor-pointer select-none hover:text-[#e1e2ec]/80"
+                className="kc-table-th text-center cursor-pointer select-none hover:text-[#e1e2ec]/80"
                 onClick={() => handleSort("fpy")}
               >
                 FPY (%)<SortIcon active={sortKey === "fpy"} dir={sortDir} />
               </th>
-              <th className="px-4 py-4 text-[10px] font-black uppercase tracking-widest text-[#e1e2ec]/50 text-center">
+              <th className="kc-table-th text-center">
                 HPU <span className="text-[#e1e2ec]/20 text-[8px] normal-case tracking-normal">(Hrs/Unit)</span>
               </th>
-              <th className="px-4 py-4 text-[10px] font-black uppercase tracking-widest text-[#e1e2ec]/50 text-center">
+              <th className="kc-table-th text-center">
                 Headcount
               </th>
-              <th className="px-4 py-4 text-[10px] font-black uppercase tracking-widest text-[#e1e2ec]/50 text-center">
+              <th className="kc-table-th text-center">
                 OEE
               </th>
               <th
-                className="px-4 py-4 text-[10px] font-black uppercase tracking-widest text-[#e1e2ec]/50 text-center cursor-pointer select-none hover:text-[#e1e2ec]/80"
+                className="kc-table-th text-center cursor-pointer select-none hover:text-[#e1e2ec]/80"
                 onClick={() => handleSort("pace")}
               >
                 Pace <span className="text-[#e1e2ec]/20 text-[8px] normal-case tracking-normal">(/hr)</span>
                 <SortIcon active={sortKey === "pace"} dir={sortDir} />
               </th>
-              <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-[#e1e2ec]/50 text-right">
+              <th className="kc-table-th px-6 text-right">
                 Status
               </th>
             </tr>

@@ -134,7 +134,7 @@ export default function Header({
             <>
               <div className="flex items-center space-x-2 px-3 py-1.5 bg-surface border border-border rounded-sm">
                 <div className="flex flex-col items-end">
-                  <span className="text-[9px] uppercase tracking-widest text-[#e1e2ec]/40 font-bold leading-none">
+                  <span className="kc-micro-label-xs leading-none">
                     Remaining
                   </span>
                   <span
@@ -145,7 +145,7 @@ export default function Header({
                 </div>
                 <div className="w-px h-8 bg-border" />
                 <div className="flex flex-col">
-                  <span className="text-[9px] uppercase tracking-widest text-[#e1e2ec]/40 font-bold leading-none">
+                  <span className="kc-micro-label-xs leading-none">
                     End
                   </span>
                   <span
@@ -159,7 +159,7 @@ export default function Header({
               {/* Shift + time pill */}
               <div className="flex items-center space-x-3 px-3 py-1.5 bg-surface border border-border rounded-sm">
                 <div className="flex flex-col items-end">
-                  <span className="text-[9px] uppercase tracking-widest text-[#e1e2ec]/40 font-bold">
+                  <span className="kc-micro-label-xs">
                     Shift Status
                   </span>
                   <button
@@ -172,7 +172,7 @@ export default function Header({
                 </div>
                 <div className="w-px h-8 bg-border" />
                 <div className="flex flex-col">
-                  <span className="text-[9px] uppercase tracking-widest text-[#e1e2ec]/40 font-bold">
+                  <span className="kc-micro-label-xs">
                     Current Time
                   </span>
                   <span className="text-sm font-medium font-mono text-[#e1e2ec] leading-tight">

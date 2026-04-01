@@ -90,7 +90,7 @@ export default function LineDetailCard({
 
         <div className="col-span-12 lg:col-span-8 grid grid-cols-2 md:grid-cols-5 gap-4">
           <div className="bg-surface p-4 border-t-2 border-status-green">
-            <span className="block text-[11px] font-bold text-[#e1e2ec]/55 uppercase mb-1">
+            <span className="kc-kpi-label">
               Current Output
             </span>
             <div className="flex items-baseline gap-2">
@@ -105,7 +105,7 @@ export default function LineDetailCard({
             </div>
           </div>
           <div className="bg-surface p-4 border-t-2 border-status-green">
-            <span className="block text-[11px] font-bold text-[#e1e2ec]/55 uppercase mb-1">
+            <span className="kc-kpi-label">
               First Pass Yield
             </span>
             <div className="flex items-baseline gap-2">
@@ -117,7 +117,7 @@ export default function LineDetailCard({
             </div>
           </div>
           <div className="bg-surface p-4 border-t-2 border-accent">
-            <span className="block text-[11px] font-bold text-[#e1e2ec]/55 uppercase mb-1">
+            <span className="kc-kpi-label">
               Hours Per Unit
             </span>
             <div className="flex items-baseline gap-2">
@@ -129,7 +129,7 @@ export default function LineDetailCard({
             </div>
           </div>
           <div className="bg-surface p-4 border-t-2 border-status-green">
-            <span className="block text-[11px] font-bold text-[#e1e2ec]/55 uppercase mb-1">
+            <span className="kc-kpi-label">
               Headcount
             </span>
             <div className="flex items-baseline gap-2">
@@ -142,7 +142,7 @@ export default function LineDetailCard({
             </div>
           </div>
           <div className="bg-surface p-4 border-t-2 border-status-amber">
-            <span className="block text-[11px] font-bold text-[#e1e2ec]/55 uppercase mb-1">
+            <span className="kc-kpi-label">
               Changeovers
             </span>
             <div className="flex items-baseline gap-2">
@@ -225,7 +225,7 @@ export default function LineDetailCard({
               </h3>
               <button
                 onClick={() => setShowScrapForm(true)}
-                className="bg-accent text-black px-3 py-1 text-[11px] font-bold rounded-sm hover:opacity-90 active:scale-95 transition-all cursor-pointer border-none"
+                className="kc-panel-action-btn"
               >
                 ADD ENTRY
               </button>
@@ -279,7 +279,7 @@ export default function LineDetailCard({
               </h3>
               <button
                 onClick={() => setShowDowntimeForm(true)}
-                className="bg-accent text-black px-3 py-1 text-[11px] font-bold rounded-sm hover:opacity-90 active:scale-95 transition-all cursor-pointer border-none"
+                className="kc-panel-action-btn"
               >
                 + LOG STOP
               </button>

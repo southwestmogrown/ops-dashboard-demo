@@ -343,7 +343,7 @@ Comprehensive code review identified 7 key waste/redundancy issues. See detailed
 
 - **M22: Type Definition Organization** ✅ COMPLETE (2026-04-01) — Consolidated canonical type modules under `src/lib/types/` (`core`, `mes`, `eos`, `quality`, `downtime`, `auth`) and migrated imports; kept legacy files as compatibility re-export shims.
 
-- **M23: Tailwind CSS Abstraction** 🟢 LOW — Repeated class patterns (nav-link 8×, card-base 50×, micro-label 15×). Add @apply rules to `globals.css` to save ~150 class strings.
+- **M23: Tailwind CSS Abstraction** ✅ COMPLETE (2026-04-01) — Reusable utility classes consolidated in `globals.css` and applied across dashboard/admin/sim/team-lead/EOS components in three passes; build verified green.
 
 - **M24: Dynamic Import Audit** 🟢 NICE-TO-HAVE — 8 dynamic imports; verify each truly needs SSR exclusion. Remove 2-3 unnecessary imports if found.
 

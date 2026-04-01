@@ -104,7 +104,7 @@ export default function OutputChart({
         <div className="flex items-center space-x-6">
           <div className="flex items-center space-x-2">
             <div className="w-3 h-3 bg-accent rounded-sm" />
-            <span className="text-[10px] font-bold uppercase tracking-widest text-[#cfd6e3]">
+            <span className="kc-micro-label-base text-[#cfd6e3]">
               VS1 (Folding)
             </span>
             {vs1Warn && (
@@ -118,7 +118,7 @@ export default function OutputChart({
           </div>
           <div className="flex items-center space-x-2">
             <div className="w-3 h-3 bg-vs2 rounded-sm" />
-            <span className="text-[10px] font-bold uppercase tracking-widest text-[#cfd6e3]">
+            <span className="kc-micro-label-base text-[#cfd6e3]">
               VS2 (Revolver)
             </span>
             {vs2Warn && (
@@ -209,20 +209,20 @@ export default function OutputChart({
             <div className="flex items-center space-x-6">
               <div className="flex items-center space-x-2">
                 <div className="w-3 h-0.5 bg-accent rounded-full" />
-                <span className="text-[10px] font-bold uppercase tracking-widest text-[#cfd6e3]">
+                <span className="kc-micro-label-base text-[#cfd6e3]">
                   VS1 (Folding)
                 </span>
               </div>
               <div className="flex items-center space-x-2">
                 <div className="w-3 h-0.5 bg-vs2 rounded-full" />
-                <span className="text-[10px] font-bold uppercase tracking-widest text-[#cfd6e3]">
+                <span className="kc-micro-label-base text-[#cfd6e3]">
                   VS2 (Revolver)
                 </span>
               </div>
               {totalTarget && totalTarget > 0 && (
                 <div className="flex items-center space-x-2">
                   <div className="w-3 h-0.5 border-t-2 border-dashed border-[#e1e2ec]/30 rounded-full" />
-                  <span className="text-[10px] font-bold uppercase tracking-widest text-[#cfd6e3]">
+                  <span className="kc-micro-label-base text-[#cfd6e3]">
                     Target Trajectory
                   </span>
                 </div>

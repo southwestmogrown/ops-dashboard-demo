@@ -65,13 +65,13 @@ export default function EOSLineCard({ lineKey, vsId, line, vsName, data, onChang
 
         {/* Summary metrics (display) */}
         <div>
-          <p className="text-[10px] text-[#e1e2ec]/40 uppercase font-bold tracking-widest mb-1">Output</p>
+          <p className="kc-micro-label mb-1">Output</p>
           <p className="font-['Space_Grotesk',sans-serif] text-2xl font-bold tabular-nums">
             {data.output || "—"}
           </p>
         </div>
         <div>
-          <p className="text-[10px] text-[#e1e2ec]/40 uppercase font-bold tracking-widest mb-1">HC / HPU</p>
+          <p className="kc-micro-label mb-1">HC / HPU</p>
           <p className="font-['Space_Grotesk',sans-serif] text-2xl font-bold tabular-nums">
             {data.headcount || "—"}
             <span className="text-sm font-normal text-[#e1e2ec]/30 ml-1">
@@ -80,13 +80,13 @@ export default function EOSLineCard({ lineKey, vsId, line, vsName, data, onChang
           </p>
         </div>
         <div>
-          <p className="text-[10px] text-[#e1e2ec]/40 uppercase font-bold tracking-widest mb-1">Rem. Order</p>
+          <p className="kc-micro-label mb-1">Rem. Order</p>
           <p className="font-['Space_Grotesk',sans-serif] text-2xl font-bold tabular-nums">
             {data.remainingOnOrder || "—"}
           </p>
         </div>
         <div className="flex flex-col justify-start">
-          <p className="text-[10px] text-[#e1e2ec]/40 uppercase font-bold tracking-widest mb-1">C/O</p>
+          <p className="kc-micro-label mb-1">C/O</p>
           <p className="font-['Space_Grotesk',sans-serif] text-2xl font-bold tabular-nums">
             {data.changeovers || "0"}
           </p>
@@ -97,7 +97,7 @@ export default function EOSLineCard({ lineKey, vsId, line, vsName, data, onChang
       <div className="px-5 pb-5 grid grid-cols-[repeat(auto-fill,minmax(140px,1fr))] gap-3 border-t border-border/30 pt-4">
         {FIELDS.map(({ key, label, type, readOnly }) => (
           <div key={key}>
-            <label className="block text-[10px] text-[#e1e2ec]/30 mb-1 tracking-widest uppercase font-bold">
+            <label className="block kc-micro-label text-[#e1e2ec]/30 mb-1">
               {label}
             </label>
             <input
@@ -118,7 +118,7 @@ export default function EOSLineCard({ lineKey, vsId, line, vsName, data, onChang
 
       {/* Per-line notes */}
       <div className="px-5 pb-5">
-        <label className="block text-[10px] text-[#e1e2ec]/30 mb-1 tracking-widest uppercase font-bold">
+        <label className="block kc-micro-label text-[#e1e2ec]/30 mb-1">
           Line Notes
         </label>
         <textarea

@@ -65,7 +65,7 @@ function EditEntryForm({
           <input
             value={model}
             onChange={(e) => setModel(e.target.value)}
-            className="w-full bg-background border-none rounded-sm px-2 py-1 text-[10px] text-[#e1e2ec] outline-none font-mono"
+            className="kc-input-compact"
           />
         </div>
         <div>
@@ -77,7 +77,7 @@ function EditEntryForm({
             onChange={(e) =>
               setPanel(e.target.value as (typeof PANEL_OPTIONS)[number])
             }
-            className="w-full bg-background border-none rounded-sm px-2 py-1 text-[10px] text-[#e1e2ec] outline-none font-mono"
+            className="kc-input-compact"
           >
             {PANEL_OPTIONS.map((p) => (
               <option key={p} value={p}>
@@ -96,7 +96,7 @@ function EditEntryForm({
           onChange={(e) =>
             setDamageType(e.target.value as (typeof DAMAGE_TYPES)[number])
           }
-          className="w-full bg-background border-none rounded-sm px-2 py-1 text-[10px] text-[#e1e2ec] outline-none font-mono"
+          className="kc-input-compact"
         >
           {DAMAGE_TYPES.map((d) => (
             <option key={d} value={d}>
@@ -108,14 +108,14 @@ function EditEntryForm({
       <div className="flex gap-2 justify-end">
         <button
           onClick={onCancel}
-          className="px-2 py-1 text-[9px] text-[#e1e2ec]/40 hover:text-[#e1e2ec] transition-colors"
+          className="kc-btn-inline-muted"
         >
           Cancel
         </button>
         <button
           onClick={handleSave}
           disabled={saving}
-          className="px-2 py-1 text-[9px] bg-accent text-background rounded-sm font-bold hover:bg-accent/80 transition-colors disabled:opacity-40"
+          className="kc-btn-inline-accent"
         >
           {saving ? "Saving..." : "Save"}
         </button>
@@ -153,14 +153,14 @@ function VoidConfirm({
       <div className="flex gap-2 justify-end">
         <button
           onClick={onCancel}
-          className="px-2 py-1 text-[9px] text-[#e1e2ec]/40 hover:text-[#e1e2ec] transition-colors"
+          className="kc-btn-inline-muted"
         >
           Cancel
         </button>
         <button
           onClick={() => onConfirm(reason.trim())}
           disabled={!reason.trim()}
-          className="px-2 py-1 text-[9px] bg-status-red text-white rounded-sm font-bold hover:bg-status-red/80 transition-colors disabled:opacity-40"
+          className="kc-btn-inline-danger"
         >
           Void Entry
         </button>

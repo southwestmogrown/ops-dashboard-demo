@@ -300,7 +300,7 @@ export default function SimPage() {
                   {!running ? (
                     <button
                       onClick={startSim}
-                      className="px-4 py-2 bg-accent text-black rounded-sm font-bold text-xs uppercase flex items-center gap-2 hover:opacity-90 transition-colors cursor-pointer border-none"
+                      className="kc-btn-control-primary"
                     >
                       <span
                         className="material-symbols-outlined text-sm"
@@ -313,7 +313,7 @@ export default function SimPage() {
                   ) : (
                     <button
                       onClick={pauseSim}
-                      className="px-4 py-2 bg-surface-highest text-[#e1e2ec] rounded-sm font-bold text-xs uppercase flex items-center gap-2 border border-border/30 hover:bg-surface-high transition-colors cursor-pointer"
+                      className="kc-btn-control-neutral"
                     >
                       <span className="material-symbols-outlined text-sm">
                         pause
@@ -323,7 +323,7 @@ export default function SimPage() {
                   )}
                   <button
                     onClick={resetSim}
-                    className="px-4 py-2 bg-surface-highest text-[#e1e2ec] rounded-sm font-bold text-xs uppercase flex items-center gap-2 border border-border/30 hover:bg-surface-high transition-colors cursor-pointer"
+                    className="kc-btn-control-neutral"
                   >
                     <span className="material-symbols-outlined text-sm">
                       refresh
@@ -359,7 +359,7 @@ export default function SimPage() {
 
                 {/* Shift selector */}
                 <div className="flex items-center gap-3 pt-2">
-                  <span className="text-[10px] uppercase tracking-widest text-[#e1e2ec]/40 font-bold">
+                  <span className="kc-micro-label">
                     Shift
                   </span>
                   {(["day", "night"] as ShiftName[]).map((s) => (
@@ -393,7 +393,7 @@ export default function SimPage() {
             {/* Status Bento — right 5 cols */}
             <div className="col-span-12 lg:col-span-5 grid grid-cols-2 gap-4">
               <div className="bg-surface p-4 rounded-sm flex flex-col justify-between border-t-2 border-status-green">
-                <span className="text-[10px] font-bold uppercase tracking-widest text-status-green">
+                <span className="kc-micro-label-base text-status-green">
                   Output %
                 </span>
                 <span className="font-['Space_Grotesk',sans-serif] text-4xl font-light tabular-nums">
@@ -408,7 +408,7 @@ export default function SimPage() {
                 </div>
               </div>
               <div className="bg-surface p-4 rounded-sm flex flex-col justify-between border-t-2 border-accent">
-                <span className="text-[10px] font-bold uppercase tracking-widest text-accent">
+                <span className="kc-micro-label-base text-accent">
                   Total Output
                 </span>
                 <span className="font-['Space_Grotesk',sans-serif] text-4xl font-light tabular-nums">
@@ -420,7 +420,7 @@ export default function SimPage() {
               </div>
               <div className="col-span-2 bg-surface p-4 rounded-sm flex items-center justify-between">
                 <div>
-                  <span className="text-[10px] font-bold uppercase tracking-widest text-[#e1e2ec]/40">
+                  <span className="kc-micro-label">
                     {running
                       ? "Simulation Running"
                       : scheduledLines > 0

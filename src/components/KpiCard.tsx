@@ -60,7 +60,7 @@ export default function KpiCard({
 
         <div className="flex justify-between items-start mb-3">
           <div className="flex items-center gap-1.5">
-            <span className="text-[10px] font-bold text-[#e1e2ec]/50 uppercase tracking-widest">
+            <span className="kc-micro-label-muted">
               {label}
             </span>
             {tooltip && (

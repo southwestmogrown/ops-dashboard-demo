@@ -22,6 +22,92 @@ body {
   font-family: "Inter", sans-serif;
 }
 
+@layer components {
+  .kc-micro-label {
+    @apply text-[10px] text-[#e1e2ec]/40 uppercase tracking-widest font-bold;
+  }
+
+  .kc-micro-label-base {
+    @apply text-[10px] uppercase tracking-widest font-bold;
+  }
+
+  .kc-micro-label-muted {
+    @apply text-[10px] text-[#e1e2ec]/50 uppercase tracking-widest font-bold;
+  }
+
+  .kc-micro-label-xs {
+    @apply text-[9px] text-[#e1e2ec]/40 uppercase tracking-widest font-bold;
+  }
+
+  .kc-input-field {
+    @apply w-full bg-surface-highest border-0 border-l-2 border-accent rounded-sm px-3.5 py-2.5 text-[#e1e2ec] text-sm outline-none focus:ring-1 focus:ring-accent/40 placeholder:text-[#e1e2ec]/20;
+  }
+
+  .kc-input-admin {
+    @apply w-full bg-surface-highest border-0 border-l-2 border-accent rounded-sm px-3 py-2.5 text-sm outline-none focus:ring-1 focus:ring-accent/30 placeholder:text-[#e1e2ec]/20;
+  }
+
+  .kc-btn-primary-wide {
+    @apply w-full bg-accent text-black font-black py-3 rounded-sm text-xs uppercase tracking-[0.2em] hover:opacity-90 transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+
+  .kc-input-compact {
+    @apply w-full bg-background border-0 rounded-sm px-2 py-1 text-[10px] text-[#e1e2ec] outline-none font-mono;
+  }
+
+  .kc-btn-inline-muted {
+    @apply px-2 py-1 text-[9px] text-[#e1e2ec]/40 hover:text-[#e1e2ec] transition-colors;
+  }
+
+  .kc-btn-inline-accent {
+    @apply px-2 py-1 text-[9px] bg-accent text-background rounded-sm font-bold hover:bg-accent/80 transition-colors disabled:opacity-40;
+  }
+
+  .kc-btn-inline-danger {
+    @apply px-2 py-1 text-[9px] bg-status-red text-white rounded-sm font-bold hover:bg-status-red/80 transition-colors disabled:opacity-40;
+  }
+
+  .kc-panel-action-btn {
+    @apply bg-accent text-black px-3 py-1 text-[11px] font-bold rounded-sm hover:opacity-90 active:scale-95 transition-all cursor-pointer border-none;
+  }
+
+  .kc-kpi-label {
+    @apply block text-[11px] font-bold text-[#e1e2ec]/55 uppercase mb-1;
+  }
+
+  .kc-btn-wide-success {
+    @apply w-full bg-status-green hover:opacity-90 disabled:opacity-50 text-black font-black text-xs uppercase tracking-[0.2em] py-3 rounded-sm transition-all active:scale-95 cursor-pointer border-none;
+  }
+
+  .kc-btn-wide-danger {
+    @apply w-full bg-status-red hover:opacity-90 disabled:opacity-50 text-white font-black text-xs uppercase tracking-[0.2em] py-3 rounded-sm transition-all active:scale-95 cursor-pointer border-none;
+  }
+
+  .kc-btn-control-primary {
+    @apply px-4 py-2 bg-accent text-black rounded-sm font-bold text-xs uppercase flex items-center gap-2 hover:opacity-90 transition-colors cursor-pointer border-none;
+  }
+
+  .kc-btn-control-neutral {
+    @apply px-4 py-2 bg-surface-highest text-[#e1e2ec] rounded-sm font-bold text-xs uppercase flex items-center gap-2 border border-border/30 hover:bg-surface-high transition-colors cursor-pointer;
+  }
+
+  .kc-disclosure-btn {
+    @apply flex items-center gap-1.5 text-[10px] bg-transparent border-none cursor-pointer transition-colors mb-1 uppercase tracking-widest font-bold;
+  }
+
+  .kc-btn-compact-neutral {
+    @apply flex-1 text-[10px] text-[#e1e2ec]/60 hover:text-[#e1e2ec] bg-surface/30 hover:bg-surface-high transition-colors py-2 rounded-sm font-bold uppercase tracking-widest;
+  }
+
+  .kc-btn-compact-danger {
+    @apply flex-1 text-[10px] text-status-red/60 hover:text-status-red bg-surface/30 hover:bg-status-red/10 transition-colors py-2 rounded-sm font-bold uppercase tracking-widest;
+  }
+
+  .kc-table-th {
+    @apply px-4 py-4 text-[10px] font-black uppercase tracking-widest text-[#e1e2ec]/50;
+  }
+}
+
 /* Material Symbols */
 .material-symbols-outlined {
   font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;

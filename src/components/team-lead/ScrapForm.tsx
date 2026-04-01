@@ -81,10 +81,8 @@ export default function ScrapForm({
     }
   }
 
-  const inputClass =
-    "w-full bg-surface-highest border-0 border-l-2 border-accent rounded-sm px-3.5 py-2.5 text-[#e1e2ec] text-sm outline-none focus:ring-1 focus:ring-accent/40 placeholder:text-[#e1e2ec]/20";
-  const labelClass =
-    "block text-[10px] text-[#e1e2ec]/40 uppercase tracking-widest font-bold mb-1";
+  const inputClass = "kc-input-field";
+  const labelClass = "block kc-micro-label mb-1";
 
   return (
     <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
@@ -242,7 +240,7 @@ export default function ScrapForm({
           <button
             type="submit"
             disabled={submitting}
-            className="w-full bg-accent hover:opacity-90 disabled:opacity-50 text-black font-black text-xs uppercase tracking-[0.2em] py-3 rounded-sm transition-all active:scale-95 cursor-pointer border-none"
+            className="kc-btn-primary-wide cursor-pointer border-none"
           >
             {submitting ? "Saving..." : "Log Entry"}
           </button>
