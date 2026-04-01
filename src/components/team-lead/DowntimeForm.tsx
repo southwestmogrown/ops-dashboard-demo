@@ -1,10 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import type { DowntimeReason } from "@/lib/downtimeTypes";
+import type { DowntimeReason } from "@/lib/types/downtime";
 import { useAuth } from "@/hooks/useAuth";
-import { DOWNTIME_REASON_LABELS } from "@/lib/downtimeTypes";
-import type { ShiftName } from "@/lib/types";
+import { DOWNTIME_REASON_LABELS } from "@/lib/types/downtime";
+import type { ShiftName } from "@/lib/types/core";
 
 interface DowntimeFormProps {
   lineId: string;

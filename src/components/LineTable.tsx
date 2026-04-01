@@ -1,8 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import type { Line } from "@/lib/types";
-import type { AdminLineConfig, LineState } from "@/lib/mesTypes";
+import type { Line } from "@/lib/types/core";
+import type { AdminLineConfig, LineState } from "@/lib/types/mes";
 import type { ShiftProgress } from "@/lib/shiftTime";
 import {
   getFpyColor,

@@ -11,10 +11,10 @@ import {
   ReferenceLine,
   ResponsiveContainer,
 } from "recharts";
-import { Line as LineData } from "@/lib/types";
-import type { AdminLineConfig, LineState } from "@/lib/mesTypes";
-import type { DowntimeEntry } from "@/lib/downtimeTypes";
-import { DOWNTIME_REASON_LABELS } from "@/lib/downtimeTypes";
+import { Line as LineData } from "@/lib/types/core";
+import type { AdminLineConfig, LineState } from "@/lib/types/mes";
+import type { DowntimeEntry } from "@/lib/types/downtime";
+import { DOWNTIME_REASON_LABELS } from "@/lib/types/downtime";
 import type { ShiftProgress } from "@/lib/shiftTime";
 import { getHourlyTargets } from "@/lib/shiftBreaks";
 import {
@@ -25,7 +25,7 @@ import {
   getStatusReasons,
   calcLinePace,
 } from "@/lib/status";
-import type { ShiftName } from "@/lib/types";
+import type { ShiftName } from "@/lib/types/core";
 
 interface LineDrawerProps {
   line: LineData | null;

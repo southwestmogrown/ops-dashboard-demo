@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
-import { UserRole } from "@/lib/authTypes";
+import { UserRole } from "@/lib/types/auth";
 
 export default function PinGate() {
   const { login } = useAuth();

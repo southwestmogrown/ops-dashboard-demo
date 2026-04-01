@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import type { UserRole } from "@/lib/authTypes";
+import type { UserRole } from "@/lib/types/auth";
 
 const VALID_ROLES: UserRole[] = ["supervisor", "team-lead"];
 

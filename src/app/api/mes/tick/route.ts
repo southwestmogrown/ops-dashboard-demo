@@ -14,9 +14,9 @@ import {
   refreshCacheFromDb,
 } from "@/lib/mesStore";
 import { getShiftWindows } from "@/lib/shiftTime";
-import type { ShiftName } from "@/lib/types";
-import { PANEL_OPTIONS, pickDefectType } from "@/lib/reworkTypes";
-import type { DowntimeReason } from "@/lib/downtimeTypes";
+import type { ShiftName } from "@/lib/types/core";
+import { PANEL_OPTIONS, pickDefectType } from "@/lib/types/quality";
+import type { DowntimeReason } from "@/lib/types/downtime";
 import { requireRole } from "@/lib/apiAuth";
 
 interface TickBody {

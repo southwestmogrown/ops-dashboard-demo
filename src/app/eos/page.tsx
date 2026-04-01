@@ -3,15 +3,15 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { usePathname } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
-import type { ShiftMetrics } from "@/lib/types";
+import type { ShiftMetrics } from "@/lib/types/core";
 import Header from "@/components/Header";
-import type { AdminLineConfig, LineState } from "@/lib/mesTypes";
+import type { AdminLineConfig, LineState } from "@/lib/types/mes";
 import type {
   EOSFormData,
   EOSLineDescriptor,
   EOSLineEntry,
   EOSValueStream,
-} from "@/lib/eosTypes";
+} from "@/lib/types/eos";
 import { calculateHPU, downloadAllReports } from "@/lib/eosReports";
 import EOSLineCard from "@/components/eos/EOSLineCard";
 import EOSMetaForm from "@/components/eos/EOSMetaForm";

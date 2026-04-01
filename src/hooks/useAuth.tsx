@@ -7,7 +7,7 @@ import {
   useEffect,
   useState,
 } from "react";
-import { UserRole, SUPERVISOR_PIN, TEAM_LEAD_PIN } from "@/lib/authTypes";
+import { UserRole, SUPERVISOR_PIN, TEAM_LEAD_PIN } from "@/lib/types/auth";
 
 interface AuthState {
   role: UserRole | null;

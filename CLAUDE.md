@@ -341,7 +341,7 @@ Comprehensive code review identified 7 key waste/redundancy issues. See detailed
 
 - **M21: API Fetch Deduplication & Caching** ✅ COMPLETE (2026-03-31, Option B) — Added React Query app provider + shared query keys/fetchers, migrated high-traffic reads across dashboard/sim/admin/team-lead/EOS, converted team-lead comment save to invalidate queries, and removed temporary `clientFetchCache.ts`.
 
-- **M22: Type Definition Organization** 🟢 LOW — Types fragmented across 6 files (types.ts, mesTypes.ts, eosTypes.ts, reworkTypes.ts, downtimeTypes.ts, authTypes.ts). Consolidate to `src/lib/types/` directory for clarity (no functional impact).
+- **M22: Type Definition Organization** ✅ COMPLETE (2026-04-01) — Consolidated canonical type modules under `src/lib/types/` (`core`, `mes`, `eos`, `quality`, `downtime`, `auth`) and migrated imports; kept legacy files as compatibility re-export shims.
 
 - **M23: Tailwind CSS Abstraction** 🟢 LOW — Repeated class patterns (nav-link 8×, card-base 50×, micro-label 15×). Add @apply rules to `globals.css` to save ~150 class strings.
 

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Line, ShiftName } from "@/lib/types";
+import { Line, ShiftName } from "@/lib/types/core";
 import { useAuth } from "@/hooks/useAuth";
 import ExportButton from "./ExportButton";
 import {

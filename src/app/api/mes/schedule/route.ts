@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { setSchedule, enqueueSchedule, clearLine, skipOrder, unskipOrder } from "@/lib/mesStore";
-import type { LineSchedule } from "@/lib/mesTypes";
+import type { LineSchedule } from "@/lib/types/mes";
 import { requireRole } from "@/lib/apiAuth";
 
 interface ScheduleBody {

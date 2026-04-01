@@ -1,16 +1,16 @@
 "use client";
 
 import { useCallback, useState } from "react";
-import { Line, ShiftName } from "@/lib/types";
-import type { LineState } from "@/lib/mesTypes";
+import { Line, ShiftName } from "@/lib/types/core";
+import type { LineState } from "@/lib/types/mes";
 import HourlyTable from "./HourlyTable";
 import ReworkPanel from "./ReworkPanel";
 import ScrapForm from "./ScrapForm";
 import DowntimePanel from "./DowntimePanel";
 import DowntimeForm from "./DowntimeForm";
 import type { HourlyTargetRow } from "@/lib/shiftBreaks";
-import type { ScrapEntry, ScrapStats } from "@/lib/reworkTypes";
-import type { DowntimeEntry } from "@/lib/downtimeTypes";
+import type { ScrapEntry, ScrapStats } from "@/lib/types/quality";
+import type { DowntimeEntry } from "@/lib/types/downtime";
 import { getFpyColor, getHpuColor, getOutputColor } from "@/lib/status";
 
 interface LineDetailCardProps {

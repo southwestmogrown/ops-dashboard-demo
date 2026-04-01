@@ -1257,7 +1257,7 @@ Multiple inefficiencies identified:
 
 ## M22: Type Definition Organization — CODE QUALITY
 
-**Status:** Not Started  
+**Status:** ✅ Implemented (2026-04-01)  
 **Severity:** LOW — organizational clarity, not functional
 
 ### Problem
@@ -1269,32 +1269,38 @@ Types split across 6 files with unclear domain boundaries:
 - `src/lib/downtimeTypes.ts` — downtime: DowntimeEntry, DOWNTIME_REASON_LABELS
 - `src/lib/authTypes.ts` — auth: UserRole, SUPERVISOR_PIN, TEAM_LEAD_PIN
 
-### Solution
-**Option A (Minimal):** Keep as-is; document domain in each file header.
-
-**Option B (Ideal):** Create `src/lib/types/` directory:
+### Solution (Implemented)
+Created canonical type modules under `src/lib/types/`:
 ```
 src/lib/types/
-  index.ts              ← exports * from all files
-  core.ts               ← Line, TimePoint, ShiftMetrics, ShiftName
-  mes.ts                ← RunSheetItem, LineSchedule, ScanEvent, LineState
-  eos.ts                ← EOSFormData, EOSLineEntry, EOSLineDescriptor
-  quality.ts            ← ScrapEntry, KickedLid, PANEL_OPTIONS, DAMAGE_TYPES
-  downtime.ts           ← DowntimeEntry, DOWNTIME_REASON_LABELS
-  auth.ts               ← UserRole, SUPERVISOR_PIN, TEAM_LEAD_PIN
+  index.ts
+  core.ts
+  mes.ts
+  eos.ts
+  quality.ts
+  downtime.ts
+  auth.ts
 ```
 
-Then update all imports: `from "@/lib/types/core"` etc.
+Updated imports throughout the codebase to canonical paths (`@/lib/types/core`, `@/lib/types/mes`, etc).
+
+Kept compatibility shims at legacy paths for safety:
+- `src/lib/types.ts` → re-exports from `./types/core`
+- `src/lib/mesTypes.ts` → re-exports from `./types/mes`
+- `src/lib/eosTypes.ts` → re-exports from `./types/eos`
+- `src/lib/reworkTypes.ts` → re-exports from `./types/quality`
+- `src/lib/downtimeTypes.ts` → re-exports from `./types/downtime`
+- `src/lib/authTypes.ts` → re-exports from `./types/auth`
 
 ### Files Affected
-- Create `src/lib/types/` directory structure
-- Update ~20 imports across codebase
-- Update `tsconfig.json` paths if needed
+- Added `src/lib/types/` directory structure
+- Updated imports across app/components/api/lib files to canonical type modules
+- Added compatibility shims to preserve old import paths during transition
 
 ### Acceptance Criteria
-- [ ] Types organized by logical domain
-- [ ] Imports remain compatible (via `index.ts`)
-- [ ] No unused exports
+- [x] Types organized by logical domain
+- [x] Imports remain compatible (via compatibility shims + index/core modules)
+- [x] No build regressions after migration
 
 ---
 

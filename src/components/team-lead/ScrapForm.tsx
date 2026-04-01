@@ -1,9 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import type { ScrapEntry } from "@/lib/reworkTypes";
-import { PANEL_OPTIONS, DAMAGE_TYPES } from "@/lib/reworkTypes";
-import type { ShiftName } from "@/lib/types";
+import type { ScrapEntry } from "@/lib/types/quality";
+import { PANEL_OPTIONS, DAMAGE_TYPES } from "@/lib/types/quality";
+import type { ShiftName } from "@/lib/types/core";
 
 interface ScrapFormProps {
   lineId: string;

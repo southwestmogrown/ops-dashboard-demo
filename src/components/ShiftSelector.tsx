@@ -1,5 +1,5 @@
 "use client";
-import { ShiftName } from "@/lib/types";
+import { ShiftName } from "@/lib/types/core";
 
 interface ShiftSelectorProps {
   value: ShiftName;

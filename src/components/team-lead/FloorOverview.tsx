@@ -1,9 +1,9 @@
 "use client";
 
-import type { ShiftMetrics } from "@/lib/types";
-import type { LineState } from "@/lib/mesTypes";
-import type { AdminLineConfig } from "@/lib/mesTypes";
-import type { ScrapEntry } from "@/lib/reworkTypes";
+import type { ShiftMetrics } from "@/lib/types/core";
+import type { LineState } from "@/lib/types/mes";
+import type { AdminLineConfig } from "@/lib/types/mes";
+import type { ScrapEntry } from "@/lib/types/quality";
 import {
   getRiskLevel,
   getFpyColor,

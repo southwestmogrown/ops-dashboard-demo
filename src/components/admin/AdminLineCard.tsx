@@ -7,7 +7,7 @@ import {
   useRef,
   useState,
 } from "react";
-import type { LineSchedule, RunSheetItem } from "@/lib/mesTypes";
+import type { LineSchedule, RunSheetItem } from "@/lib/types/mes";
 
 interface AdminLineCardProps {
   lineId: string;

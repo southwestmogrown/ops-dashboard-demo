@@ -8,8 +8,8 @@ import {
   getAllLineStates,
   refreshCacheFromDb,
 } from "@/lib/mesStore";
-import type { DowntimeReason, DowntimeEntry } from "@/lib/downtimeTypes";
-import type { ShiftName } from "@/lib/types";
+import type { DowntimeReason, DowntimeEntry } from "@/lib/types/downtime";
+import type { ShiftName } from "@/lib/types/core";
 import { getShiftWindows } from "@/lib/shiftTime";
 import { getDefaultTarget } from "@/lib/generateMetrics";
 import { getRequestRole, requireRole } from "@/lib/apiAuth";

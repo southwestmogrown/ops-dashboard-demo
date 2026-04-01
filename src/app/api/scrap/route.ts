@@ -7,8 +7,8 @@ import {
   voidScrapEntry,
   updateScrapEntry,
 } from "@/lib/mesStore";
-import type { ScrapEntry, ScrappedPanel, KickedLid } from "@/lib/reworkTypes";
-import type { ShiftName } from "@/lib/types";
+import type { ScrapEntry, ScrappedPanel, KickedLid } from "@/lib/types/quality";
+import type { ShiftName } from "@/lib/types/core";
 import { requireRole } from "@/lib/apiAuth";
 
 export async function GET(request: NextRequest): Promise<NextResponse> {

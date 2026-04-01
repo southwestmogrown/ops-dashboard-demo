@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
-import type { LineState } from "@/lib/mesTypes";
+import type { LineState } from "@/lib/types/mes";
 
 interface HourlyTableProps {
   states: LineState[];

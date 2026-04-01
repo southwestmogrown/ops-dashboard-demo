@@ -2,7 +2,7 @@
 
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { HourlyTargetRow } from "@/lib/shiftBreaks";
-import type { ShiftName } from "@/lib/types";
+import type { ShiftName } from "@/lib/types/core";
 
 type SaveStatus = "idle" | "saving" | "saved" | "error";
 

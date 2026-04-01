@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { setAdminConfig, getAllAdminConfig, refreshCacheFromDb } from "@/lib/mesStore";
-import type { AdminLineConfig } from "@/lib/mesTypes";
+import type { AdminLineConfig } from "@/lib/types/mes";
 import { requireRole } from "@/lib/apiAuth";
 
 export async function GET(): Promise<NextResponse> {

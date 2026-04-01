@@ -11,9 +11,9 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from "recharts";
-import { Line as LineData, TimePoint } from "@/lib/types";
+import { Line as LineData, TimePoint } from "@/lib/types/core";
 import { getShiftWindows } from "@/lib/shiftTime";
-import type { ShiftName } from "@/lib/types";
+import type { ShiftName } from "@/lib/types/core";
 
 interface OutputChartProps {
   lines: LineData[];

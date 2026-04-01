@@ -1,6 +1,6 @@
 "use client";
 
-import type { EOSFormData, EOSShift } from "@/lib/eosTypes";
+import type { EOSFormData, EOSShift } from "@/lib/types/eos";
 
 const SHIFTS: EOSShift[] = ["Day", "Night"];
 

@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { generateMetrics, getDefaultHeadcount, getDefaultTarget } from "@/lib/generateMetrics";
-import { ShiftName } from "@/lib/types";
+import { ShiftName } from "@/lib/types/core";
 import { getOutputForLine, getAdminConfig, getKickedLidsForLineShift, getAllLineStates, getDowntimeEntries, refreshCacheFromDb } from "@/lib/mesStore";
 import { getShiftProgress, getShiftWindows } from "@/lib/shiftTime";
-import type { TimePoint } from "@/lib/types";
+import type { TimePoint } from "@/lib/types/core";
 
 export const dynamic = "force-dynamic";
 

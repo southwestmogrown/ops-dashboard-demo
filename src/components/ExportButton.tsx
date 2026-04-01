@@ -1,6 +1,6 @@
 "use client";
 
-import { Line, ShiftName } from "@/lib/types";
+import { Line, ShiftName } from "@/lib/types/core";
 
 interface ExportButtonProps {
   lines: Line[];

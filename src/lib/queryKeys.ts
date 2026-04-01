@@ -1,4 +1,4 @@
-import type { ShiftName } from "@/lib/types";
+import type { ShiftName } from "@/lib/types/core";
 
 export const queryKeys = {
   metrics: (shift: ShiftName) => ["metrics", shift] as const,

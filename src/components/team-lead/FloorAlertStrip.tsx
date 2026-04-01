@@ -1,9 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import type { Line } from "@/lib/types";
-import type { LineState } from "@/lib/mesTypes";
-import type { AdminLineConfig } from "@/lib/mesTypes";
+import type { Line } from "@/lib/types/core";
+import type { LineState } from "@/lib/types/mes";
+import type { AdminLineConfig } from "@/lib/types/mes";
 
 export interface FloorAlert {
   lineId: string;

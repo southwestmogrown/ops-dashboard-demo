@@ -1,7 +1,7 @@
 "use client";
 
-import { Line } from "@/lib/types";
-import type { LineState } from "@/lib/mesTypes";
+import { Line } from "@/lib/types/core";
+import type { LineState } from "@/lib/types/mes";
 import { getOutputColor } from "@/lib/status";
 
 interface LineSelectorProps {

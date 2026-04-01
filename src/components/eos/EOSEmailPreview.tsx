@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import type { EOSFormData, EOSLineDescriptor } from "@/lib/eosTypes";
+import type { EOSFormData, EOSLineDescriptor } from "@/lib/types/eos";
 import { generateEmailBody, downloadAllReports } from "@/lib/eosReports";
 
 interface Props {

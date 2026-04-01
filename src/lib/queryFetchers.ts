@@ -1,7 +1,7 @@
-import type { ShiftMetrics, ShiftName } from "@/lib/types";
-import type { AdminLineConfig, LineState } from "@/lib/mesTypes";
-import type { DowntimeEntry } from "@/lib/downtimeTypes";
-import type { ScrapEntry } from "@/lib/reworkTypes";
+import type { ShiftMetrics, ShiftName } from "@/lib/types/core";
+import type { AdminLineConfig, LineState } from "@/lib/types/mes";
+import type { DowntimeEntry } from "@/lib/types/downtime";
+import type { ScrapEntry } from "@/lib/types/quality";
 
 async function fetchJson<T>(url: string): Promise<T> {
   const res = await fetch(url, { cache: "no-store" });

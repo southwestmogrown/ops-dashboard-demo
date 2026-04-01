@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
-import type { LineState, LineSchedule } from "@/lib/mesTypes";
+import type { LineState, LineSchedule } from "@/lib/types/mes";
 
 interface LineSimCardProps {
   label: string;      // e.g. "VS1 Line 1"

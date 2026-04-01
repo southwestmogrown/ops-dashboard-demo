@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import type { ScrapEntry } from "@/lib/reworkTypes";
-import { PANEL_OPTIONS, DAMAGE_TYPES } from "@/lib/reworkTypes";
+import type { ScrapEntry } from "@/lib/types/quality";
+import { PANEL_OPTIONS, DAMAGE_TYPES } from "@/lib/types/quality";
 
 interface ReworkPanelProps {
   entries: ScrapEntry[];

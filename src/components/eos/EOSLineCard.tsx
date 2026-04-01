@@ -1,6 +1,6 @@
 "use client";
 
-import type { EOSLineEntry } from "@/lib/eosTypes";
+import type { EOSLineEntry } from "@/lib/types/eos";
 
 interface Props {
   lineKey: string;

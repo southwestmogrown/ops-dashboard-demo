@@ -1,8 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import type { DowntimeEntry } from "@/lib/downtimeTypes";
-import { DOWNTIME_REASON_LABELS } from "@/lib/downtimeTypes";
+import type { DowntimeEntry } from "@/lib/types/downtime";
+import { DOWNTIME_REASON_LABELS } from "@/lib/types/downtime";
 
 interface DowntimePanelProps {
   entries: DowntimeEntry[];
