@@ -23,6 +23,7 @@ import KpiCard from "@/components/KpiCard";
 import LineTable from "@/components/LineTable";
 import { getOutputColor, getFpyColor, getHpuColor, getOeeColor } from "@/lib/status";
 
+// Recharts + ResponsiveContainer are browser-layout dependent; keep client-only.
 const OutputChart = dynamic(() => import("@/components/OutputChart"), {
   ssr: false,
   loading: () => (
@@ -30,6 +31,7 @@ const OutputChart = dynamic(() => import("@/components/OutputChart"), {
   ),
 });
 
+// Drawer uses charting + browser event listeners (Escape key), so keep client-only.
 const LineDrawer = dynamic(() => import("@/components/LineDrawer"), {
   ssr: false,
 });

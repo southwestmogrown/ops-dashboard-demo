@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import dynamic from "next/dynamic";
 import { usePathname } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { AdminLineConfig, LineState } from "@/lib/types/mes";
@@ -11,13 +10,10 @@ import { LINES, LINE_LABELS, getDefaultTarget } from "@/lib/lines";
 import { getShiftWindows } from "@/lib/shiftTime";
 import Header from "@/components/Header";
 import SidebarNav from "@/components/SidebarNav";
+import HourlyTable from "@/components/sim/HourlyTable";
 import { useRedirectTeamLead } from "@/hooks/useRedirectTeamLead";
 import { queryKeys } from "@/lib/queryKeys";
 import { fetchAdminConfig, fetchMesState, fetchSimClock } from "@/lib/queryFetchers";
-
-const HourlyTable = dynamic(() => import("@/components/sim/HourlyTable"), {
-  ssr: false,
-});
 
 const SIDE_NAV: { icon: string; label: string; href?: string }[] = [
   { icon: "dashboard", label: "Dashboard", href: "/" },

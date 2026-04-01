@@ -345,7 +345,7 @@ Comprehensive code review identified 7 key waste/redundancy issues. See detailed
 
 - **M23: Tailwind CSS Abstraction** ✅ COMPLETE (2026-04-01) — Reusable utility classes consolidated in `globals.css` and applied across dashboard/admin/sim/team-lead/EOS components in three passes; build verified green.
 
-- **M24: Dynamic Import Audit** 🟢 NICE-TO-HAVE — 8 dynamic imports; verify each truly needs SSR exclusion. Remove 2-3 unnecessary imports if found.
+- **M24: Dynamic Import Audit** ✅ COMPLETE (2026-04-01) — Removed unnecessary dynamic wrappers for admin `AdminLineCard` and sim `HourlyTable`; kept chart/drawer dynamics where browser-only rendering is required and documented rationale.
 
 **Priority order for implementation:**
 1. M22–M24 (housekeeping) — low priority, do when refactoring that area

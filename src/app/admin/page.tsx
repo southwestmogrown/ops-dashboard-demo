@@ -2,13 +2,13 @@
 
 import { useCallback, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
-import dynamic from "next/dynamic";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import type { AdminLineConfig, LineSchedule, LineState } from "@/lib/types/mes";
 import type { ShiftName } from "@/lib/types/core";
 import { LINES, LINE_ADMIN_LABELS } from "@/lib/lines";
 import Header from "@/components/Header";
 import AdminLayout from "@/components/admin/AdminLayout";
+import AdminLineCard from "@/components/admin/AdminLineCard";
 import SidebarNav, { SidebarNavItem } from "@/components/SidebarNav";
 import { useRedirectTeamLead } from "@/hooks/useRedirectTeamLead";
 import { queryKeys } from "@/lib/queryKeys";
@@ -18,11 +18,6 @@ const SIDE_NAV_ITEMS: SidebarNavItem[] = [
   { href: "/", label: "Dashboard", icon: "dashboard" },
   { href: "/admin", label: "Admin", icon: "factory" },
 ];
-
-const AdminLineCard = dynamic(
-  () => import("@/components/admin/AdminLineCard"),
-  { ssr: false },
-);
 
 function AdminPageContent() {
   const pathname = usePathname();
