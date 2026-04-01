@@ -1,11 +1,13 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { useAuth } from "@/hooks/useAuth";
 import { UserRole } from "@/lib/types/auth";
 
 export default function PinGate() {
   const { login } = useAuth();
+  const router = useRouter();
   const [pin, setPin] = useState("");
   const [role, setRole] = useState<UserRole>("supervisor");
   const [error, setError] = useState("");
@@ -20,7 +22,12 @@ export default function PinGate() {
       setLoading(false);
       return;
     }
-    // Auth succeeded — state update triggers useEffect in AuthProviders to redirect
+
+    // Force a fresh navigation so middleware re-evaluates against the new role cookie
+    // instead of reusing an auth-stale prefetched redirect.
+    router.replace(role === "supervisor" ? "/" : "/team-lead");
+    router.refresh();
+    setLoading(false);
   }
 
   return (

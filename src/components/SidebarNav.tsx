@@ -59,6 +59,7 @@ export default function SidebarNav({
               <Link
                 key={item.label}
                 href={item.href}
+                prefetch={false}
                 className={`${linkBaseClassName} ${
                   isActive ? activeLinkClassName : inactiveLinkClassName
                 }`}

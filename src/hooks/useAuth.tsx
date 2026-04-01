@@ -21,6 +21,16 @@ interface AuthContextValue extends AuthState {
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
+function writeRoleCookie(role: UserRole): void {
+  document.cookie = `ops-role=${role}; path=/; max-age=86400; samesite=lax`;
+}
+
+function clearRoleCookie(): void {
+  // Use both Max-Age and Expires for broad browser compatibility.
+  document.cookie =
+    "ops-role=; path=/; max-age=0; expires=Thu, 01 Jan 1970 00:00:00 GMT; samesite=lax";
+}
+
 function readStorage(): AuthState {
   if (typeof window === "undefined")
     return { role: null, isAuthenticated: false };
@@ -46,7 +56,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
-    setAuth(readStorage());
+    const stored = readStorage();
+    setAuth(stored);
+
+    // Keep middleware cookie aligned with persisted client auth state.
+    if (stored.isAuthenticated && stored.role) {
+      writeRoleCookie(stored.role);
+    } else {
+      clearRoleCookie();
+    }
+
     setMounted(true);
   }, []);
 
@@ -55,14 +74,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (pin !== expectedPin) return false;
     const state = { role, isAuthenticated: true };
     localStorage.setItem("ops-auth", JSON.stringify({ pin, role }));
-    document.cookie = `ops-role=${role}; path=/; max-age=86400`;
+    writeRoleCookie(role);
     setAuth(state);
     return true;
   }, []);
 
   const logout = useCallback(() => {
     localStorage.removeItem("ops-auth");
-    document.cookie = "ops-role=; path=/; max-age=0";
+    clearRoleCookie();
     setAuth({ role: null, isAuthenticated: false });
   }, []);
 

@@ -248,6 +248,7 @@ export default function TeamLeadPage() {
               {!isTeamLeadGated && (
                 <Link
                   href="/"
+                  prefetch={false}
                   className="text-base text-[#e1e2ec]/75 hover:text-[#f8f8fb] transition-colors"
                 >
                   Dashboard
@@ -257,12 +258,14 @@ export default function TeamLeadPage() {
                 <>
                   <Link
                     href="/eos"
+                    prefetch={false}
                     className="text-base text-[#e1e2ec]/75 hover:text-[#f8f8fb] transition-colors"
                   >
                     EOS
                   </Link>
                   <Link
                     href="/admin"
+                    prefetch={false}
                     className="text-base text-[#e1e2ec]/75 hover:text-[#f8f8fb] transition-colors"
                   >
                     Admin
@@ -271,6 +274,7 @@ export default function TeamLeadPage() {
               )}
               <Link
                 href="/team-lead"
+                prefetch={false}
                 className="text-accent border-b-2 border-accent pb-0.5 font-bold text-base"
               >
                 Team Lead
@@ -278,6 +282,7 @@ export default function TeamLeadPage() {
               {!isTeamLeadGated && (
                 <Link
                   href="/sim"
+                  prefetch={false}
                   className="text-base text-[#e1e2ec]/75 hover:text-[#f8f8fb] transition-colors"
                 >
                   SIM
@@ -310,7 +315,8 @@ export default function TeamLeadPage() {
               <button
                 onClick={() => {
                   logout();
-                  router.push("/");
+                  router.replace("/");
+                  router.refresh();
                 }}
                 className="p-2 text-[#e1e2ec]/40 hover:text-[#e1e2ec] hover:bg-surface transition-all rounded-sm"
                 title="Logout"

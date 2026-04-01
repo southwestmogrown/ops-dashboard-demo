@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Line, ShiftName } from "@/lib/types/core";
 import { useAuth } from "@/hooks/useAuth";
 import ExportButton from "./ExportButton";
@@ -27,6 +28,7 @@ export default function Header({
   simClock = null,
 }: HeaderProps) {
   const { role, logout } = useAuth();
+  const router = useRouter();
   const [now, setNow] = useState(new Date());
 
   // Tick display clock every second
@@ -87,12 +89,14 @@ export default function Header({
             <nav className="hidden md:flex items-center space-x-6">
               <Link
                 href="/"
+                prefetch={false}
                 className="text-sm text-[#e1e2ec]/60 hover:text-[#e1e2ec] transition-colors"
               >
                 Dashboard
               </Link>
               <Link
                 href="/eos"
+                prefetch={false}
                 className="text-sm text-[#e1e2ec]/60 hover:text-[#e1e2ec] transition-colors"
               >
                 EOS
@@ -100,6 +104,7 @@ export default function Header({
               {role === "supervisor" && (
                 <Link
                   href="/admin"
+                  prefetch={false}
                   className="text-sm text-[#e1e2ec]/60 hover:text-[#e1e2ec] transition-colors"
                 >
                   Admin
@@ -107,12 +112,14 @@ export default function Header({
               )}
               <Link
                 href="/team-lead"
+                prefetch={false}
                 className="text-sm text-[#e1e2ec]/60 hover:text-[#e1e2ec] transition-colors"
               >
                 Team Lead
               </Link>
               <Link
                 href="/sim"
+                prefetch={false}
                 className="text-sm text-[#e1e2ec]/60 hover:text-[#e1e2ec] transition-colors"
               >
                 SIM
@@ -199,7 +206,11 @@ export default function Header({
 
           {/* Logout */}
           <button
-            onClick={logout}
+            onClick={() => {
+              logout();
+              router.replace("/");
+              router.refresh();
+            }}
             className="p-2 text-[#e1e2ec]/40 hover:text-[#e1e2ec] hover:bg-surface transition-all rounded-sm"
             title="Logout"
           >
