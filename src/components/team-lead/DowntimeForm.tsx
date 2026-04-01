@@ -5,6 +5,7 @@ import type { DowntimeReason } from "@/lib/types/downtime";
 import { useAuth } from "@/hooks/useAuth";
 import { DOWNTIME_REASON_LABELS } from "@/lib/types/downtime";
 import type { ShiftName } from "@/lib/types/core";
+import { authFetch } from "@/lib/clientAuth";
 
 interface DowntimeFormProps {
   lineId: string;
@@ -62,7 +63,7 @@ export default function DowntimeForm({
     setSubmitting(true);
     setError(null);
     try {
-      const res = await fetch("/api/downtime", {
+      const res = await authFetch("/api/downtime", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -92,7 +93,7 @@ export default function DowntimeForm({
     setSubmitting(true);
     setError(null);
     try {
-      const res = await fetch("/api/downtime", {
+      const res = await authFetch("/api/downtime", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

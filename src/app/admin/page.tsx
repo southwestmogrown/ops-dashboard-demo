@@ -13,6 +13,7 @@ import SidebarNav, { SidebarNavItem } from "@/components/SidebarNav";
 import { useRedirectTeamLead } from "@/hooks/useRedirectTeamLead";
 import { queryKeys } from "@/lib/queryKeys";
 import { fetchAdminConfig, fetchMesState } from "@/lib/queryFetchers";
+import { authFetch } from "@/lib/clientAuth";
 
 const SIDE_NAV_ITEMS: SidebarNavItem[] = [
   { href: "/", label: "Dashboard", icon: "dashboard" },
@@ -63,7 +64,7 @@ function AdminPageContent() {
 
   async function handleScheduleLoaded(lineId: string, schedule: LineSchedule) {
     const mode = stateFor(lineId)?.schedule ? "queue" : "replace";
-    await fetch("/api/mes/schedule", {
+    await authFetch("/api/mes/schedule", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ lineId, schedule, mode }),
@@ -72,7 +73,7 @@ function AdminPageContent() {
   }
 
   async function handleClearSchedule(lineId: string) {
-    await fetch("/api/mes/schedule", {
+    await authFetch("/api/mes/schedule", {
       method: "DELETE",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ lineId }),
@@ -87,7 +88,7 @@ function AdminPageContent() {
     isRunning: boolean,
     supervisorName: string,
   ) {
-    await fetch("/api/admin/config", {
+    await authFetch("/api/admin/config", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -102,7 +103,7 @@ function AdminPageContent() {
   }
 
   async function handleRemoveQueued(lineId: string, index: number) {
-    await fetch("/api/admin/queue", {
+    await authFetch("/api/admin/queue", {
       method: "DELETE",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ lineId, index }),
@@ -111,7 +112,7 @@ function AdminPageContent() {
   }
 
   async function handleSkipOrder(lineId: string, model: string) {
-    await fetch("/api/mes/schedule", {
+    await authFetch("/api/mes/schedule", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ lineId, model, action: "skip" }),
@@ -120,7 +121,7 @@ function AdminPageContent() {
   }
 
   async function handleUnskipOrder(lineId: string, model: string) {
-    await fetch("/api/mes/schedule", {
+    await authFetch("/api/mes/schedule", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ lineId, model, action: "unskip" }),
@@ -133,7 +134,7 @@ function AdminPageContent() {
       "Clear all schedules and MES data? This cannot be undone.",
     );
     if (confirmed) {
-      await fetch("/api/mes/reset", { method: "POST" });
+      await authFetch("/api/mes/reset", { method: "POST" });
       await refresh();
     }
   }

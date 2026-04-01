@@ -20,7 +20,7 @@ function formatTime(iso: string): string {
 function formatDuration(startIso: string, endIso: string | null): string {
   const start = new Date(startIso).getTime();
   const end = endIso ? new Date(endIso).getTime() : Date.now();
-  const mins = Math.floor((end - start) / 60000);
+  const mins = Math.max(0, Math.floor((end - start) / 60000));
   if (mins < 60) return `${mins}m`;
   const h = Math.floor(mins / 60);
   const m = mins % 60;
@@ -59,7 +59,7 @@ export default function DowntimePanel({
   const totalMinutes = entries.reduce<number>((sum, e) => {
     const start = new Date(e.startTime).getTime();
     const end = e.endTime ? new Date(e.endTime).getTime() : now;
-    return sum + Math.floor((end - start) / 60000);
+    return sum + Math.max(0, Math.floor((end - start) / 60000));
   }, 0);
 
   const totalLabel =

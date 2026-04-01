@@ -2,9 +2,10 @@ import type { ShiftMetrics, ShiftName } from "@/lib/types/core";
 import type { AdminLineConfig, LineState } from "@/lib/types/mes";
 import type { DowntimeEntry } from "@/lib/types/downtime";
 import type { ScrapEntry } from "@/lib/types/quality";
+import { authFetch } from "@/lib/clientAuth";
 
 async function fetchJson<T>(url: string): Promise<T> {
-  const res = await fetch(url, { cache: "no-store" });
+  const res = await authFetch(url, { cache: "no-store" });
   if (!res.ok) {
     throw new Error(`Request failed: ${url} (${res.status})`);
   }

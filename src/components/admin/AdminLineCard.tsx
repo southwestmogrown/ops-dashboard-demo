@@ -8,6 +8,7 @@ import {
   useState,
 } from "react";
 import type { LineSchedule, RunSheetItem } from "@/lib/types/mes";
+import { authFetch } from "@/lib/clientAuth";
 
 interface AdminLineCardProps {
   lineId: string;
@@ -221,7 +222,7 @@ const AdminLineCardInner = forwardRef(function AdminLineCardInner(
               onChange={async () => {
                 const next = !isRunning;
                 setIsRunning(next);
-                await fetch("/api/admin/config", {
+                await authFetch("/api/admin/config", {
                   method: "POST",
                   headers: { "Content-Type": "application/json" },
                   body: JSON.stringify({ lineId, isRunning: next }),

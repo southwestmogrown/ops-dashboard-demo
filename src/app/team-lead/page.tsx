@@ -19,6 +19,7 @@ import {
   fetchMetrics,
   fetchScrapAll,
 } from "@/lib/queryFetchers";
+import { authFetch } from "@/lib/clientAuth";
 import LineDetailCard from "@/components/team-lead/LineDetailCard";
 import FloorOverview from "@/components/team-lead/FloorOverview";
 import FloorAlertStrip from "@/components/team-lead/FloorAlertStrip";
@@ -89,7 +90,7 @@ export default function TeamLeadPage() {
   const saveCommentMutation = useMutation({
     mutationFn: async ({ hour, comment }: { hour: string; comment: string }) => {
       if (!selectedLineId) return;
-      await fetch("/api/line/comments", {
+      await authFetch("/api/line/comments", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ lineId: selectedLineId, hour, comment }),

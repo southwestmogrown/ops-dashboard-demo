@@ -218,7 +218,9 @@ export default function Home() {
     ? (lines.find((l) => l.id === selectedLineId) ?? null)
     : null;
 
-  const shiftProgress = getShiftProgress(shift, simClock ?? new Date());
+  const shiftProgress = getShiftProgress(shift, simClock ?? new Date(), {
+    useUtc: Boolean(simClock),
+  });
 
   const hasSchedule = mesStates.some((s) => s.schedule !== null);
   const mesTotal = mesStates.reduce((sum, s) => sum + s.totalOutput, 0);

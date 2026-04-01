@@ -21,6 +21,7 @@ import SidebarNav, { SidebarNavItem } from "@/components/SidebarNav";
 import { useRedirectTeamLead } from "@/hooks/useRedirectTeamLead";
 import { queryKeys } from "@/lib/queryKeys";
 import { fetchAdminConfig, fetchMesState } from "@/lib/queryFetchers";
+import { authFetch } from "@/lib/clientAuth";
 
 // ── Draft types ────────────────────────────────────────────────────────────────
 
@@ -158,7 +159,7 @@ export default function EOSPage() {
     setMesRefreshing(true);
     try {
       const [metrics, mesStates, adminConfig] = await Promise.all([
-        fetch(`/api/metrics?shift=${shift.toLowerCase()}`).then(
+        authFetch(`/api/metrics?shift=${shift.toLowerCase()}`).then(
           (r) => r.json() as Promise<ShiftMetrics>,
         ),
         queryClient.fetchQuery({

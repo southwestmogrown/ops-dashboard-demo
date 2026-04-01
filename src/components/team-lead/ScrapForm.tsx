@@ -4,6 +4,7 @@ import { useState } from "react";
 import type { ScrapEntry } from "@/lib/types/quality";
 import { PANEL_OPTIONS, DAMAGE_TYPES } from "@/lib/types/quality";
 import type { ShiftName } from "@/lib/types/core";
+import { authFetch } from "@/lib/clientAuth";
 
 interface ScrapFormProps {
   lineId: string;
@@ -62,7 +63,7 @@ export default function ScrapForm({
               auditorInitials: auditorInitials.toUpperCase().trim(),
             };
 
-      const res = await fetch("/api/scrap", {
+      const res = await authFetch("/api/scrap", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),

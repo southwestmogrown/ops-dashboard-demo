@@ -14,6 +14,7 @@ import HourlyTable from "@/components/sim/HourlyTable";
 import { useRedirectTeamLead } from "@/hooks/useRedirectTeamLead";
 import { queryKeys } from "@/lib/queryKeys";
 import { fetchAdminConfig, fetchMesState, fetchSimClock } from "@/lib/queryFetchers";
+import { authFetch } from "@/lib/clientAuth";
 
 const SIDE_NAV: { icon: string; label: string; href?: string }[] = [
   { icon: "dashboard", label: "Dashboard", href: "/" },
@@ -93,7 +94,7 @@ export default function SimPage() {
     if (tickInterval.current) return;
     const shiftStart = new Date();
     shiftStart.setUTCHours(getShiftWindows(shift).startHour, 0, 0, 0);
-    await fetch("/api/sim/clock", {
+    await authFetch("/api/sim/clock", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -107,7 +108,7 @@ export default function SimPage() {
       // Scale units with speed so production stays in a realistic band while
       // still accelerating smoothly at higher sim speeds.
       const units = unitsForSpeed(speedRef.current);
-      const res = await fetch("/api/mes/tick", {
+      const res = await authFetch("/api/mes/tick", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ all: true, units }),
@@ -132,7 +133,7 @@ export default function SimPage() {
       clearInterval(tickInterval.current);
       tickInterval.current = null;
     }
-    await fetch("/api/sim/clock", {
+    await authFetch("/api/sim/clock", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ running: false }),
@@ -146,8 +147,8 @@ export default function SimPage() {
       tickInterval.current = null;
     }
     await Promise.all([
-      fetch("/api/sim/reset", { method: "POST" }),
-      fetch("/api/sim/clock", {
+      authFetch("/api/sim/reset", { method: "POST" }),
+      authFetch("/api/sim/clock", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ clock: null, running: false }),
@@ -159,7 +160,7 @@ export default function SimPage() {
   async function handleSpeedChange(newSpeed: number) {
     speedRef.current = newSpeed;
     setSpeed(newSpeed);
-    await fetch("/api/sim/clock", {
+    await authFetch("/api/sim/clock", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ speed: newSpeed }),

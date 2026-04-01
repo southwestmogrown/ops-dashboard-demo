@@ -8,12 +8,7 @@ import { createAppQueryClient } from "@/lib/queryClient";
 
 function AuthGate({ children }: { children: React.ReactNode }) {
   const { isAuthenticated } = useAuth();
-  return (
-    <>
-      {children}
-      {!isAuthenticated && <PinGate />}
-    </>
-  );
+  return isAuthenticated ? <>{children}</> : <PinGate />;
 }
 
 export default function AuthProviders({ children }: { children: React.ReactNode }) {

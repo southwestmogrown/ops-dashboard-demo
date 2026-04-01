@@ -8,6 +8,11 @@ import {
   useState,
 } from "react";
 import { UserRole, SUPERVISOR_PIN, TEAM_LEAD_PIN } from "@/lib/types/auth";
+import {
+  clearClientAuth,
+  readClientAuth,
+  writeClientAuth,
+} from "@/lib/clientAuth";
 
 interface AuthState {
   role: UserRole | null;
@@ -21,23 +26,12 @@ interface AuthContextValue extends AuthState {
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
-function writeRoleCookie(role: UserRole): void {
-  document.cookie = `ops-role=${role}; path=/; max-age=86400; samesite=lax`;
-}
-
-function clearRoleCookie(): void {
-  // Use both Max-Age and Expires for broad browser compatibility.
-  document.cookie =
-    "ops-role=; path=/; max-age=0; expires=Thu, 01 Jan 1970 00:00:00 GMT; samesite=lax";
-}
-
 function readStorage(): AuthState {
   if (typeof window === "undefined")
     return { role: null, isAuthenticated: false };
   try {
-    const raw = localStorage.getItem("ops-auth");
-    if (!raw) return { role: null, isAuthenticated: false };
-    const parsed = JSON.parse(raw) as { pin: string; role: UserRole };
+    const parsed = readClientAuth();
+    if (!parsed) return { role: null, isAuthenticated: false };
     const expectedPin =
       parsed.role === "supervisor" ? SUPERVISOR_PIN : TEAM_LEAD_PIN;
     return { role: parsed.role, isAuthenticated: parsed.pin === expectedPin };
@@ -59,13 +53,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const stored = readStorage();
     setAuth(stored);
 
-    // Keep middleware cookie aligned with persisted client auth state.
-    if (stored.isAuthenticated && stored.role) {
-      writeRoleCookie(stored.role);
-    } else {
-      clearRoleCookie();
-    }
-
     setMounted(true);
   }, []);
 
@@ -73,15 +60,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const expectedPin = role === "supervisor" ? SUPERVISOR_PIN : TEAM_LEAD_PIN;
     if (pin !== expectedPin) return false;
     const state = { role, isAuthenticated: true };
-    localStorage.setItem("ops-auth", JSON.stringify({ pin, role }));
-    writeRoleCookie(role);
+    writeClientAuth({ pin, role });
     setAuth(state);
     return true;
   }, []);
 
   const logout = useCallback(() => {
-    localStorage.removeItem("ops-auth");
-    clearRoleCookie();
+    clearClientAuth();
     setAuth({ role: null, isAuthenticated: false });
   }, []);
 

@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import type { ScrapEntry } from "@/lib/types/quality";
 import { PANEL_OPTIONS, DAMAGE_TYPES } from "@/lib/types/quality";
+import { authFetch } from "@/lib/clientAuth";
 
 interface ReworkPanelProps {
   entries: ScrapEntry[];
@@ -40,7 +41,7 @@ function EditEntryForm({
   async function handleSave() {
     setSaving(true);
     try {
-      await fetch("/api/scrap", {
+      await authFetch("/api/scrap", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -193,7 +194,7 @@ export default function ReworkPanel({
   }
 
   async function handleVoid(id: string, reason: string) {
-    const res = await fetch("/api/scrap", {
+    const res = await authFetch("/api/scrap", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ id, void: true, voidReason: reason }),

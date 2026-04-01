@@ -49,10 +49,21 @@ export interface ShiftProgress {
   elapsedFraction: number;
 }
 
-export function getShiftProgress(shift: ShiftName, now: Date): ShiftProgress {
+function getDecimalHours(now: Date, useUtc: boolean): number {
+  const hours = useUtc ? now.getUTCHours() : now.getHours();
+  const minutes = useUtc ? now.getUTCMinutes() : now.getMinutes();
+  const seconds = useUtc ? now.getUTCSeconds() : now.getSeconds();
+  return hours + minutes / 60 + seconds / 3600;
+}
+
+export function getShiftProgress(
+  shift: ShiftName,
+  now: Date,
+  options?: { useUtc?: boolean },
+): ShiftProgress {
   const win = getShiftWindows(shift);
   const totalHours = win.totalClockMinutes / 60;
-  const nowH = now.getHours() + now.getMinutes() / 60 + now.getSeconds() / 3600;
+  const nowH = getDecimalHours(now, options?.useUtc ?? false);
 
   let elapsed: number;
   if (nowH >= win.startHour) {

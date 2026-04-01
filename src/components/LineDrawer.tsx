@@ -26,6 +26,7 @@ import {
   calcLinePace,
 } from "@/lib/status";
 import type { ShiftName } from "@/lib/types/core";
+import { authFetch } from "@/lib/clientAuth";
 
 interface LineDrawerProps {
   line: LineData | null;
@@ -105,7 +106,7 @@ function DowntimeTimeline({ entries }: { entries: DowntimeEntry[] }) {
         const start = new Date(entry.startTime);
         const end = isOngoing ? now : new Date(entry.endTime!);
         const elapsedMs = end.getTime() - start.getTime();
-        const durationMin = Math.floor(elapsedMs / 60000);
+        const durationMin = Math.max(0, Math.floor(elapsedMs / 60000));
 
         return (
           <div
@@ -262,7 +263,7 @@ export default function LineDrawer({
   // ─── Downtime fetch (when tab is active) ────────────────────────────────────
   useEffect(() => {
     if (!isOpen || activeTab !== "downtime" || !line) return;
-    fetch(`/api/downtime?lineId=${line.id}&shift=${shift}`)
+    authFetch(`/api/downtime?lineId=${line.id}&shift=${shift}`)
       .then((r) => r.json())
       .then((data: DowntimeEntry[]) => setDowntimeEntries(data))
       .catch(() => setDowntimeEntries([]));

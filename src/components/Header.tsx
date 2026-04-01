@@ -38,10 +38,13 @@ export default function Header({
   }, []);
 
   const displayTime = simClock ?? now;
+  const useUtcClock = Boolean(simClock);
 
   // Shift clock derived from `now` (already ticking every second)
   const win = getShiftWindows(shift);
-  const progress = getShiftProgress(shift, displayTime);
+  const progress = getShiftProgress(shift, displayTime, {
+    useUtc: useUtcClock,
+  });
 
   // Shift end clock time
   const endHour = win.endHour;
@@ -50,7 +53,9 @@ export default function Header({
 
   // Break proximity — find next break start (in decimal hours from midnight)
   function nextBreakHours(n: Date): number | null {
-    const cur = n.getHours() + n.getMinutes() / 60 + n.getSeconds() / 3600;
+    const cur = useUtcClock
+      ? n.getUTCHours() + n.getUTCMinutes() / 60 + n.getUTCSeconds() / 3600
+      : n.getHours() + n.getMinutes() / 60 + n.getSeconds() / 3600;
     for (const b of win.breakWindows) {
       if (b.start > cur) return b.start;
     }
@@ -62,9 +67,13 @@ export default function Header({
     nextBreak != null
       ? Math.round(
           (nextBreak -
-            (displayTime.getHours() +
-              displayTime.getMinutes() / 60 +
-              displayTime.getSeconds() / 3600)) *
+            (useUtcClock
+              ? displayTime.getUTCHours() +
+                displayTime.getUTCMinutes() / 60 +
+                displayTime.getUTCSeconds() / 3600
+              : displayTime.getHours() +
+                displayTime.getMinutes() / 60 +
+                displayTime.getSeconds() / 3600)) *
             60,
         )
       : null;
@@ -187,6 +196,7 @@ export default function Header({
                       hour: "2-digit",
                       minute: "2-digit",
                       second: "2-digit",
+                      timeZone: useUtcClock ? "UTC" : undefined,
                     })}
                   </span>
                 </div>
