@@ -16,6 +16,7 @@ interface HeaderProps {
   onShiftChange?: (shift: ShiftName) => void;
   lastUpdated?: Date | null;
   lines?: Line[];
+  simClock?: Date | null;
 }
 
 export default function Header({
@@ -23,29 +24,10 @@ export default function Header({
   onShiftChange,
   lastUpdated,
   lines,
+  simClock = null,
 }: HeaderProps) {
   const { role, logout } = useAuth();
-  const [simClock, setSimClock] = useState<Date | null>(null);
   const [now, setNow] = useState(new Date());
-
-  // Poll sim clock every 5 s
-  useEffect(() => {
-    const tick = async () => {
-      try {
-        const res = await fetch("/api/sim/clock");
-        if (res.ok) {
-          const { clock } = await res.json();
-          const parsed = clock ? new Date(clock) : null;
-          setSimClock(parsed);
-        }
-      } catch {
-        // silent
-      }
-    };
-    tick();
-    const id = setInterval(tick, 5000);
-    return () => clearInterval(id);
-  }, []);
 
   // Tick display clock every second
   useEffect(() => {

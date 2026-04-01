@@ -1214,7 +1214,7 @@ Then middleware redirects both admin + eos + sim if not supervisor → eliminate
 
 ## M21: API Fetch Deduplication & Caching — MODERATE WASTE
 
-**Status:** Not Started  
+**Status:** ✅ Implemented (2026-03-31, Option B React Query)  
 **Severity:** MODERATE — 5-10× redundant requests for same data
 
 ### Problem
@@ -1226,31 +1226,32 @@ Multiple inefficiencies identified:
 
 3. **`/api/mes/state` fetched 5 places**: Similar duplication. Simulator polls every 2s despite **driving the state via `/api/mes/tick`** — wasteful.
 
-### Solution Options
-**Option A (Quick): Reduce polling intervals + Header caching**
-- Header exports sim clock to context
-- Pages consume from context instead of direct fetch
-- Extend poll intervals to 10s where safe
-- ETA: 2-3 hrs, saves ~60% redundant requests
+### Implemented Solution (Option B)
+- Added `@tanstack/react-query` and app-level `QueryClientProvider`
+- Added shared query client and query key registry (`queryClient.ts`, `queryKeys.ts`)
+- Added centralized query fetchers (`queryFetchers.ts`) with normalized error handling
+- Migrated dashboard, sim, admin, team-lead, and EOS high-traffic read paths to React Query
+- Migrated team-lead comment save flow to mutation + query invalidation
+- Replaced ad-hoc dedupe helper and removed `clientFetchCache.ts`
 
-**Option B (Recommended): Add React Query**
-- Implement `react-query` with 30s stale cache
-- Deduplicate requests automatically
-- Add refetch-on-focus behavior
-- ETA: 4-5 hrs, saves ~80% redundant requests
-
-**Option C (Future): GraphQL subscription**
-- Not recommended for current scope
-
-### Files Affected (Option A)
-- `src/components/Header.tsx` — don't fetch clock, consume from context
-- `src/app/page.tsx` — export clock to context via custom hook
-- All other pages — consume from context
+### Files Affected
+- **NEW:** `src/lib/queryClient.ts`
+- **NEW:** `src/lib/queryKeys.ts`
+- **NEW:** `src/lib/queryFetchers.ts`
+- `src/components/AuthProviders.tsx` — now wraps app in `QueryClientProvider`
+- `src/components/Header.tsx` — no independent clock polling
+- `src/app/page.tsx` — React Query reads for metrics/state/config/clock/downtime
+- `src/app/sim/page.tsx` — React Query reads and invalidation for controls
+- `src/app/admin/page.tsx` — React Query reads + invalidation-based refresh
+- `src/app/team-lead/page.tsx` — React Query reads + comment mutation invalidation
+- `src/app/eos/page.tsx` — React Query-backed cached fetches for mes state/admin config
+- **REMOVED:** `src/lib/clientFetchCache.ts`
 
 ### Acceptance Criteria
-- [ ] Simulator tick rate doesn't cause cascading state fetches
-- [ ] When 2+ pages open, `/api/admin/config` fetch count ≤ 2/min (was 12+/min)
-- [ ] Header clock updates without duplicate requests
+- [x] Header clock updates without duplicate header-level polling
+- [x] Shared GET endpoints now dedupe via React Query cache + in-flight request sharing
+- [x] Read-path polling migrated from per-page custom loops to query-managed refetch intervals on high-traffic pages
+- [ ] Multi-tab traffic target (`/api/admin/config` ≤ 2/min with 2+ tabs) manual verification pending
 
 ---
 

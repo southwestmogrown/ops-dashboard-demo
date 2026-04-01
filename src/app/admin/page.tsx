@@ -1,8 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import dynamic from "next/dynamic";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import type { AdminLineConfig, LineSchedule, LineState } from "@/lib/mesTypes";
 import type { ShiftName } from "@/lib/types";
 import { LINES, LINE_ADMIN_LABELS } from "@/lib/lines";
@@ -10,6 +11,8 @@ import Header from "@/components/Header";
 import AdminLayout from "@/components/admin/AdminLayout";
 import SidebarNav, { SidebarNavItem } from "@/components/SidebarNav";
 import { useRedirectTeamLead } from "@/hooks/useRedirectTeamLead";
+import { queryKeys } from "@/lib/queryKeys";
+import { fetchAdminConfig, fetchMesState } from "@/lib/queryFetchers";
 
 const SIDE_NAV_ITEMS: SidebarNavItem[] = [
   { href: "/", label: "Dashboard", icon: "dashboard" },
@@ -24,15 +27,28 @@ const AdminLineCard = dynamic(
 function AdminPageContent() {
   const pathname = usePathname();
   useRedirectTeamLead();
+  const queryClient = useQueryClient();
 
-  const [mesStates, setMesStates] = useState<LineState[]>([]);
-  const [adminConfig, setAdminConfig] = useState<
-    Record<string, AdminLineConfig>
-  >({});
-  const [now, setNow] = useState<Date>(new Date());
   const [savingAll, setSavingAll] = useState(false);
   const [shift, setShift] = useState<ShiftName>("day");
-  const [lastSync, setLastSync] = useState<Date | null>(null);
+
+  const mesStatesQuery = useQuery<LineState[]>({
+    queryKey: queryKeys.mesState(),
+    queryFn: fetchMesState,
+    refetchInterval: 5000,
+  });
+
+  const adminConfigQuery = useQuery<Record<string, AdminLineConfig>>({
+    queryKey: queryKeys.adminConfig(),
+    queryFn: fetchAdminConfig,
+    refetchInterval: 5000,
+  });
+
+  const mesStates = mesStatesQuery.data ?? [];
+  const adminConfig = adminConfigQuery.data ?? {};
+  const lastSync = adminConfigQuery.dataUpdatedAt
+    ? new Date(adminConfigQuery.dataUpdatedAt)
+    : null;
 
   // Refs for each line card — allows Save All to trigger each card's save
   const cardRefs = useRef<Record<string, { save: () => Promise<void> } | null>>(
@@ -40,20 +56,11 @@ function AdminPageContent() {
   );
 
   const refresh = useCallback(async () => {
-    const [stateRes, configRes] = await Promise.all([
-      fetch("/api/mes/state"),
-      fetch("/api/admin/config"),
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: queryKeys.mesState() }),
+      queryClient.invalidateQueries({ queryKey: queryKeys.adminConfig() }),
     ]);
-    if (stateRes.ok) setMesStates(await stateRes.json());
-    if (configRes.ok) setAdminConfig(await configRes.json());
-    setLastSync(new Date());
-  }, []);
-
-  useEffect(() => {
-    refresh();
-    const timer = setInterval(() => setNow(new Date()), 1000);
-    return () => clearInterval(timer);
-  }, [refresh]);
+  }, [queryClient]);
 
   function stateFor(lineId: string) {
     return mesStates.find((s) => s.lineId === lineId) ?? null;

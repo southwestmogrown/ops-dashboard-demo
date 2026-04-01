@@ -3,125 +3,120 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ShiftMetrics, ShiftName } from "@/lib/types";
 import type { AdminLineConfig, LineState } from "@/lib/mesTypes";
 import type { ScrapEntry, ScrapStats } from "@/lib/reworkTypes";
 import type { DowntimeEntry } from "@/lib/downtimeTypes";
 import { getHourlyTargets } from "@/lib/shiftBreaks";
 import { useAuth } from "@/hooks/useAuth";
+import { queryKeys } from "@/lib/queryKeys";
+import {
+  fetchAdminConfig,
+  fetchDowntime,
+  fetchLineComments,
+  fetchMesState,
+  fetchMetrics,
+  fetchScrapAll,
+} from "@/lib/queryFetchers";
 import LineDetailCard from "@/components/team-lead/LineDetailCard";
 import FloorOverview from "@/components/team-lead/FloorOverview";
 import FloorAlertStrip from "@/components/team-lead/FloorAlertStrip";
 
 export default function TeamLeadPage() {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const { role, isAuthenticated, logout } = useAuth();
   const isTeamLeadGated = isAuthenticated && role === "team-lead";
 
   const [shift, setShift] = useState<ShiftName>("day");
-  const [metrics, setMetrics] = useState<ShiftMetrics | null>(null);
-  const [mesStates, setMesStates] = useState<LineState[]>([]);
   const [selectedLineId, setSelectedLineId] = useState<string | null>(null);
-  const [comments, setComments] = useState<
-    Record<string, Record<string, string>>
-  >({});
-  const [allScrapEntries, setAllScrapEntries] = useState<ScrapEntry[]>([]);
-  const [allDowntimeEntries, setAllDowntimeEntries] = useState<DowntimeEntry[]>(
-    [],
-  );
-  const [adminConfig, setAdminConfig] = useState<
-    Record<string, AdminLineConfig>
-  >({});
-  const [isLoading, setIsLoading] = useState(true);
   const [now, setNow] = useState<Date>(new Date());
   const [filter, setFilter] = useState("");
   const [viewMode, setViewMode] = useState<"floor" | "detail">("floor");
   const prevDataRef = useRef<string>("");
-  const fetchRequestId = useRef(0);
 
-  const fetchData = useCallback(async () => {
-    const requestId = ++fetchRequestId.current;
-    const [
-      metricsRes,
-      mesRes,
-      clockRes,
-      allScrapRes,
-      allDowntimeRes,
-      configRes,
-    ] = await Promise.all([
-      fetch(`/api/metrics?shift=${shift}`, { cache: "no-store" }),
-      fetch("/api/mes/state", { cache: "no-store" }),
-      fetch("/api/sim/clock", { cache: "no-store" }),
-      fetch(`/api/scrap?lineId=all&shift=${shift}`, { cache: "no-store" }),
-      fetch(`/api/downtime?shift=${shift}`, { cache: "no-store" }),
-      fetch("/api/admin/config", { cache: "no-store" }),
-    ]);
-    if (requestId !== fetchRequestId.current) return;
-    if (metricsRes.ok) {
-      const data: ShiftMetrics = await metricsRes.json();
-      // Use generatedAt timestamp as a cheap change detector instead of JSON.stringify
-      if (data.generatedAt !== prevDataRef.current) {
-        prevDataRef.current = data.generatedAt;
-        setMetrics(data);
-      }
-    }
-    if (mesRes.ok) setMesStates(await mesRes.json());
-    if (clockRes.ok) await clockRes.json();
-    if (allScrapRes.ok) setAllScrapEntries(await allScrapRes.json());
-    if (allDowntimeRes.ok) setAllDowntimeEntries(await allDowntimeRes.json());
-    if (configRes.ok) setAdminConfig(await configRes.json());
-    setIsLoading(false);
-  }, [shift]);
+  const metricsQuery = useQuery<ShiftMetrics>({
+    queryKey: queryKeys.metrics(shift),
+    queryFn: () => fetchMetrics(shift),
+    refetchInterval: 5000,
+  });
+
+  const mesStatesQuery = useQuery<LineState[]>({
+    queryKey: queryKeys.mesState(),
+    queryFn: fetchMesState,
+    refetchInterval: 5000,
+  });
+
+  const scrapQuery = useQuery<ScrapEntry[]>({
+    queryKey: queryKeys.scrapAll(shift),
+    queryFn: () => fetchScrapAll(shift),
+    refetchInterval: 5000,
+  });
+
+  const downtimeQuery = useQuery<DowntimeEntry[]>({
+    queryKey: queryKeys.downtime(shift),
+    queryFn: () => fetchDowntime(shift),
+    refetchInterval: 5000,
+  });
+
+  const adminConfigQuery = useQuery<Record<string, AdminLineConfig>>({
+    queryKey: queryKeys.adminConfig(),
+    queryFn: fetchAdminConfig,
+    refetchInterval: 5000,
+  });
+
+  const lineCommentsQuery = useQuery<Record<string, string>>({
+    queryKey: queryKeys.lineComments(selectedLineId ?? ""),
+    queryFn: () => fetchLineComments(selectedLineId ?? ""),
+    enabled: Boolean(selectedLineId),
+  });
+
+  const metrics = metricsQuery.data ?? null;
+  const mesStates = mesStatesQuery.data ?? [];
+  const allScrapEntries = scrapQuery.data ?? [];
+  const allDowntimeEntries = downtimeQuery.data ?? [];
+  const adminConfig = adminConfigQuery.data ?? {};
+  const isLoading = metricsQuery.isLoading;
 
   useEffect(() => {
-    const initialFetch = setTimeout(() => {
-      void fetchData();
-    }, 0);
-    const interval = setInterval(fetchData, 5000);
     const clock = setInterval(() => setNow(new Date()), 1000);
     return () => {
-      clearTimeout(initialFetch);
-      clearInterval(interval);
       clearInterval(clock);
     };
-  }, [fetchData]);
+  }, []);
 
-  useEffect(() => {
-    if (!selectedLineId) return;
-    fetch(`/api/line/comments?lineId=${selectedLineId}`)
-      .then((r) => r.json())
-      .then((data: Record<string, string>) => {
-        setComments((prev) => ({ ...prev, [selectedLineId]: data }));
-      });
-  }, [selectedLineId]);
-
-  const saveComment = useCallback(
-    async (hour: string, comment: string) => {
+  const saveCommentMutation = useMutation({
+    mutationFn: async ({ hour, comment }: { hour: string; comment: string }) => {
       if (!selectedLineId) return;
       await fetch("/api/line/comments", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ lineId: selectedLineId, hour, comment }),
       });
-      setComments((prev) => ({
-        ...prev,
-        [selectedLineId]: { ...prev[selectedLineId], [hour]: comment },
-      }));
     },
-    [selectedLineId],
+    onSuccess: async () => {
+      if (!selectedLineId) return;
+      await queryClient.invalidateQueries({
+        queryKey: queryKeys.lineComments(selectedLineId),
+      });
+    },
+  });
+
+  const saveComment = useCallback(
+    async (hour: string, comment: string) => {
+      await saveCommentMutation.mutateAsync({ hour, comment });
+    },
+    [saveCommentMutation],
   );
 
   const refreshScrap = useCallback(() => {
-    fetch(`/api/scrap?lineId=all&shift=${shift}`)
-      .then((r) => r.json())
-      .then((data: ScrapEntry[]) => setAllScrapEntries(data));
-  }, [shift]);
+    return queryClient.invalidateQueries({ queryKey: queryKeys.scrapAll(shift) });
+  }, [queryClient, shift]);
 
   const refreshDowntime = useCallback(() => {
-    fetch(`/api/downtime?shift=${shift}`)
-      .then((r) => r.json())
-      .then((data: DowntimeEntry[]) => setAllDowntimeEntries(data));
-  }, [shift]);
+    return queryClient.invalidateQueries({ queryKey: queryKeys.downtime(shift) });
+  }, [queryClient, shift]);
 
   const selectedScrapEntries = useMemo(() => {
     if (!selectedLineId) return [];
@@ -148,12 +143,10 @@ export default function TeamLeadPage() {
   }, [selectedScrapEntries]);
 
   useEffect(() => {
-    const initialRefresh = setTimeout(() => {
-      refreshScrap();
-      refreshDowntime();
-    }, 0);
-    return () => clearTimeout(initialRefresh);
-  }, [shift, refreshScrap, refreshDowntime]);
+    if (metrics?.generatedAt && metrics.generatedAt !== prevDataRef.current) {
+      prevDataRef.current = metrics.generatedAt;
+    }
+  }, [metrics?.generatedAt]);
 
   const { lines, selectedLine, selectedMesState } = useMemo(() => {
     if (!metrics)
@@ -473,7 +466,7 @@ export default function TeamLeadPage() {
               mesState={selectedMesState}
               shift={shift}
               hourlyTargets={hourlyTargets}
-              comments={selectedLineId ? (comments[selectedLineId] ?? {}) : {}}
+              comments={lineCommentsQuery.data ?? {}}
               onSaveComment={saveComment}
               onBack={() => {
                 setSelectedLineId(null);

@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { usePathname } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
 import type { ShiftMetrics } from "@/lib/types";
 import Header from "@/components/Header";
 import type { AdminLineConfig, LineState } from "@/lib/mesTypes";
@@ -18,6 +19,8 @@ import EOSEmailPreview from "@/components/eos/EOSEmailPreview";
 import NoteCheckboxField from "@/components/eos/NoteCheckboxField";
 import SidebarNav, { SidebarNavItem } from "@/components/SidebarNav";
 import { useRedirectTeamLead } from "@/hooks/useRedirectTeamLead";
+import { queryKeys } from "@/lib/queryKeys";
+import { fetchAdminConfig, fetchMesState } from "@/lib/queryFetchers";
 
 // ── Draft types ────────────────────────────────────────────────────────────────
 
@@ -124,6 +127,7 @@ function lineIdToLineKey(lineId: string): string {
 export default function EOSPage() {
   const pathname = usePathname();
   useRedirectTeamLead();
+  const queryClient = useQueryClient();
 
   const [formData, setFormData] = useState<EOSFormData>(emptyFormData());
   const [hiddenLines, setHiddenLines] = useState<Set<string>>(new Set());
@@ -157,12 +161,18 @@ export default function EOSPage() {
         fetch(`/api/metrics?shift=${shift.toLowerCase()}`).then(
           (r) => r.json() as Promise<ShiftMetrics>,
         ),
-        fetch("/api/mes/state")
-          .then((r) => r.json() as Promise<LineState[]>)
-          .catch(() => [] as LineState[]),
-        fetch("/api/admin/config")
-          .then((r) => r.json() as Promise<Record<string, AdminLineConfig>>)
-          .catch(() => ({})),
+        queryClient.fetchQuery({
+          queryKey: queryKeys.mesState(),
+          queryFn: fetchMesState,
+          staleTime: 2000,
+        }).catch(
+          () => [] as LineState[],
+        ),
+        queryClient.fetchQuery({
+          queryKey: queryKeys.adminConfig(),
+          queryFn: fetchAdminConfig,
+          staleTime: 2000,
+        }).catch(() => ({} as Record<string, AdminLineConfig>)),
       ]);
 
       const toHide: string[] = [];

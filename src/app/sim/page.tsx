@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import { usePathname } from "next/navigation";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { AdminLineConfig, LineState } from "@/lib/mesTypes";
 import type { ShiftName } from "@/lib/types";
 import { LINES, LINE_LABELS, getDefaultTarget } from "@/lib/lines";
@@ -11,6 +12,8 @@ import { getShiftWindows } from "@/lib/shiftTime";
 import Header from "@/components/Header";
 import SidebarNav from "@/components/SidebarNav";
 import { useRedirectTeamLead } from "@/hooks/useRedirectTeamLead";
+import { queryKeys } from "@/lib/queryKeys";
+import { fetchAdminConfig, fetchMesState, fetchSimClock } from "@/lib/queryFetchers";
 
 const HourlyTable = dynamic(() => import("@/components/sim/HourlyTable"), {
   ssr: false,
@@ -37,20 +40,43 @@ function unitsForSpeed(speed: number): number {
 export default function SimPage() {
   const pathname = usePathname();
   useRedirectTeamLead();
+  const queryClient = useQueryClient();
 
-  const [states, setStates] = useState<LineState[]>([]);
-  const [adminConfig, setAdminConfig] = useState<
-    Record<string, AdminLineConfig>
-  >({});
-  const [running, setRunning] = useState(false);
   const [speed, setSpeed] = useState(60);
   const speedRef = useRef(speed); // always mirrors speed; used in interval closures
   const [shift, setShift] = useState<ShiftName>("day");
-  const [simClock, setSimClock] = useState<Date | null>(null);
   const [now, setNow] = useState(new Date());
   const tickInterval = useRef<ReturnType<typeof setInterval> | null>(null);
-  const pollInterval = useRef<ReturnType<typeof setInterval> | null>(null);
-  const pollRequestId = useRef(0);
+
+  const statesQuery = useQuery<LineState[]>({
+    queryKey: queryKeys.mesState(),
+    queryFn: fetchMesState,
+    refetchInterval: 2000,
+  });
+
+  const adminConfigQuery = useQuery<Record<string, AdminLineConfig>>({
+    queryKey: queryKeys.adminConfig(),
+    queryFn: fetchAdminConfig,
+    refetchInterval: 2000,
+  });
+
+  const simClockQuery = useQuery<{ clock: string | null; running: boolean; speed: number }>({
+    queryKey: queryKeys.simClock(),
+    queryFn: fetchSimClock,
+    refetchInterval: 1000,
+  });
+
+  const states = statesQuery.data ?? [];
+  const adminConfig = adminConfigQuery.data ?? {};
+  const running = simClockQuery.data?.running ?? false;
+  const simClock = simClockQuery.data?.clock ? new Date(simClockQuery.data.clock) : null;
+
+  useEffect(() => {
+    if (simClockQuery.data?.speed != null) {
+      setSpeed(simClockQuery.data.speed);
+      speedRef.current = simClockQuery.data.speed;
+    }
+  }, [simClockQuery.data?.speed]);
 
   // ── Clock ─────────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -58,36 +84,13 @@ export default function SimPage() {
     return () => clearInterval(id);
   }, []);
 
-  // ── Polling ─────────────────────────────────────────────────────────────────
-  const pollState = useCallback(async () => {
-    const requestId = ++pollRequestId.current;
-    const [stateRes, clockRes, configRes] = await Promise.all([
-      fetch("/api/mes/state", { cache: "no-store" }),
-      fetch("/api/sim/clock", { cache: "no-store" }),
-      fetch("/api/admin/config", { cache: "no-store" }),
+  const refreshSimQueries = useCallback(async () => {
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: queryKeys.mesState() }),
+      queryClient.invalidateQueries({ queryKey: queryKeys.adminConfig() }),
+      queryClient.invalidateQueries({ queryKey: queryKeys.simClock() }),
     ]);
-    if (requestId !== pollRequestId.current) return;
-    if (stateRes.ok) setStates(await stateRes.json());
-    if (configRes.ok) setAdminConfig(await configRes.json());
-    if (clockRes.ok) {
-      const c = await clockRes.json();
-      setRunning(c.running);
-      setSpeed(c.speed);
-      speedRef.current = c.speed; // keep ref in sync so interval uses latest speed
-      setSimClock(c.clock ? new Date(c.clock) : null);
-    }
-  }, []);
-
-  useEffect(() => {
-    const initialPoll = setTimeout(() => {
-      void pollState();
-    }, 0);
-    pollInterval.current = setInterval(pollState, 2000);
-    return () => {
-      clearTimeout(initialPoll);
-      if (pollInterval.current) clearInterval(pollInterval.current);
-    };
-  }, [pollState]);
+  }, [queryClient]);
 
   // ── Simulation controls ─────────────────────────────────────────────────────
   async function startSim() {
@@ -103,7 +106,7 @@ export default function SimPage() {
         speed: speedRef.current,
       }),
     });
-    setRunning(true);
+    await refreshSimQueries();
     tickInterval.current = setInterval(async () => {
       // Scale units with speed so production stays in a realistic band while
       // still accelerating smoothly at higher sim speeds.
@@ -121,12 +124,11 @@ export default function SimPage() {
             clearInterval(tickInterval.current);
             tickInterval.current = null;
           }
-          setRunning(false);
-          await pollState();
+          await refreshSimQueries();
         }
       }
     }, 1000);
-    await pollState();
+    await refreshSimQueries();
   }
 
   async function pauseSim() {
@@ -139,8 +141,7 @@ export default function SimPage() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ running: false }),
     });
-    setRunning(false);
-    await pollState();
+    await refreshSimQueries();
   }
 
   async function resetSim() {
@@ -156,11 +157,7 @@ export default function SimPage() {
         body: JSON.stringify({ clock: null, running: false }),
       }),
     ]);
-    setSimClock(null);
-    setRunning(false);
-    setSpeed(60);
-    speedRef.current = 60;
-    await pollState();
+    await refreshSimQueries();
   }
 
   async function handleSpeedChange(newSpeed: number) {
@@ -171,6 +168,7 @@ export default function SimPage() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ speed: newSpeed }),
     });
+    await queryClient.invalidateQueries({ queryKey: queryKeys.simClock() });
   }
 
   useEffect(() => {
@@ -238,6 +236,7 @@ export default function SimPage() {
       <Header
         shift={shift}
         onShiftChange={setShift}
+        simClock={simClock}
       />
 
       <div className="flex flex-1 overflow-hidden">

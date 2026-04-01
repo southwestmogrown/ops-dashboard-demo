@@ -339,7 +339,7 @@ Comprehensive code review identified 7 key waste/redundancy issues. See detailed
 
 - **M20: Role-Check Logic Extraction** ✅ COMPLETE (2026-03-31) — Extracted shared `useRedirectTeamLead()` hook and replaced duplicated redirect logic in 4 pages; middleware coverage extended to `/eos/*` and `/sim/*`.
 
-- **M21: API Fetch Deduplication & Caching** 🟡 MODERATE — Header polls `/api/sim/clock` independently (every page also does → 2-4× redundant). `/api/admin/config` fetched by 6 places. Option A (quick): Header-level caching via context. Option B (ideal): React Query for automatic deduplication & 30s stale cache.
+- **M21: API Fetch Deduplication & Caching** ✅ COMPLETE (2026-03-31, Option B) — Added React Query app provider + shared query keys/fetchers, migrated high-traffic reads across dashboard/sim/admin/team-lead/EOS, converted team-lead comment save to invalidate queries, and removed temporary `clientFetchCache.ts`.
 
 - **M22: Type Definition Organization** 🟢 LOW — Types fragmented across 6 files (types.ts, mesTypes.ts, eosTypes.ts, reworkTypes.ts, downtimeTypes.ts, authTypes.ts). Consolidate to `src/lib/types/` directory for clarity (no functional impact).
 
@@ -348,8 +348,7 @@ Comprehensive code review identified 7 key waste/redundancy issues. See detailed
 - **M24: Dynamic Import Audit** 🟢 NICE-TO-HAVE — 8 dynamic imports; verify each truly needs SSR exclusion. Remove 2-3 unnecessary imports if found.
 
 **Priority order for implementation:**
-1. M21 (performance) — moderate effort, good ROI if using React Query
-2. M22–M24 (housekeeping) — low priority, do when refactoring that area
+1. M22–M24 (housekeeping) — low priority, do when refactoring that area
 
 
 ### Remaining

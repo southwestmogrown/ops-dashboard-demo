@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import { usePathname } from "next/navigation";
+import { useQuery } from "@tanstack/react-query";
 import { ShiftMetrics, ShiftName } from "@/lib/types";
 import type { AdminLineConfig, LineState } from "@/lib/mesTypes";
 import type { DowntimeEntry } from "@/lib/downtimeTypes";
@@ -10,6 +11,14 @@ import { getShiftProgress } from "@/lib/shiftTime";
 import Header from "@/components/Header";
 import SidebarNav, { SidebarNavItem } from "@/components/SidebarNav";
 import { useRedirectTeamLead } from "@/hooks/useRedirectTeamLead";
+import { queryKeys } from "@/lib/queryKeys";
+import {
+  fetchAdminConfig,
+  fetchDowntime,
+  fetchMesState,
+  fetchMetrics,
+  fetchSimClock,
+} from "@/lib/queryFetchers";
 import KpiCard from "@/components/KpiCard";
 import LineTable from "@/components/LineTable";
 import { getOutputColor, getFpyColor, getHpuColor, getOeeColor } from "@/lib/status";
@@ -89,20 +98,68 @@ function ErrorScreen({
 export default function Home() {
   const pathname = usePathname();
   useRedirectTeamLead();
-  const [metrics, setMetrics] = useState<ShiftMetrics | null>(null);
-  const [mesStates, setMesStates] = useState<LineState[]>([]);
-  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [fetchError, setFetchError] = useState<string | null>(null);
   const [shift, setShift] = useState<ShiftName>("day");
   const [selectedLineId, setSelectedLineId] = useState<string | null>(null);
   const closeDrawer = useCallback(() => setSelectedLineId(null), []);
-
-  const [adminConfig, setAdminConfig] = useState<Record<string, AdminLineConfig>>({});
-  const [simClock, setSimClock] = useState<Date | null>(null);
   const lastOutputRef = useRef<Record<string, number>>({});
-  const fetchRequestId = useRef(0);
-  const [openDowntimeByLine, setOpenDowntimeByLine] = useState<Record<string, boolean>>({});
+
+  const metricsQuery = useQuery<ShiftMetrics>({
+    queryKey: queryKeys.metrics(shift),
+    queryFn: () => fetchMetrics(shift),
+    refetchInterval: 5000,
+  });
+
+  const mesStatesQuery = useQuery<LineState[]>({
+    queryKey: queryKeys.mesState(),
+    queryFn: fetchMesState,
+    refetchInterval: 5000,
+  });
+
+  const adminConfigQuery = useQuery<Record<string, AdminLineConfig>>({
+    queryKey: queryKeys.adminConfig(),
+    queryFn: fetchAdminConfig,
+    refetchInterval: 5000,
+  });
+
+  const simClockQuery = useQuery<{ clock: string | null; running: boolean; speed: number }>({
+    queryKey: queryKeys.simClock(),
+    queryFn: fetchSimClock,
+    refetchInterval: 5000,
+  });
+
+  const downtimeQuery = useQuery<DowntimeEntry[]>({
+    queryKey: queryKeys.downtime(shift),
+    queryFn: () => fetchDowntime(shift),
+    refetchInterval: 5000,
+  });
+
+  const metrics = metricsQuery.data ?? null;
+  const mesStates = mesStatesQuery.data ?? [];
+  const adminConfig = adminConfigQuery.data ?? {};
+  const simClock = simClockQuery.data?.clock
+    ? new Date(simClockQuery.data.clock)
+    : null;
+  const fetchError =
+    metricsQuery.error instanceof Error ? metricsQuery.error.message : null;
+  const isLoading = metricsQuery.isLoading;
+  const lastUpdated = metricsQuery.dataUpdatedAt
+    ? new Date(metricsQuery.dataUpdatedAt)
+    : null;
+
+  const openDowntimeByLine = useMemo<Record<string, boolean>>(() => {
+    const entries = downtimeQuery.data ?? [];
+    const map: Record<string, boolean> = {};
+    for (const e of entries) {
+      if (e.endTime === null) map[e.lineId] = true;
+    }
+    return map;
+  }, [downtimeQuery.data]);
+
+  useEffect(() => {
+    for (const s of mesStates) {
+      lastOutputRef.current[s.lineId] = s.totalOutput;
+    }
+  }, [mesStates]);
 
   const {
     totalOutput,
@@ -149,61 +206,9 @@ export default function Home() {
     [mesStates]
   );
 
-  const fetchMetrics = async () => {
-    const requestId = ++fetchRequestId.current;
-    try {
-      const [metricsRes, mesRes, configRes, clockRes, downtimeRes] = await Promise.all([
-        fetch(`/api/metrics?shift=${shift}`, { cache: "no-store" }),
-        fetch("/api/mes/state", { cache: "no-store" }),
-        fetch("/api/admin/config", { cache: "no-store" }),
-        fetch("/api/sim/clock", { cache: "no-store" }),
-        fetch(`/api/downtime?shift=${shift}`, { cache: "no-store" }),
-      ]);
-      if (requestId !== fetchRequestId.current) return;
-      if (!metricsRes.ok) throw new Error(`HTTP ${metricsRes.status}`);
-      const data: ShiftMetrics = await metricsRes.json();
-      setMetrics(data);
-      if (mesRes.ok) {
-        const states: LineState[] = await mesRes.json();
-        setMesStates(states);
-        for (const s of states) {
-          lastOutputRef.current[s.lineId] = s.totalOutput;
-        }
-      }
-      if (configRes.ok) setAdminConfig(await configRes.json());
-      if (clockRes.ok) {
-        const { clock } = await clockRes.json();
-        setSimClock(clock ? new Date(clock) : null);
-      }
-      if (downtimeRes.ok) {
-        const allEntries: DowntimeEntry[] = await downtimeRes.json();
-        const openMap: Record<string, boolean> = {};
-        for (const e of allEntries) {
-          if (e.endTime === null) openMap[e.lineId] = true;
-        }
-        setOpenDowntimeByLine(openMap);
-      }
-      setLastUpdated(new Date());
-      setFetchError(null);
-    } catch (err) {
-      setFetchError(err instanceof Error ? err.message : "Request failed");
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    setMetrics(null);
-    setIsLoading(true);
-    setFetchError(null);
-    fetchMetrics();
-    const interval = setInterval(fetchMetrics, 5000);
-    return () => clearInterval(interval);
-  }, [shift]);
-
   if (isLoading && !metrics) return <DashboardSkeleton />;
   if (fetchError && !metrics) {
-    return <ErrorScreen message={fetchError} onRetry={fetchMetrics} />;
+    return <ErrorScreen message={fetchError} onRetry={() => metricsQuery.refetch()} />;
   }
 
   const lines = metrics!.lines;
@@ -230,6 +235,7 @@ export default function Home() {
         onShiftChange={setShift}
         lastUpdated={lastUpdated}
         lines={activeLines}
+        simClock={simClock}
       />
 
       <div className="flex flex-1 overflow-hidden">
