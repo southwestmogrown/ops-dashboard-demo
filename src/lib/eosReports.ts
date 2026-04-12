@@ -107,10 +107,10 @@ export function downloadCSV(content: string, filename: string): void {
 }
 
 export function downloadAllReports(data: EOSFormData, activeLines: EOSLineDescriptor[]): void {
-  downloadCSV(generateEOSCSV(data, activeLines), `BAK_EOS_${data.date}_${data.shift}.csv`);
-  downloadCSV(generateLineStatusCSV(data, activeLines), `BAK_LineStatus_${data.date}_${data.shift}.csv`);
-  downloadCSV(generateLocalCSV(data, activeLines), `BAK_Local_${data.date}_${data.shift}.csv`);
-  downloadCSV(generatePrePostCSV(data, activeLines), `BAK_PrePost_${data.date}_${data.shift}.csv`);
+  downloadCSV(generateEOSCSV(data, activeLines), `KC_EOS_${data.date}_${data.shift}.csv`);
+  downloadCSV(generateLineStatusCSV(data, activeLines), `KC_LineStatus_${data.date}_${data.shift}.csv`);
+  downloadCSV(generateLocalCSV(data, activeLines), `KC_Local_${data.date}_${data.shift}.csv`);
+  downloadCSV(generatePrePostCSV(data, activeLines), `KC_PrePost_${data.date}_${data.shift}.csv`);
 }
 
 export function generateEmailBody(
@@ -154,5 +154,5 @@ ${notesSections.length > 0 ? notesSections.join("\n") : "(no notes entered)"}
 
 ${divider}
 Reports attached: EOS Report | Line Status | Local Report | Pre/Post Shift
-Generated automatically by BAK EOS System`;
+Generated automatically by Kinetic Command EOS System`;
 }

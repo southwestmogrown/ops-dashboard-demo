@@ -6,7 +6,7 @@ type: project
 
 ## Session: 2026-03-28
 
-**Role reviewed as:** Production Shift Manager evaluating the BAK Ops Dashboard
+**Role reviewed as:** Production Shift Manager evaluating the Kinetic Command Ops Dashboard
 
 ### What happened
 - Full codebase evaluation from a floor manager POV

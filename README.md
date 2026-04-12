@@ -1,8 +1,8 @@
-# Ops Dashboard — RealTruck BAK
+# Kinetic Command — Ops Dashboard
 
-> Real-time production monitoring for manufacturing floor operations. Built for shift supervisors who need to catch at-risk lines before they miss targets — not after.
+> Real-time production monitoring for manufacturing floor operations. Built by **Wilkey Digital Solutions** for shift supervisors who need to catch at-risk lines before they miss targets — not after.
 
-BAK Industries runs multiple production lines across two value streams. Historically, shift performance was tracked in spreadsheets and reviewed after the fact. This dashboard replaces that workflow with live KPI visibility, automatic at-risk flagging, and one-click shift reporting — built to the same standards you'd ship to production.
+A modern manufacturing floor runs multiple production lines across two value streams. Historically, shift performance was tracked in spreadsheets and reviewed after the fact. This dashboard replaces that workflow with live KPI visibility, automatic at-risk flagging, and one-click shift reporting — built to the same standards you'd ship to production.
 
 **[Live demo →](https://ops-dashboard-demo.vercel.app)**
 
@@ -85,3 +85,7 @@ The dashboard is a single Next.js page that owns all state. Data flows from a `/
 - [ ] **Changeover timestamp tracking** — captures start/end times per changeover to enable MTCO reporting and scheduling system integration
 - [ ] **Live data adapter** — WebSocket connection to plant MES replaces the mock layer; component API unchanged
 - [ ] **Role-based views** — supervisor, operator, and plant-manager permission tiers gating export, drill-down, and cross-value-stream visibility
+
+---
+
+*Kinetic Command is built and maintained by **Wilkey Digital Solutions**.*
