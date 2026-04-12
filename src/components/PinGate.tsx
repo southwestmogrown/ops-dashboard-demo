@@ -33,13 +33,13 @@ export default function PinGate() {
   return (
     <div className="fixed inset-0 z-50 bg-background/90 backdrop-blur-sm flex items-center justify-center">
       <div className="bg-surface border border-border rounded-xl p-8 w-full max-w-sm shadow-2xl">
-        {/* BAK Logo */}
+        {/* Kinetic Command Logo */}
         <div className="flex flex-col items-center mb-8">
           <div className="bg-accent text-black font-black text-sm px-3 py-1.5 rounded tracking-widest mb-2">
-            BAK
+            KC
           </div>
           <div className="text-slate-500 text-xs tracking-widest uppercase">
-            RealTruck · Ops Dashboard
+            Kinetic Command · Ops Dashboard
           </div>
         </div>
 
@@ -109,7 +109,7 @@ export default function PinGate() {
 
           <p className="text-xs text-slate-600 text-center mt-4">
             {role === "supervisor"
-              ? "Supervisor PIN: bak2026"
+              ? "Supervisor PIN: ops2026"
               : "Team Lead PIN: lead2026"}
           </p>
         </div>

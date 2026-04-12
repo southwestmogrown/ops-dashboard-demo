@@ -1,6 +1,6 @@
 /**
  * Client-side PDF run sheet parser.
- * Handles two BAK run sheet formats:
+ * Handles two production run sheet formats:
  *
  *   VS1 (HFC):  "449324TS *449324TS* 40  234S0139 ..."   MODEL first, then *MODEL*
  *   VS2 (HRC):  "*80120* 80120 12  234S0102 ..."         *MODEL* first, then MODEL

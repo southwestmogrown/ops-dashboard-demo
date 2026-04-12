@@ -112,7 +112,7 @@ Two features: (1) role-based access separating supervisors/managers (full admin)
 **File:** `src/lib/authTypes.ts` (new)
 ```typescript
 export type UserRole = "supervisor" | "team-lead";
-export const AUTH_PIN = process.env.AUTH_PIN ?? "bak2026";
+export const AUTH_PIN = process.env.AUTH_PIN ?? "ops2026";
 ```
 
 ### Issue 1.2 — Create useAuth hook
@@ -125,7 +125,7 @@ export const AUTH_PIN = process.env.AUTH_PIN ?? "bak2026";
 ### Issue 1.3 — Create PinGate component
 **File:** `src/components/PinGate.tsx` (new)
 - Full-screen overlay (`fixed inset-0 z-50 bg-background/90 backdrop-blur-sm`)
-- Centered card: BAK logo, "Enter PIN" label, masked PIN input, role radio buttons (Supervisor/Manager, Team Lead), Submit button
+- Centered card: KC logo, "Enter PIN" label, masked PIN input, role radio buttons (Supervisor/Manager, Team Lead), Submit button
 - Wrong PIN: inline error message below input
 - On success: writes to localStorage + sets cookie, overlay unmounts
 
@@ -159,7 +159,7 @@ export const AUTH_PIN = process.env.AUTH_PIN ?? "bak2026";
 ### Issue 1.9 — Add AUTH_PIN to .env.example
 **File:** `.env.example`
 ```
-AUTH_PIN=bak2026
+AUTH_PIN=ops2026
 ```
 
 ---
@@ -479,7 +479,7 @@ export interface ScrapStats { kickedLids: number; scrappedPanels: number; totalB
 | `src/components/admin/AdminLineCard.tsx` | MODIFY — add `savedIsRunning` prop + "Not Running" toggle |
 | `src/components/LineTable.tsx` | MODIFY — import `PILL_STYLE` from `status.ts`, remove local copy |
 | `src/components/Header.tsx` | MODIFY — role badge + conditional nav |
-| `.env.example` | MODIFY — add `AUTH_PIN=bak2026` |
+| `.env.example` | MODIFY — add `AUTH_PIN=ops2026` |
 
 ## Open Questions
 
