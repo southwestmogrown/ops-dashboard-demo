@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { getHourlyTargets, type HourlyTargetRow } from "./shiftBreaks";
+import { getHourlyTargets } from "./shiftBreaks";
 
 describe("getHourlyTargets", () => {
   const EMPTY_OUTPUT: Record<string, number> = {};

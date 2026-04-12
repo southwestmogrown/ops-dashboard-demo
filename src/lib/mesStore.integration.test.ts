@@ -72,7 +72,6 @@ import {
   closeDowntimeEntry,
   getOpenDowntime,
   getTotalDowntimeMinutes,
-  refreshCacheFromDb,
 } from "@/lib/mesStore";
 
 // Wipe the in-memory global cache between tests
