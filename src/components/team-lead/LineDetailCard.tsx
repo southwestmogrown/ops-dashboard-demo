@@ -302,6 +302,7 @@ export default function LineDetailCard({
             changeoversByHour={mesState?.hourlyChangeovers ?? {}}
             shift={shift}
             onSaveComment={onSaveComment}
+            hasAnyOutput={(mesState?.totalOutput ?? 0) > 0}
           />
         </div>
       </div>

@@ -12,6 +12,9 @@ interface HourlyTableProps {
   changeoversByHour?: Record<string, number>;
   shift: ShiftName;
   onSaveComment: (hour: string, comment: string) => Promise<void>;
+  /** Pass false when the line has no MES output (e.g. sim not started or after reset).
+   *  All rows will show "--" instead of 0/negative-variance until production begins. */
+  hasAnyOutput?: boolean;
 }
 
 const CommentInput = memo(function CommentInput({
@@ -81,6 +84,7 @@ export default function HourlyTable({
   changeoversByHour = {},
   shift,
   onSaveComment,
+  hasAnyOutput = true,
 }: HourlyTableProps) {
   const [saveStatus, setSaveStatus] = useState<Record<string, SaveStatus>>({});
 
@@ -165,9 +169,16 @@ export default function HourlyTable({
           <tbody className="divide-y divide-border/20">
             {rows.map((row, idx) => {
               const isBreak = row.isBreak;
+              // A row is "future" only when: the shift is active (a current-hour row
+              // exists, currentRowIdx >= 0), the row falls after the current real-clock
+              // hour, AND it has no actual output (sim-produced data overrides the mask).
               const isFuture =
-                !isBreak && currentRowIdx >= 0 && idx > currentRowIdx;
-              const hasNegVar = !isBreak && !isFuture && row.variance < 0;
+                !isBreak && row.actual === 0 && currentRowIdx >= 0 && idx > currentRowIdx;
+              // When the sim has never produced output (not started / just reset),
+              // show all non-break rows as blank rather than "0 / -31".
+              const isNoData = !hasAnyOutput && !isBreak;
+              const isHidden = isFuture || isNoData;
+              const hasNegVar = !isBreak && !isHidden && row.variance < 0;
               const comment = comments[row.hour] ?? "";
               const status = saveStatus[row.hour] ?? "idle";
 
@@ -183,7 +194,7 @@ export default function HourlyTable({
                   }`}
                 >
                   <td
-                    className={`px-6 py-4 text-sm font-mono font-bold ${isFuture ? "text-[#e1e2ec]/25" : ""}`}
+                    className={`px-6 py-4 text-sm font-mono font-bold ${isHidden ? "text-[#e1e2ec]/25" : ""}`}
                   >
                     <div className="flex items-center gap-2">
                       <span>{row.hour}</span>
@@ -195,7 +206,7 @@ export default function HourlyTable({
                     </div>
                   </td>
                   <td
-                    className={`px-6 py-4 text-base font-['Space_Grotesk',sans-serif] tabular-nums ${isFuture ? "text-[#e1e2ec]/25" : ""}`}
+                    className={`px-6 py-4 text-base font-['Space_Grotesk',sans-serif] tabular-nums ${isHidden ? "text-[#e1e2ec]/25" : ""}`}
                   >
                     {isBreak ? "—" : row.planned}
                   </td>
@@ -203,18 +214,18 @@ export default function HourlyTable({
                     className={`px-6 py-4 text-base font-['Space_Grotesk',sans-serif] tabular-nums font-bold ${
                       isBreak
                         ? "text-[#e1e2ec]/40"
-                        : isFuture
+                        : isHidden
                           ? "text-[#e1e2ec]/25"
                           : row.variance < 0
                             ? "text-accent"
                             : "text-status-green"
                     }`}
                   >
-                    {isBreak ? "—" : isFuture ? "--" : row.actual}
+                    {isBreak ? "—" : isHidden ? "--" : row.actual}
                   </td>
                   <td
                     className={`px-6 py-4 text-sm font-bold ${
-                      isBreak || isFuture
+                      isBreak || isHidden
                         ? "text-[#e1e2ec]/25"
                         : row.variance > 0
                           ? "text-status-green"
@@ -225,7 +236,7 @@ export default function HourlyTable({
                   >
                     {isBreak
                       ? "—"
-                      : isFuture
+                      : isHidden
                         ? "--"
                         : row.variance > 0
                           ? `+${row.variance}`
@@ -236,7 +247,7 @@ export default function HourlyTable({
                       <span className="text-xs text-[#e1e2ec]/35 italic uppercase">
                         Break
                       </span>
-                    ) : isFuture ? (
+                    ) : isHidden ? (
                       <span className="text-xs text-[#e1e2ec]/35 italic uppercase">
                         Upcoming
                       </span>
