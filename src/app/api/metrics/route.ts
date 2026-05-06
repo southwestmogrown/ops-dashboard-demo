@@ -58,10 +58,15 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       line.availability = 100;
       line.performance = 100;
       line.quality = 100;
-      line.oee = 100;
+      line.oee = 1;
       line.hpu = 0;
       continue;
     }
+
+    // HPU = (headcount × elapsed hours) / output  — uses elapsed time, not full-shift uptime
+    line.hpu = totalOutput > 0 && elapsedHours > 0
+      ? Math.round((line.headcount * elapsedHours) / totalOutput * 100) / 100
+      : 0;
 
     const downtimeEntries = await getDowntimeEntries(line.id, shiftParam as ShiftName);
     let downtimeMinutes = 0;
@@ -74,12 +79,6 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
         downtimeMinutes += (clampedEnd.getTime() - clampedStart.getTime()) / 60000;
       }
     }
-
-    const uptimeMinutes = totalShiftMinutes - downtimeMinutes;
-    const uptimeHours   = uptimeMinutes / 60;
-    line.hpu = totalOutput > 0 && uptimeHours > 0
-      ? Math.round((line.headcount * uptimeHours) / totalOutput * 100) / 100
-      : 0;
 
     const availability = totalShiftMinutes > 0
       ? Math.max(0, Math.min(100, Math.round((1 - downtimeMinutes / totalShiftMinutes) * 1000) / 10))
@@ -94,7 +93,9 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     line.availability = availability;
     line.performance  = performance;
     line.quality      = line.fpy;
-    line.oee = Math.round((availability * performance * line.fpy) / 100) / 100;
+    // OEE stored as 0–1 decimal (e.g. 0.8653 = 86.53%), displayed as percentage in the UI.
+    // When output is zero, line.oee is set to 1 (= 100%) above in the early-exit branch.
+    line.oee = Math.round((availability / 100) * (performance / 100) * (line.fpy / 100) * 10000) / 10000;
   }
 
   const states   = await getAllLineStates();

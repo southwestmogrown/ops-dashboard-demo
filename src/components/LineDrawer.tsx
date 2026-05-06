@@ -638,9 +638,9 @@ export default function LineDrawer({
                           Overall Equipment Effectiveness
                         </p>
                         <p
-                          className={`text-5xl font-bold font-['Space_Grotesk',sans-serif] ${getOeeColor(line.oee)}`}
+                          className={`text-5xl font-bold font-['Space_Grotesk',sans-serif] ${getOeeColor(line.oee * 100)}`}
                         >
-                          {line.oee.toFixed(1)}%
+                          {(line.oee * 100).toFixed(1)}%
                         </p>
                         <p className="text-[10px] text-[#e1e2ec]/30 mt-1">
                           A × P × Q
