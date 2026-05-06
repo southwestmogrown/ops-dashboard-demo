@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { generateMetrics, getDefaultHeadcount, getDefaultTarget } from "@/lib/generateMetrics";
 import { ShiftName } from "@/lib/types/core";
-import { getOutputForLine, getAdminConfig, getKickedLidsForLineShift, getAllLineStates, getDowntimeEntries, refreshCacheFromDb } from "@/lib/mesStore";
+import { getOutputForLineShift, getAdminConfig, getKickedLidsForLineShift, getAllLineStates, getDowntimeEntries, refreshCacheFromDb } from "@/lib/mesStore";
 import { getShiftProgress, getShiftWindows } from "@/lib/shiftTime";
 import type { TimePoint } from "@/lib/types/core";
 
@@ -45,7 +45,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     const admin = await getAdminConfig(line.id);
     line.target    = admin.target    ?? getDefaultTarget(line.id);
     line.headcount = admin.headcount ?? getDefaultHeadcount(line.id);
-    line.output    = await getOutputForLine(line.id);
+    line.output    = await getOutputForLineShift(line.id, shiftParam as ShiftName);
 
     const totalOutput = line.output;
     const kickedLids  = await getKickedLidsForLineShift(line.id, shiftParam as ShiftName);

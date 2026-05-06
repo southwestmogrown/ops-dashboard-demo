@@ -68,9 +68,12 @@ export function getShiftProgress(
   let elapsed: number;
   if (nowH >= win.startHour) {
     elapsed = nowH - win.startHour;
-  } else {
-    // Overnight shift crosses midnight (e.g. 17:00 to 03:30).
+  } else if (win.endHour > 24 && nowH < win.endHour - 24) {
+    // Overnight shift crosses midnight; current time is in the post-midnight continuation
     elapsed = nowH + 24 - win.startHour;
+  } else {
+    // Shift hasn't started yet for this day
+    elapsed = 0;
   }
 
   const elapsedHours = Math.max(0, Math.min(totalHours, elapsed));

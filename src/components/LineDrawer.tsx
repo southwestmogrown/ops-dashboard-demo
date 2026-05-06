@@ -311,24 +311,6 @@ export default function LineDrawer({
         )
       : null;
 
-  const etaInfo = (() => {
-    if (
-      !mesState ||
-      mesState.remainingOnOrder <= 0 ||
-      shiftProgress.elapsedHours < 0.25
-    )
-      return null;
-    const output = mesState.schedule
-      ? mesState.totalOutput
-      : (line?.output ?? 0);
-    if (output === 0) return null;
-    const uph = output / shiftProgress.elapsedHours;
-    if (uph === 0) return null;
-    const minutesLeft = Math.ceil((mesState.remainingOnOrder / uph) * 60);
-    const now = nowOverride ?? new Date();
-    const etaTime = new Date(now.getTime() + minutesLeft * 60_000);
-    return { etaTime, minutesLeft };
-  })();
 
   const TABS: { id: DrawerTab; label: string }[] = [
     { id: "output", label: "Output" },
@@ -478,7 +460,7 @@ export default function LineDrawer({
 
             {/* Active order strip */}
             {mesState?.schedule && (
-              <div className="grid grid-cols-4 gap-3 px-5 py-3 bg-background border-b border-border shrink-0">
+              <div className="grid grid-cols-3 gap-3 px-5 py-3 bg-background border-b border-border shrink-0">
                 <div>
                   <p className="text-[9px] text-[#e1e2ec]/40 uppercase tracking-widest mb-0.5 font-bold">
                     Active Order
@@ -496,21 +478,6 @@ export default function LineDrawer({
                   <p className="text-sm text-[#e1e2ec]">
                     {mesState.remainingOnOrder}
                   </p>
-                </div>
-                <div>
-                  <p className="text-[9px] text-[#e1e2ec]/40 uppercase tracking-widest mb-0.5 font-bold">
-                    ETA
-                  </p>
-                  {etaInfo ? (
-                    <p className="text-sm text-[#e1e2ec] font-semibold">
-                      {etaInfo.etaTime.toLocaleTimeString([], {
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      })}
-                    </p>
-                  ) : (
-                    <p className="text-sm text-[#e1e2ec]/20">—</p>
-                  )}
                 </div>
                 <div>
                   <p className="text-[9px] text-[#e1e2ec]/40 uppercase tracking-widest mb-0.5 font-bold">

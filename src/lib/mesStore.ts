@@ -523,6 +523,11 @@ export async function getOutputForLine(lineId: string): Promise<number> {
   return _c().scanLog.filter((s) => s.lineId === lineId).length;
 }
 
+export async function getOutputForLineShift(lineId: string, shift: "day" | "night"): Promise<number> {
+  await ensureInit();
+  return _c().scanLog.filter((s) => s.lineId === lineId && s.shift === shift).length;
+}
+
 // ── Admin config ──────────────────────────────────────────────────────────────
 
 export async function setAdminConfig(
