@@ -1,22 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
-  getSimClock,
   getSimRunning,
-  getSimSpeed,
+  getSimState,
   refreshCacheFromDb,
   setSimClock,
   setSimRunning,
+  startSimSession,
 } from "@/lib/mesStore";
+import type { ShiftName } from "@/lib/types/core";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(): Promise<NextResponse> {
   await refreshCacheFromDb();
-  return NextResponse.json({
-    clock:   (await getSimClock())?.toISOString() ?? null,
-    running: await getSimRunning(),
-    speed:   await getSimSpeed(),
-  });
+  return NextResponse.json(await getSimState());
 }
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
@@ -27,15 +24,28 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
 
+  if (body.initializeSession === true) {
+    const startShift = body.startShift as ShiftName | undefined;
+    const speed = typeof body.speed === "number" ? body.speed : 60;
+    if (startShift !== "day" && startShift !== "night") {
+      return NextResponse.json(
+        { error: "startShift must be 'day' or 'night'" },
+        { status: 400 },
+      );
+    }
+    await startSimSession(startShift, speed);
+    return NextResponse.json({ ok: true });
+  }
+
   if (body.clock !== undefined) {
     if (body.clock === null) {
       await setSimClock(null);
     } else {
-      const d = new Date(body.clock as string);
-      if (isNaN(d.getTime())) {
+      const date = new Date(body.clock as string);
+      if (Number.isNaN(date.getTime())) {
         return NextResponse.json({ error: "Invalid clock date" }, { status: 400 });
       }
-      await setSimClock(d);
+      await setSimClock(date);
     }
   }
 

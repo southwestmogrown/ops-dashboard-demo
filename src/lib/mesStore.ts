@@ -15,10 +15,18 @@ import type {
   LineSchedule,
   LineState,
   ScanEvent,
+  SimState,
 } from "./mesTypes";
 import type { NewScrapEntry, ScrapEntry } from "./reworkTypes";
 import type { DowntimeEntry } from "./downtimeTypes";
-import { getShiftWindows } from "./shiftTime";
+import type { ShiftName } from "./types";
+import {
+  formatProductionDate,
+  getNextShift,
+  getProductionDateForTime,
+  getShiftContext,
+  getShiftForTime,
+} from "./shiftTime";
 import {
   runMigrations,
   dbGetAllScans,
@@ -65,6 +73,10 @@ interface MesCache {
   simClock: Date | null;
   simRunning: boolean;
   simSpeed: number;
+  simSessionStart: Date | null;
+  simSessionEnd: Date | null;
+  simSessionStartShift: ShiftName | null;
+  simHandoffCount: number;
   unitCarryover: Record<string, number>;
   changeoverRemaining: Record<string, number>;
   failureAccumulator: Record<string, number>;
@@ -93,6 +105,10 @@ function _c(): MesCache {
       simClock: null,
       simRunning: false,
       simSpeed: 60,
+      simSessionStart: null,
+      simSessionEnd: null,
+      simSessionStartShift: null,
+      simHandoffCount: 0,
       unitCarryover: {},
       changeoverRemaining: {},
       failureAccumulator: {},
@@ -107,6 +123,7 @@ function _c(): MesCache {
 /** Default MTBF in hours per value stream. */
 const MTBF_VS1 = 4;
 const MTBF_VS2 = 5;
+const UNFILTERED_CONTEXT = "__unfiltered__";
 
 async function _hydrateFromDb(): Promise<void> {
   const c = _c();
@@ -150,6 +167,10 @@ async function _hydrateFromDb(): Promise<void> {
   c.simClock = sim.clock;
   c.simRunning = sim.running;
   c.simSpeed = sim.speed;
+  c.simSessionStart = sim.sessionStart;
+  c.simSessionEnd = sim.sessionEnd;
+  c.simSessionStartShift = sim.sessionStartShift;
+  c.simHandoffCount = sim.handoffCount;
 }
 
 async function _doInit(): Promise<void> {
@@ -205,8 +226,57 @@ async function bumpChangeoverSerial(): Promise<string> {
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-function shiftForHour(hour: number): "day" | "night" {
-  return hour >= 6 && hour < 18 ? "day" : "night";
+function commentNamespace(
+  lineId: string,
+  shift: ShiftName,
+  productionDate: string,
+): string {
+  // Keep a hard separator between the physical line id and the shift context key so
+  // parsing line ids never has to understand the date/shift sub-format.
+  return `${lineId}::${productionDate}:${shift}`;
+}
+
+function getNextShiftProductionDate(
+  shift: ShiftName,
+  productionDate: string,
+): string {
+  if (shift !== "night") return productionDate;
+  const nextDate = new Date(`${productionDate}T00:00:00.000Z`);
+  nextDate.setUTCDate(nextDate.getUTCDate() + 1);
+  return formatProductionDate(nextDate, { useUtc: true });
+}
+
+function getRecordContext(
+  time: Date,
+  shift?: ShiftName,
+): { shift: ShiftName; productionDate: string; contextKey: string } {
+  const resolvedShift = shift ?? getShiftForTime(time, { useUtc: true }) ?? "day";
+  const context = getShiftContext(resolvedShift, time, { useUtc: true });
+  return {
+    shift: resolvedShift,
+    productionDate: context.productionDate,
+    contextKey: context.contextKey,
+  };
+}
+
+async function persistSimState(): Promise<void> {
+  const c = _c();
+  await dbSetSimClock(c.simClock, c.simRunning, c.simSpeed, {
+    sessionStart: c.simSessionStart,
+    sessionEnd: c.simSessionEnd,
+    sessionStartShift: c.simSessionStartShift,
+    handoffCount: c.simHandoffCount,
+  });
+}
+
+function getOperatingClock(c: MesCache): {
+  now: Date;
+  timeSource: "realtime" | "simulated";
+} {
+  if (c.simClock) {
+    return { now: c.simClock, timeSource: "simulated" };
+  }
+  return { now: new Date(), timeSource: "realtime" };
 }
 
 async function advanceQueue(lineId: string): Promise<void> {
@@ -320,6 +390,7 @@ export async function tickLine(
   const c = _c();
   const effectiveNow =
     c.simRunning && c.simClock ? c.simClock : (now ?? new Date());
+  const recordContext = getRecordContext(effectiveNow);
   const simMinsPerTick = c.simSpeed / 60;
   const simHoursPerTick = c.simSpeed / 3600;
 
@@ -360,8 +431,6 @@ export async function tickLine(
   if (!queue || queue.length === 0) return;
 
   const schedule = queue[0];
-  const shift = shiftForHour(effectiveNow.getUTCHours());
-
   const firstIncomplete = schedule.items.find(
     (it) => !it.skipped && it.completed < it.qty,
   );
@@ -387,7 +456,8 @@ export async function tickLine(
         id: await bumpMesSerial(),
         timestamp: effectiveNow.toISOString(),
         lineId,
-        shift,
+        shift: recordContext.shift,
+        productionDate: recordContext.productionDate,
         partNumber: item.model,
       };
       newEvents.push(event);
@@ -411,7 +481,8 @@ export async function tickLine(
         id: await bumpChangeoverSerial(),
         timestamp: effectiveNow.toISOString(),
         lineId,
-        shift,
+        shift: recordContext.shift,
+        productionDate: recordContext.productionDate,
         completedModel: firstIncomplete.model,
         nextModel: nextIncomplete.model,
       };
@@ -430,16 +501,38 @@ export async function tickLine(
 
 // ── State derivation ──────────────────────────────────────────────────────────
 
-export async function getLineState(lineId: string): Promise<LineState> {
+export async function getLineState(
+  lineId: string,
+  filters?: { shift?: ShiftName; productionDate?: string },
+): Promise<LineState> {
   await ensureInit();
   const c = _c();
+  const { now } = getOperatingClock(c);
+  const filterContext = filters?.shift
+    ? getShiftContext(filters.shift, now, {
+        useUtc: true,
+        productionDate: filters.productionDate,
+      })
+    : null;
   await advanceQueue(lineId);
   const queue = c.queues[lineId] ?? [];
   const schedule = queue[0] ?? null;
   const queuedCount = Math.max(0, queue.length - 1);
 
-  const lineScans = c.scanLog.filter((s) => s.lineId === lineId);
-  const lineChangeovers = c.changeoverLog.filter((e) => e.lineId === lineId);
+  const lineScans = c.scanLog.filter(
+    (s) =>
+      s.lineId === lineId &&
+      (!filterContext ||
+        (s.shift === filterContext.shift &&
+          s.productionDate === filterContext.productionDate)),
+  );
+  const lineChangeovers = c.changeoverLog.filter(
+    (e) =>
+      e.lineId === lineId &&
+      (!filterContext ||
+        (e.shift === filterContext.shift &&
+          e.productionDate === filterContext.productionDate)),
+  );
 
   const hourlyOutput: Record<string, number> = {};
   for (const scan of lineScans) {
@@ -481,7 +574,9 @@ export async function getLineState(lineId: string): Promise<LineState> {
   }
 
   const remainingOnRunSheet = schedule
-    ? Math.max(0, schedule.totalTarget - totalOutput)
+    ? schedule.items
+        .filter((it) => !it.skipped)
+        .reduce((sum, item) => sum + Math.max(0, item.qty - item.completed), 0)
     : 0;
 
   const skippedItems = schedule
@@ -490,6 +585,9 @@ export async function getLineState(lineId: string): Promise<LineState> {
 
   return {
     lineId,
+    shift: filterContext?.shift ?? "day",
+    productionDate: filterContext?.productionDate ?? UNFILTERED_CONTEXT,
+    contextKey: filterContext?.contextKey ?? `${lineId}:${UNFILTERED_CONTEXT}`,
     schedule,
     totalOutput,
     currentOrder,
@@ -500,13 +598,16 @@ export async function getLineState(lineId: string): Promise<LineState> {
     queue: queue.slice(1),
     hourlyOutput,
     hourlyChangeovers,
+    totalChangeovers: lineChangeovers.length,
     skippedItems,
     changeoverRemaining: c.changeoverRemaining[lineId] ?? 0,
     repairRemaining: c.repairRemaining[lineId] ?? 0,
   };
 }
 
-export async function getAllLineStates(): Promise<LineState[]> {
+export async function getAllLineStates(
+  filters?: { shift?: ShiftName; productionDate?: string },
+): Promise<LineState[]> {
   await ensureInit();
   const c = _c();
   const allIds = new Set([
@@ -515,7 +616,7 @@ export async function getAllLineStates(): Promise<LineState[]> {
     ...c.changeoverLog.map((e) => e.lineId),
   ]);
   const sortedIds = Array.from(allIds).sort();
-  return Promise.all(sortedIds.map(getLineState));
+  return Promise.all(sortedIds.map((lineId) => getLineState(lineId, filters)));
 }
 
 export async function getOutputForLine(lineId: string): Promise<number> {
@@ -523,9 +624,18 @@ export async function getOutputForLine(lineId: string): Promise<number> {
   return _c().scanLog.filter((s) => s.lineId === lineId).length;
 }
 
-export async function getOutputForLineShift(lineId: string, shift: "day" | "night"): Promise<number> {
+export async function getOutputForLineShift(
+  lineId: string,
+  shift: "day" | "night",
+  productionDate?: string,
+): Promise<number> {
   await ensureInit();
-  return _c().scanLog.filter((s) => s.lineId === lineId && s.shift === shift).length;
+  return _c().scanLog.filter(
+    (s) =>
+      s.lineId === lineId &&
+      s.shift === shift &&
+      (productionDate ? s.productionDate === productionDate : true),
+  ).length;
 }
 
 // ── Admin config ──────────────────────────────────────────────────────────────
@@ -555,25 +665,32 @@ export async function getAllAdminConfig(): Promise<
 
 // ── Comments ──────────────────────────────────────────────────────────────────
 
-export async function getLineComments(lineId: string): Promise<LineComments> {
+export async function getLineComments(
+  lineId: string,
+  shift: ShiftName,
+  productionDate: string,
+): Promise<LineComments> {
   await ensureInit();
-  return _c().comments[lineId] ?? {};
+  return _c().comments[commentNamespace(lineId, shift, productionDate)] ?? {};
 }
 
 export async function setLineComment(
   lineId: string,
+  shift: ShiftName,
+  productionDate: string,
   hour: string,
   comment: string,
 ): Promise<void> {
   await ensureInit();
   const c = _c();
-  if (!c.comments[lineId]) c.comments[lineId] = {};
+  const key = commentNamespace(lineId, shift, productionDate);
+  if (!c.comments[key]) c.comments[key] = {};
   if (comment.trim() === "") {
-    delete c.comments[lineId][hour];
-    await dbDeleteComment(lineId, hour);
+    delete c.comments[key][hour];
+    await dbDeleteComment(lineId, shift, productionDate, hour);
   } else {
-    c.comments[lineId][hour] = comment.trim();
-    await dbSetComment(lineId, hour, comment.trim());
+    c.comments[key][hour] = comment.trim();
+    await dbSetComment(lineId, shift, productionDate, hour, comment.trim());
   }
 }
 
@@ -585,7 +702,7 @@ export async function addScrapEntry(entry: NewScrapEntry): Promise<ScrapEntry> {
   const full = {
     ...entry,
     id: await bumpScrapSerial(),
-    timestamp: new Date().toISOString(),
+    timestamp: (c.simClock ?? new Date()).toISOString(),
   } as ScrapEntry;
   c.scrapLog.push(full);
   await dbInsertScrap(full);
@@ -595,21 +712,34 @@ export async function addScrapEntry(entry: NewScrapEntry): Promise<ScrapEntry> {
 export async function getScrapEntries(
   lineId: string,
   shift: "day" | "night",
+  productionDate?: string,
 ): Promise<ScrapEntry[]> {
   await ensureInit();
-  return _c().scrapLog.filter((e) => e.lineId === lineId && e.shift === shift);
+  return _c().scrapLog.filter(
+    (e) =>
+      e.lineId === lineId &&
+      e.shift === shift &&
+      (productionDate ? e.productionDate === productionDate : true),
+  );
 }
 
 export async function getAllScrapEntries(
   shift: "day" | "night",
+  productionDate?: string,
 ): Promise<ScrapEntry[]> {
   await ensureInit();
-  return _c().scrapLog.filter((e) => e.shift === shift);
+  return _c().scrapLog.filter(
+    (e) => e.shift === shift && (productionDate ? e.productionDate === productionDate : true),
+  );
 }
 
-export async function getScrapStats(lineId: string, shift: "day" | "night") {
+export async function getScrapStats(
+  lineId: string,
+  shift: "day" | "night",
+  productionDate?: string,
+) {
   await ensureInit();
-  const entries = (await getScrapEntries(lineId, shift)).filter(
+  const entries = (await getScrapEntries(lineId, shift, productionDate)).filter(
     (e) => !e.voidReason,
   );
   return {
@@ -622,9 +752,10 @@ export async function getScrapStats(lineId: string, shift: "day" | "night") {
 export async function getKickedLidsForLineShift(
   lineId: string,
   shift: "day" | "night",
+  productionDate?: string,
 ): Promise<number> {
   await ensureInit();
-  return dbGetKickedLids(lineId, shift);
+  return dbGetKickedLids(lineId, shift, productionDate);
 }
 
 export async function voidScrapEntry(
@@ -680,18 +811,25 @@ export async function addDowntimeEntry(
 export async function getDowntimeEntries(
   lineId: string,
   shift: "day" | "night",
+  productionDate?: string,
 ): Promise<DowntimeEntry[]> {
   await ensureInit();
   return _c().downtimeLog.filter(
-    (e) => e.lineId === lineId && e.shift === shift,
+    (e) =>
+      e.lineId === lineId &&
+      e.shift === shift &&
+      (productionDate ? e.productionDate === productionDate : true),
   );
 }
 
 export async function getAllDowntimeEntriesForShift(
   shift: "day" | "night",
+  productionDate?: string,
 ): Promise<DowntimeEntry[]> {
   await ensureInit();
-  return _c().downtimeLog.filter((e) => e.shift === shift);
+  return _c().downtimeLog.filter(
+    (e) => e.shift === shift && (productionDate ? e.productionDate === productionDate : true),
+  );
 }
 
 export async function closeDowntimeEntry(
@@ -712,10 +850,18 @@ export async function closeDowntimeEntry(
 
 export async function getOpenDowntime(
   lineId: string,
+  shift?: ShiftName,
+  productionDate?: string,
 ): Promise<DowntimeEntry | null> {
   await ensureInit();
   return (
-    _c().downtimeLog.find((e) => e.lineId === lineId && e.endTime === null) ??
+    _c().downtimeLog.find(
+      (e) =>
+        e.lineId === lineId &&
+        e.endTime === null &&
+        (shift ? e.shift === shift : true) &&
+        (productionDate ? e.productionDate === productionDate : true),
+    ) ??
     null
   );
 }
@@ -723,10 +869,11 @@ export async function getOpenDowntime(
 export async function getTotalDowntimeMinutes(
   lineId: string,
   shift: "day" | "night",
+  productionDate?: string,
 ): Promise<number> {
   await ensureInit();
-  const entries = await getDowntimeEntries(lineId, shift);
-  const now = Date.now();
+  const entries = await getDowntimeEntries(lineId, shift, productionDate);
+  const now = (await getSimClock())?.getTime() ?? Date.now();
   let total = 0;
   for (const e of entries) {
     const start = new Date(e.startTime).getTime();
@@ -743,11 +890,92 @@ export async function getSimClock(): Promise<Date | null> {
   return _c().simClock;
 }
 
+/**
+ * Root-cause fix:
+ * - KPI math previously read real wall-clock time while the simulator advanced a separate clock.
+ * - Shift state was previously aggregated only by line, which let day/night data bleed together.
+ * - Ad hoc shift detection used different boundaries than the canonical shift windows.
+ * This accessor centralizes the active operating clock so downstream callers can build one shift
+ * context and one production-date key for every simulation-sensitive query.
+ */
+export async function getOperatingTime(): Promise<{
+  now: Date;
+  timeSource: "realtime" | "simulated";
+  currentShift: ShiftName | null;
+  productionDate: string;
+}> {
+  await ensureInit();
+  const c = _c();
+  const { now, timeSource } = getOperatingClock(c);
+  return {
+    now,
+    timeSource,
+    currentShift: getShiftForTime(now, { useUtc: true }),
+    productionDate: getProductionDateForTime(now, { useUtc: true }),
+  };
+}
+
+export async function getSimState(): Promise<SimState> {
+  await ensureInit();
+  const c = _c();
+  const currentShift = c.simClock ? getShiftForTime(c.simClock, { useUtc: true }) : null;
+  return {
+    clock: c.simClock?.toISOString() ?? null,
+    running: c.simRunning,
+    speed: c.simSpeed,
+    timeSource: c.simClock ? "simulated" : "realtime",
+    currentShift,
+    productionDate: c.simClock
+      ? getProductionDateForTime(c.simClock, { useUtc: true })
+      : null,
+    sessionStart: c.simSessionStart?.toISOString() ?? null,
+    sessionEnd: c.simSessionEnd?.toISOString() ?? null,
+    sessionStartShift: c.simSessionStartShift,
+    handoffCount: c.simHandoffCount,
+  };
+}
+
 export async function setSimClock(time: Date | null): Promise<void> {
   await ensureInit();
   const c = _c();
   c.simClock = time;
-  await dbSetSimClock(c.simClock, c.simRunning, c.simSpeed);
+  if (!time) {
+    c.simSessionStart = null;
+    c.simSessionEnd = null;
+    c.simSessionStartShift = null;
+    c.simHandoffCount = 0;
+  }
+  await persistSimState();
+}
+
+export async function startSimSession(
+  shift: ShiftName,
+  speed: number,
+): Promise<void> {
+  await ensureInit();
+  const c = _c();
+  const baseNow = new Date();
+  const startContext = getShiftContext(shift, baseNow, {
+    useUtc: true,
+    productionDate: getProductionDateForTime(baseNow, { useUtc: true }),
+  });
+  const nextShift = getNextShift(shift);
+  const endContext = getShiftContext(nextShift, startContext.shiftStart, {
+    useUtc: true,
+    productionDate: getNextShiftProductionDate(
+      shift,
+      startContext.productionDate,
+    ),
+  });
+
+  c.simClock = startContext.shiftStart;
+  c.simRunning = true;
+  c.simSpeed = speed;
+  c.simSessionStart = startContext.shiftStart;
+  c.simSessionEnd = endContext.shiftEnd;
+  c.simSessionStartShift = shift;
+  c.simHandoffCount = 0;
+  await persistSimState();
 }
 
 export async function setSimRunning(
@@ -758,7 +986,7 @@ export async function setSimRunning(
   const c = _c();
   c.simRunning = running;
   if (speed !== undefined) c.simSpeed = speed;
-  await dbSetSimClock(c.simClock, c.simRunning, c.simSpeed);
+  await persistSimState();
 }
 
 export async function getSimRunning(): Promise<boolean> {
@@ -788,21 +1016,20 @@ export async function advanceSimClock(): Promise<void> {
   const c = _c();
   if (!c.simRunning || !c.simClock) return;
   c.simClock = new Date(c.simClock.getTime() + c.simSpeed * 1000);
-
-  // Auto-stop when the simulated clock reaches the end of the current shift.
-  const h =
-    c.simClock.getUTCHours() +
-    c.simClock.getUTCMinutes() / 60 +
-    c.simClock.getUTCSeconds() / 3600;
-  const shiftName = h >= 6 && h < 17 ? "day" : "night";
-  const win = getShiftWindows(shiftName);
-  // Night shift crosses midnight: normalise hours past midnight to 24+
-  const normalized = shiftName === "night" && h < win.startHour ? h + 24 : h;
-  if (normalized >= win.endHour) {
+  const currentShift = getShiftForTime(c.simClock, { useUtc: true });
+  if (
+    c.simSessionStartShift &&
+    currentShift &&
+    currentShift !== c.simSessionStartShift
+  ) {
+    c.simHandoffCount = 1;
+  }
+  if (c.simSessionEnd && c.simClock >= c.simSessionEnd) {
+    c.simClock = c.simSessionEnd;
     c.simRunning = false;
   }
 
-  await dbSetSimClock(c.simClock, c.simRunning, c.simSpeed);
+  await persistSimState();
 }
 
 function resetQueueProgress(queue: LineSchedule[]): LineSchedule[] {
@@ -839,6 +1066,10 @@ export async function resetSimulation(): Promise<void> {
   c.simClock = null;
   c.simRunning = false;
   c.simSpeed = 60;
+  c.simSessionStart = null;
+  c.simSessionEnd = null;
+  c.simSessionStartShift = null;
+  c.simHandoffCount = 0;
   c.unitCarryover = {};
   c.changeoverRemaining = {};
   c.failureAccumulator = {};
@@ -866,6 +1097,10 @@ export async function resetAll(): Promise<void> {
   c.simClock = null;
   c.simRunning = false;
   c.simSpeed = 60;
+  c.simSessionStart = null;
+  c.simSessionEnd = null;
+  c.simSessionStartShift = null;
+  c.simHandoffCount = 0;
   c.unitCarryover = {};
   c.changeoverRemaining = {};
   c.failureAccumulator = {};

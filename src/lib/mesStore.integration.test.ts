@@ -18,7 +18,15 @@ vi.mock("@/lib/db", () => ({
   dbGetAllAdminConfig: vi.fn(async () => ({})),
   dbGetAllComments: vi.fn(async () => ({})),
   dbGetAllScrapEntries: vi.fn(async () => []),
-  dbGetSimClock: vi.fn(async () => ({ clock: null, running: false, speed: 60 })),
+  dbGetSimClock: vi.fn(async () => ({
+    clock: null,
+    running: false,
+    speed: 60,
+    sessionStart: null,
+    sessionEnd: null,
+    sessionStartShift: null,
+    handoffCount: 0,
+  })),
   dbGetAllDowntimeEntries: vi.fn(async () => []),
   dbGetAllChangeovers: vi.fn(async () => []),
   getSerialCounter: vi.fn(async () => 0),
@@ -78,6 +86,8 @@ import {
 beforeEach(async () => {
   await resetAll();
 });
+
+const PROD_DATE = "2026-04-12";
 
 // ── Helper ────────────────────────────────────────────────────────────────────
 
@@ -269,20 +279,20 @@ describe("Admin config", () => {
 
 describe("Comments", () => {
   it("returns empty object for unconfigured line", async () => {
-    const comments = await getLineComments("vs1-l1");
+    const comments = await getLineComments("vs1-l1", "day", PROD_DATE);
     expect(comments).toEqual({});
   });
 
   it("stores and retrieves comments by hour", async () => {
-    await setLineComment("vs1-l1", "08:00", "Started late");
-    const comments = await getLineComments("vs1-l1");
+    await setLineComment("vs1-l1", "day", PROD_DATE, "08:00", "Started late");
+    const comments = await getLineComments("vs1-l1", "day", PROD_DATE);
     expect(comments["08:00"]).toBe("Started late");
   });
 
   it("deletes comment when empty string is set", async () => {
-    await setLineComment("vs1-l1", "08:00", "Started late");
-    await setLineComment("vs1-l1", "08:00", "");
-    const comments = await getLineComments("vs1-l1");
+    await setLineComment("vs1-l1", "day", PROD_DATE, "08:00", "Started late");
+    await setLineComment("vs1-l1", "day", PROD_DATE, "08:00", "");
+    const comments = await getLineComments("vs1-l1", "day", PROD_DATE);
     expect(comments["08:00"]).toBeUndefined();
   });
 });
@@ -295,6 +305,7 @@ describe("Scrap entries", () => {
       kind: "kicked-lid",
       lineId: "vs1-l1",
       shift: "day",
+      productionDate: PROD_DATE,
       model: "M1",
       panel: "A",
       damageType: "kicked-lid",
@@ -302,7 +313,7 @@ describe("Scrap entries", () => {
       auditorInitials: "AB",
       boughtIn: false,
     });
-    const entries = await getScrapEntries("vs1-l1", "day");
+    const entries = await getScrapEntries("vs1-l1", "day", PROD_DATE);
     expect(entries).toHaveLength(1);
     expect(entries[0].kind).toBe("kicked-lid");
     expect(entries[0].id).toMatch(/^SCR-/);
@@ -313,6 +324,7 @@ describe("Scrap entries", () => {
       kind: "kicked-lid",
       lineId: "vs1-l1",
       shift: "day",
+      productionDate: PROD_DATE,
       model: "M1",
       panel: "A",
       damageType: "kicked-lid",
@@ -324,6 +336,7 @@ describe("Scrap entries", () => {
       kind: "scrapped-panel",
       lineId: "vs1-l1",
       shift: "day",
+      productionDate: PROD_DATE,
       model: "M2",
       panel: "B",
       damageType: "Damaged Panel",
@@ -331,7 +344,7 @@ describe("Scrap entries", () => {
       howDamaged: "Dented",
       boughtIn: true,
     });
-    const stats = await getScrapStats("vs1-l1", "day");
+    const stats = await getScrapStats("vs1-l1", "day", PROD_DATE);
     expect(stats.kickedLids).toBe(1);
     expect(stats.scrappedPanels).toBe(1);
     expect(stats.totalBoughtIn).toBe(1);
@@ -342,6 +355,7 @@ describe("Scrap entries", () => {
       kind: "kicked-lid",
       lineId: "vs1-l1",
       shift: "day",
+      productionDate: PROD_DATE,
       model: "M1",
       panel: "A",
       damageType: "kicked-lid",
@@ -353,6 +367,7 @@ describe("Scrap entries", () => {
       kind: "kicked-lid",
       lineId: "vs2-l1",
       shift: "night",
+      productionDate: PROD_DATE,
       model: "M1",
       panel: "A",
       damageType: "kicked-lid",
@@ -360,11 +375,11 @@ describe("Scrap entries", () => {
       auditorInitials: "AB",
       boughtIn: false,
     });
-    const vs1Day = await getScrapEntries("vs1-l1", "day");
+    const vs1Day = await getScrapEntries("vs1-l1", "day", PROD_DATE);
     expect(vs1Day).toHaveLength(1);
-    const vs2Night = await getScrapEntries("vs2-l1", "night");
+    const vs2Night = await getScrapEntries("vs2-l1", "night", PROD_DATE);
     expect(vs2Night).toHaveLength(1);
-    const vs1Night = await getScrapEntries("vs1-l1", "night");
+    const vs1Night = await getScrapEntries("vs1-l1", "night", PROD_DATE);
     expect(vs1Night).toHaveLength(0);
   });
 });
@@ -413,13 +428,14 @@ describe("Downtime", () => {
     await addDowntimeEntry({
       lineId: "vs1-l1",
       shift: "day",
+      productionDate: PROD_DATE,
       reason: "machine-failure",
       startTime: "2026-04-12T08:00:00Z",
       endTime: null,
       unitsLost: 0,
       notes: "Motor overheated",
     });
-    const entries = await getDowntimeEntries("vs1-l1", "day");
+    const entries = await getDowntimeEntries("vs1-l1", "day", PROD_DATE);
     expect(entries).toHaveLength(1);
     expect(entries[0].reason).toBe("machine-failure");
     expect(entries[0].id).toMatch(/^DT-/);
@@ -429,13 +445,14 @@ describe("Downtime", () => {
     await addDowntimeEntry({
       lineId: "vs1-l1",
       shift: "day",
+      productionDate: PROD_DATE,
       reason: "machine-failure",
       startTime: "2026-04-12T08:00:00Z",
       endTime: null,
       unitsLost: 0,
       notes: "",
     });
-    const open = await getOpenDowntime("vs1-l1");
+    const open = await getOpenDowntime("vs1-l1", "day", PROD_DATE);
     expect(open).not.toBeNull();
     expect(open!.endTime).toBeNull();
   });
@@ -444,6 +461,7 @@ describe("Downtime", () => {
     const entry = await addDowntimeEntry({
       lineId: "vs1-l1",
       shift: "day",
+      productionDate: PROD_DATE,
       reason: "machine-failure",
       startTime: "2026-04-12T08:00:00Z",
       endTime: null,
@@ -451,7 +469,7 @@ describe("Downtime", () => {
       notes: "",
     });
     await closeDowntimeEntry(entry.id, "2026-04-12T08:30:00Z", 5);
-    const closed = await getDowntimeEntries("vs1-l1", "day");
+    const closed = await getDowntimeEntries("vs1-l1", "day", PROD_DATE);
     expect(closed[0].endTime).toBe("2026-04-12T08:30:00Z");
     expect(closed[0].unitsLost).toBe(5);
   });
@@ -460,13 +478,14 @@ describe("Downtime", () => {
     await addDowntimeEntry({
       lineId: "vs1-l1",
       shift: "day",
+      productionDate: PROD_DATE,
       reason: "machine-failure",
       startTime: "2026-04-12T08:00:00Z",
       endTime: "2026-04-12T08:30:00Z",
       unitsLost: 0,
       notes: "",
     });
-    const total = await getTotalDowntimeMinutes("vs1-l1", "day");
+    const total = await getTotalDowntimeMinutes("vs1-l1", "day", PROD_DATE);
     expect(total).toBe(30);
   });
 });
@@ -481,13 +500,13 @@ describe("resetAll", () => {
     );
     await tickLine("vs1-l1", 5, new Date("2026-04-12T08:00:00Z"));
     await setAdminConfig("vs1-l1", { target: 300 });
-    await setLineComment("vs1-l1", "08:00", "note");
+    await setLineComment("vs1-l1", "day", PROD_DATE, "08:00", "note");
 
     await resetAll();
 
     expect(await getSchedule("vs1-l1")).toBeUndefined();
     expect(await getOutputForLine("vs1-l1")).toBe(0);
-    expect(await getLineComments("vs1-l1")).toEqual({});
+    expect(await getLineComments("vs1-l1", "day", PROD_DATE)).toEqual({});
   });
 });
 

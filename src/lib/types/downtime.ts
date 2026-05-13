@@ -14,6 +14,7 @@ export interface DowntimeEntry {
   id: string; // "DT-001"
   lineId: string;
   shift: ShiftName;
+  productionDate: string;
   reason: DowntimeReason;
   startTime: string; // ISO timestamp
   endTime: string | null; // null = ongoing

@@ -29,8 +29,8 @@ function AdminPageContent() {
   const [shift, setShift] = useState<ShiftName>("day");
 
   const mesStatesQuery = useQuery<LineState[]>({
-    queryKey: queryKeys.mesState(),
-    queryFn: fetchMesState,
+    queryKey: queryKeys.mesState(shift),
+    queryFn: () => fetchMesState(shift),
     refetchInterval: 5000,
   });
 
@@ -53,10 +53,10 @@ function AdminPageContent() {
 
   const refresh = useCallback(async () => {
     await Promise.all([
-      queryClient.invalidateQueries({ queryKey: queryKeys.mesState() }),
+      queryClient.invalidateQueries({ queryKey: queryKeys.mesState(shift) }),
       queryClient.invalidateQueries({ queryKey: queryKeys.adminConfig() }),
     ]);
-  }, [queryClient]);
+  }, [queryClient, shift]);
 
   function stateFor(lineId: string) {
     return mesStates.find((s) => s.lineId === lineId) ?? null;

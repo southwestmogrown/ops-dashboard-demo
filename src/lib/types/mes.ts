@@ -37,6 +37,7 @@ export interface ScanEvent {
   timestamp: string; // ISO 8601
   lineId: string; // "vs1-l1"
   shift: "day" | "night";
+  productionDate: string; // operational day key, e.g. "2026-05-13"
   partNumber: string; // model # being produced
 }
 
@@ -46,6 +47,7 @@ export interface ChangeoverEvent {
   timestamp: string;
   lineId: string;
   shift: "day" | "night";
+  productionDate: string;
   completedModel: string;
   nextModel: string | null;
 }
@@ -56,6 +58,9 @@ export interface ChangeoverEvent {
  */
 export interface LineState {
   lineId: string;
+  shift: "day" | "night";
+  productionDate: string;
+  contextKey: string;
   schedule: LineSchedule | null;
   totalOutput: number; // total scans this session
   /** First incomplete order, or last order on sheet when fully complete */
@@ -72,10 +77,25 @@ export interface LineState {
   hourlyOutput: Record<string, number>;
   /** changeovers per hour bucket, key = "HH:00", e.g. "09:00" → 1 */
   hourlyChangeovers: Record<string, number>;
+  /** context-filtered changeovers across the current shift */
+  totalChangeovers: number;
   /** Orders skipped due to material shortage — can be re-activated */
   skippedItems: RunSheetItem[];
   /** M17.2 — simulated changeover minutes remaining before next order starts */
   changeoverRemaining: number;
   /** M17.7 — equipment repair minutes remaining; line is down during this */
   repairRemaining: number;
+}
+
+export interface SimState {
+  clock: string | null;
+  running: boolean;
+  speed: number;
+  timeSource: "realtime" | "simulated";
+  currentShift: "day" | "night" | null;
+  productionDate: string | null;
+  sessionStart: string | null;
+  sessionEnd: string | null;
+  sessionStartShift: "day" | "night" | null;
+  handoffCount: number;
 }

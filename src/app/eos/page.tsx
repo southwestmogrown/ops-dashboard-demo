@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { usePathname } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
-import type { ShiftMetrics } from "@/lib/types/core";
+import type { ShiftMetrics, ShiftName } from "@/lib/types/core";
 import Header from "@/components/Header";
 import type { AdminLineConfig, LineState } from "@/lib/types/mes";
 import type {
@@ -163,8 +163,8 @@ export default function EOSPage() {
           (r) => r.json() as Promise<ShiftMetrics>,
         ),
         queryClient.fetchQuery({
-          queryKey: queryKeys.mesState(),
-          queryFn: fetchMesState,
+          queryKey: queryKeys.mesState(shift.toLowerCase() as ShiftName),
+          queryFn: () => fetchMesState(shift.toLowerCase() as ShiftName),
           staleTime: 2000,
         }).catch(
           () => [] as LineState[],

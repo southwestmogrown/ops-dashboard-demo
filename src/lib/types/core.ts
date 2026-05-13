@@ -30,6 +30,10 @@ export interface TimePoint {
 export interface ShiftMetrics {
   shift: ShiftName;
   generatedAt: string; // ISO timestamp string, e.g. "2024-01-15T08:32:00Z"
+  productionDate: string; // operational day key, e.g. "2026-05-13"
+  contextKey: string; // productionDate + shift
+  timeSource: "realtime" | "simulated";
+  mode: "baseline" | "live";
   lines: Line[]; // all 5 lines
   trend: TimePoint[]; // time-series data for the trend chart
 }

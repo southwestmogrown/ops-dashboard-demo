@@ -11,6 +11,7 @@ interface HourlyTableProps {
   comments: Record<string, string>;
   changeoversByHour?: Record<string, number>;
   shift: ShiftName;
+  currentTime?: Date | null;
   onSaveComment: (hour: string, comment: string) => Promise<void>;
   /** Pass false when the line has no MES output (e.g. sim not started or after reset).
    *  All rows will show "--" instead of 0/negative-variance until production begins. */
@@ -83,20 +84,21 @@ export default function HourlyTable({
   comments,
   changeoversByHour = {},
   shift,
+  currentTime = null,
   onSaveComment,
   hasAnyOutput = true,
 }: HourlyTableProps) {
   const [saveStatus, setSaveStatus] = useState<Record<string, SaveStatus>>({});
 
   const currentHourKey = useMemo(() => {
-    const now = new Date();
+    const now = currentTime ?? new Date();
     const nowUtcHour = now.getUTCHours();
     const key = `${String(nowUtcHour).padStart(2, "0")}:00`;
     if (rows.some((r) => r.hour === key)) {
       return key;
     }
     return null;
-  }, [rows, shift]);
+  }, [currentTime, rows, shift]);
 
   const currentRowIdx = useMemo(() => {
     if (!currentHourKey) return -1;
