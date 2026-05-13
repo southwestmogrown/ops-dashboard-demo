@@ -29,6 +29,24 @@ export function getClient(): Client {
   return _G.__turso_client__;
 }
 
+async function addColumnIfMissing(
+  table: string,
+  column: string,
+  definition: string,
+): Promise<void> {
+  try {
+    await getClient().execute(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (
+      !message.includes("duplicate column name") &&
+      !message.includes("already exists")
+    ) {
+      throw error;
+    }
+  }
+}
+
 // ── Migrations ────────────────────────────────────────────────────────────────
 
 export async function runMigrations(): Promise<void> {
@@ -38,10 +56,11 @@ export async function runMigrations(): Promise<void> {
       timestamp   TEXT NOT NULL,
       line_id     TEXT NOT NULL,
       shift       TEXT NOT NULL,
+      production_date TEXT NOT NULL DEFAULT '',
       part_number TEXT NOT NULL
     );
     CREATE INDEX IF NOT EXISTS idx_scan_line  ON scan_events(line_id);
-    CREATE INDEX IF NOT EXISTS idx_scan_shift ON scan_events(line_id, shift);
+    CREATE INDEX IF NOT EXISTS idx_scan_shift ON scan_events(line_id, production_date, shift);
 
     CREATE TABLE IF NOT EXISTS line_queues (
       line_id  TEXT PRIMARY KEY,
@@ -57,17 +76,20 @@ export async function runMigrations(): Promise<void> {
       team_lead_contact TEXT
     );
 
-    CREATE TABLE IF NOT EXISTS line_comments (
-      line_id  TEXT NOT NULL,
-      hour     TEXT NOT NULL,
-      comment  TEXT NOT NULL,
-      PRIMARY KEY (line_id, hour)
+    CREATE TABLE IF NOT EXISTS line_comments_context (
+      line_id         TEXT NOT NULL,
+      production_date TEXT NOT NULL,
+      shift           TEXT NOT NULL,
+      hour            TEXT NOT NULL,
+      comment         TEXT NOT NULL,
+      PRIMARY KEY (line_id, production_date, shift, hour)
     );
 
     CREATE TABLE IF NOT EXISTS scrap_log (
       id          TEXT PRIMARY KEY,
       line_id     TEXT NOT NULL,
       shift       TEXT NOT NULL,
+      production_date TEXT NOT NULL DEFAULT '',
       model       TEXT NOT NULL,
       panel       TEXT NOT NULL,
       damage_type TEXT NOT NULL,
@@ -77,13 +99,17 @@ export async function runMigrations(): Promise<void> {
       timestamp   TEXT NOT NULL,
       void_reason TEXT
     );
-    CREATE INDEX IF NOT EXISTS idx_scrap_shift ON scrap_log(line_id, shift);
+    CREATE INDEX IF NOT EXISTS idx_scrap_shift ON scrap_log(line_id, production_date, shift);
 
     CREATE TABLE IF NOT EXISTS sim_clock (
       id      INTEGER PRIMARY KEY CHECK (id = 1),
       clock   TEXT,
       running INTEGER DEFAULT 0,
-      speed   REAL    DEFAULT 60
+      speed   REAL    DEFAULT 60,
+      session_start TEXT,
+      session_end   TEXT,
+      session_start_shift TEXT,
+      handoff_count INTEGER DEFAULT 0
     );
     INSERT OR IGNORE INTO sim_clock (id) VALUES (1);
 
@@ -96,6 +122,7 @@ export async function runMigrations(): Promise<void> {
       id         TEXT PRIMARY KEY,
       line_id    TEXT NOT NULL,
       shift      TEXT NOT NULL,
+      production_date TEXT NOT NULL DEFAULT '',
       reason     TEXT NOT NULL,
       start_time TEXT NOT NULL,
       end_time   TEXT,
@@ -104,18 +131,29 @@ export async function runMigrations(): Promise<void> {
       created_by TEXT,
       created_at TEXT NOT NULL
     );
-    CREATE INDEX IF NOT EXISTS idx_downtime_shift ON downtime_log(line_id, shift);
+    CREATE INDEX IF NOT EXISTS idx_downtime_shift ON downtime_log(line_id, production_date, shift);
 
     CREATE TABLE IF NOT EXISTS changeover_log (
       id              TEXT PRIMARY KEY,
       line_id         TEXT NOT NULL,
       shift           TEXT NOT NULL,
+      production_date TEXT NOT NULL DEFAULT '',
       completed_model TEXT NOT NULL,
       next_model      TEXT,
       timestamp       TEXT NOT NULL
     );
-    CREATE INDEX IF NOT EXISTS idx_changeover_shift ON changeover_log(line_id, shift);
+    CREATE INDEX IF NOT EXISTS idx_changeover_shift ON changeover_log(line_id, production_date, shift);
+
   `);
+
+  await addColumnIfMissing("scan_events", "production_date", "TEXT NOT NULL DEFAULT ''");
+  await addColumnIfMissing("scrap_log", "production_date", "TEXT NOT NULL DEFAULT ''");
+  await addColumnIfMissing("downtime_log", "production_date", "TEXT NOT NULL DEFAULT ''");
+  await addColumnIfMissing("changeover_log", "production_date", "TEXT NOT NULL DEFAULT ''");
+  await addColumnIfMissing("sim_clock", "session_start", "TEXT");
+  await addColumnIfMissing("sim_clock", "session_end", "TEXT");
+  await addColumnIfMissing("sim_clock", "session_start_shift", "TEXT");
+  await addColumnIfMissing("sim_clock", "handoff_count", "INTEGER DEFAULT 0");
 }
 
 // ── Serial helpers ─────────────────────────────────────────────────────────────
@@ -143,12 +181,13 @@ export async function setSerialCounter(
 
 export async function dbInsertScan(event: ScanEvent): Promise<void> {
   await getClient().execute({
-    sql: "INSERT INTO scan_events (id, timestamp, line_id, shift, part_number) VALUES (?, ?, ?, ?, ?)",
+    sql: "INSERT INTO scan_events (id, timestamp, line_id, shift, production_date, part_number) VALUES (?, ?, ?, ?, ?, ?)",
     args: [
       event.id,
       event.timestamp,
       event.lineId,
       event.shift,
+      event.productionDate,
       event.partNumber,
     ],
   });
@@ -158,8 +197,8 @@ export async function dbInsertScansBatch(events: ScanEvent[]): Promise<void> {
   if (events.length === 0) return;
   await getClient().batch(
     events.map((e) => ({
-      sql: "INSERT INTO scan_events (id, timestamp, line_id, shift, part_number) VALUES (?, ?, ?, ?, ?)",
-      args: [e.id, e.timestamp, e.lineId, e.shift, e.partNumber],
+      sql: "INSERT INTO scan_events (id, timestamp, line_id, shift, production_date, part_number) VALUES (?, ?, ?, ?, ?, ?)",
+      args: [e.id, e.timestamp, e.lineId, e.shift, e.productionDate, e.partNumber],
     })),
     "write",
   );
@@ -167,14 +206,14 @@ export async function dbInsertScansBatch(events: ScanEvent[]): Promise<void> {
 
 export async function dbGetAllScans(): Promise<ScanEvent[]> {
   const result = await getClient().execute(
-    "SELECT id, timestamp, line_id AS lineId, shift, part_number AS partNumber FROM scan_events",
+    "SELECT id, timestamp, line_id AS lineId, shift, production_date AS productionDate, part_number AS partNumber FROM scan_events",
   );
   return result.rows as unknown as ScanEvent[];
 }
 
 export async function dbGetScansByLine(lineId: string): Promise<ScanEvent[]> {
   const result = await getClient().execute({
-    sql: "SELECT id, timestamp, line_id AS lineId, shift, part_number AS partNumber FROM scan_events WHERE line_id = ?",
+    sql: "SELECT id, timestamp, line_id AS lineId, shift, production_date AS productionDate, part_number AS partNumber FROM scan_events WHERE line_id = ?",
     args: [lineId],
   });
   return result.rows as unknown as ScanEvent[];
@@ -183,11 +222,17 @@ export async function dbGetScansByLine(lineId: string): Promise<ScanEvent[]> {
 export async function dbGetScansByLineShift(
   lineId: string,
   shift: string,
+  productionDate?: string,
 ): Promise<ScanEvent[]> {
-  const result = await getClient().execute({
-    sql: "SELECT id, timestamp, line_id AS lineId, shift, part_number AS partNumber FROM scan_events WHERE line_id = ? AND shift = ?",
-    args: [lineId, shift],
-  });
+  const result = productionDate
+    ? await getClient().execute({
+        sql: "SELECT id, timestamp, line_id AS lineId, shift, production_date AS productionDate, part_number AS partNumber FROM scan_events WHERE line_id = ? AND shift = ? AND production_date = ?",
+        args: [lineId, shift, productionDate],
+      })
+    : await getClient().execute({
+        sql: "SELECT id, timestamp, line_id AS lineId, shift, production_date AS productionDate, part_number AS partNumber FROM scan_events WHERE line_id = ? AND shift = ?",
+        args: [lineId, shift],
+      });
   return result.rows as unknown as ScanEvent[];
 }
 
@@ -327,10 +372,14 @@ export async function dbSetAdminConfig(
 
 // ── Comments ──────────────────────────────────────────────────────────────────
 
-export async function dbGetComments(lineId: string): Promise<LineComments> {
+export async function dbGetComments(
+  lineId: string,
+  shift: string,
+  productionDate: string,
+): Promise<LineComments> {
   const result = await getClient().execute({
-    sql: "SELECT hour, comment FROM line_comments WHERE line_id = ?",
-    args: [lineId],
+    sql: "SELECT hour, comment FROM line_comments_context WHERE line_id = ? AND shift = ? AND production_date = ?",
+    args: [lineId, shift, productionDate],
   });
   const rows = result.rows as unknown as { hour: string; comment: string }[];
   const out: LineComments = {};
@@ -342,44 +391,51 @@ export async function dbGetAllComments(): Promise<
   Record<string, LineComments>
 > {
   const result = await getClient().execute(
-    "SELECT line_id, hour, comment FROM line_comments",
+    "SELECT line_id, production_date, shift, hour, comment FROM line_comments_context",
   );
   const rows = result.rows as unknown as {
     line_id: string;
+    production_date: string;
+    shift: string;
     hour: string;
     comment: string;
   }[];
   const out: Record<string, LineComments> = {};
   for (const r of rows) {
-    if (!out[r.line_id]) out[r.line_id] = {};
-    out[r.line_id][r.hour] = r.comment;
+    const key = `${r.line_id}::${r.production_date}:${r.shift}`;
+    if (!out[key]) out[key] = {};
+    out[key][r.hour] = r.comment;
   }
   return out;
 }
 
 export async function dbSetComment(
   lineId: string,
+  shift: string,
+  productionDate: string,
   hour: string,
   comment: string,
 ): Promise<void> {
   await getClient().execute({
-    sql: "INSERT OR REPLACE INTO line_comments (line_id, hour, comment) VALUES (?, ?, ?)",
-    args: [lineId, hour, comment],
+    sql: "INSERT OR REPLACE INTO line_comments_context (line_id, production_date, shift, hour, comment) VALUES (?, ?, ?, ?, ?)",
+    args: [lineId, productionDate, shift, hour, comment],
   });
 }
 
 export async function dbDeleteComment(
   lineId: string,
+  shift: string,
+  productionDate: string,
   hour: string,
 ): Promise<void> {
   await getClient().execute({
-    sql: "DELETE FROM line_comments WHERE line_id = ? AND hour = ?",
-    args: [lineId, hour],
+    sql: "DELETE FROM line_comments_context WHERE line_id = ? AND production_date = ? AND shift = ? AND hour = ?",
+    args: [lineId, productionDate, shift, hour],
   });
 }
 
 export async function dbClearComments(): Promise<void> {
-  await getClient().execute("DELETE FROM line_comments");
+  await getClient().execute("DELETE FROM line_comments_context");
 }
 
 // ── Scrap log ─────────────────────────────────────────────────────────────────
@@ -395,12 +451,13 @@ export async function dbInsertScrap(entry: ScrapEntry): Promise<void> {
   }
   await getClient().execute({
     sql: `INSERT INTO scrap_log
-            (id, line_id, shift, model, panel, damage_type, bought_in, kind, extra, timestamp)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            (id, line_id, shift, production_date, model, panel, damage_type, bought_in, kind, extra, timestamp)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     args: [
       entry.id,
       entry.lineId,
       entry.shift,
+      entry.productionDate,
       entry.model,
       entry.panel,
       entry.damageType,
@@ -416,6 +473,7 @@ type ScrapRow = {
   id: string;
   line_id: string;
   shift: "day" | "night";
+  production_date: string;
   model: string;
   panel: string;
   damage_type: string;
@@ -432,10 +490,11 @@ function _parseScrapRow(r: ScrapRow): ScrapEntry {
   const damageType = r.damage_type as ScrapEntry["damageType"];
   if (r.kind === "scrapped-panel") {
     return {
-      id: r.id,
-      lineId: r.line_id,
-      shift: r.shift,
-      model: r.model,
+        id: r.id,
+        lineId: r.line_id,
+        shift: r.shift,
+        productionDate: r.production_date,
+        model: r.model,
       panel,
       damageType,
       boughtIn: !!r.bought_in,
@@ -447,10 +506,11 @@ function _parseScrapRow(r: ScrapRow): ScrapEntry {
     };
   } else {
     return {
-      id: r.id,
-      lineId: r.line_id,
-      shift: r.shift,
-      model: r.model,
+        id: r.id,
+        lineId: r.line_id,
+        shift: r.shift,
+        productionDate: r.production_date,
+        model: r.model,
       panel,
       damageType,
       boughtIn: !!r.bought_in,
@@ -466,18 +526,25 @@ function _parseScrapRow(r: ScrapRow): ScrapEntry {
 export async function dbGetScrapEntries(
   lineId: string,
   shift: string,
+  productionDate?: string,
 ): Promise<ScrapEntry[]> {
-  const result = await getClient().execute({
-    sql: `SELECT id, line_id, shift, model, panel, damage_type, bought_in, kind, extra, timestamp, void_reason
-          FROM scrap_log WHERE line_id = ? AND shift = ?`,
-    args: [lineId, shift],
-  });
+  const result = productionDate
+    ? await getClient().execute({
+        sql: `SELECT id, line_id, shift, production_date, model, panel, damage_type, bought_in, kind, extra, timestamp, void_reason
+              FROM scrap_log WHERE line_id = ? AND shift = ? AND production_date = ?`,
+        args: [lineId, shift, productionDate],
+      })
+    : await getClient().execute({
+        sql: `SELECT id, line_id, shift, production_date, model, panel, damage_type, bought_in, kind, extra, timestamp, void_reason
+              FROM scrap_log WHERE line_id = ? AND shift = ?`,
+        args: [lineId, shift],
+      });
   return (result.rows as unknown as ScrapRow[]).map(_parseScrapRow);
 }
 
 export async function dbGetAllScrapEntries(): Promise<ScrapEntry[]> {
   const result = await getClient().execute(
-    "SELECT id, line_id, shift, model, panel, damage_type, bought_in, kind, extra, timestamp, void_reason FROM scrap_log",
+    "SELECT id, line_id, shift, production_date, model, panel, damage_type, bought_in, kind, extra, timestamp, void_reason FROM scrap_log",
   );
   return (result.rows as unknown as ScrapRow[]).map(_parseScrapRow);
 }
@@ -485,11 +552,17 @@ export async function dbGetAllScrapEntries(): Promise<ScrapEntry[]> {
 export async function dbGetKickedLids(
   lineId: string,
   shift: string,
+  productionDate?: string,
 ): Promise<number> {
-  const result = await getClient().execute({
-    sql: "SELECT COUNT(*) AS cnt FROM scrap_log WHERE line_id = ? AND shift = ? AND kind = 'kicked-lid' AND void_reason IS NULL",
-    args: [lineId, shift],
-  });
+  const result = productionDate
+    ? await getClient().execute({
+        sql: "SELECT COUNT(*) AS cnt FROM scrap_log WHERE line_id = ? AND shift = ? AND production_date = ? AND kind = 'kicked-lid' AND void_reason IS NULL",
+        args: [lineId, shift, productionDate],
+      })
+    : await getClient().execute({
+        sql: "SELECT COUNT(*) AS cnt FROM scrap_log WHERE line_id = ? AND shift = ? AND kind = 'kicked-lid' AND void_reason IS NULL",
+        args: [lineId, shift],
+      });
   const row = result.rows[0] as unknown as { cnt: number } | undefined;
   return row?.cnt ?? 0;
 }
@@ -555,6 +628,7 @@ type ChangeoverRow = {
   id: string;
   line_id: string;
   shift: "day" | "night";
+  production_date: string;
   completed_model: string;
   next_model: string | null;
   timestamp: string;
@@ -565,6 +639,7 @@ function _parseChangeoverRow(r: ChangeoverRow): ChangeoverEvent {
     id: r.id,
     lineId: r.line_id,
     shift: r.shift,
+    productionDate: r.production_date,
     completedModel: r.completed_model,
     nextModel: r.next_model,
     timestamp: r.timestamp,
@@ -576,12 +651,13 @@ export async function dbInsertChangeover(
 ): Promise<void> {
   await getClient().execute({
     sql: `INSERT INTO changeover_log
-            (id, line_id, shift, completed_model, next_model, timestamp)
-          VALUES (?, ?, ?, ?, ?, ?)`,
+            (id, line_id, shift, production_date, completed_model, next_model, timestamp)
+          VALUES (?, ?, ?, ?, ?, ?, ?)`,
     args: [
       event.id,
       event.lineId,
       event.shift,
+      event.productionDate,
       event.completedModel,
       event.nextModel,
       event.timestamp,
@@ -591,7 +667,7 @@ export async function dbInsertChangeover(
 
 export async function dbGetAllChangeovers(): Promise<ChangeoverEvent[]> {
   const result = await getClient().execute(
-    `SELECT id, line_id, shift, completed_model, next_model, timestamp
+    `SELECT id, line_id, shift, production_date, completed_model, next_model, timestamp
      FROM changeover_log
      ORDER BY timestamp DESC`,
   );
@@ -604,18 +680,44 @@ export async function dbGetSimClock(): Promise<{
   clock: Date | null;
   running: boolean;
   speed: number;
+  sessionStart: Date | null;
+  sessionEnd: Date | null;
+  sessionStartShift: "day" | "night" | null;
+  handoffCount: number;
 }> {
   const result = await getClient().execute(
-    "SELECT clock, running, speed FROM sim_clock WHERE id = 1",
+    "SELECT clock, running, speed, session_start, session_end, session_start_shift, handoff_count FROM sim_clock WHERE id = 1",
   );
   const row = result.rows[0] as unknown as
-    | { clock: string | null; running: number; speed: number }
+    | {
+        clock: string | null;
+        running: number;
+        speed: number;
+        session_start: string | null;
+        session_end: string | null;
+        session_start_shift: "day" | "night" | null;
+        handoff_count: number | null;
+      }
     | undefined;
-  if (!row) return { clock: null, running: false, speed: 60 };
+  if (!row) {
+    return {
+      clock: null,
+      running: false,
+      speed: 60,
+      sessionStart: null,
+      sessionEnd: null,
+      sessionStartShift: null,
+      handoffCount: 0,
+    };
+  }
   return {
     clock: row.clock ? new Date(row.clock) : null,
     running: !!row.running,
     speed: row.speed,
+    sessionStart: row.session_start ? new Date(row.session_start) : null,
+    sessionEnd: row.session_end ? new Date(row.session_end) : null,
+    sessionStartShift: row.session_start_shift ?? null,
+    handoffCount: row.handoff_count ?? 0,
   };
 }
 
@@ -623,16 +725,30 @@ export async function dbSetSimClock(
   clock: Date | null,
   running: boolean,
   speed: number,
+  session?: {
+    sessionStart: Date | null;
+    sessionEnd: Date | null;
+    sessionStartShift: "day" | "night" | null;
+    handoffCount: number;
+  },
 ): Promise<void> {
   await getClient().execute({
-    sql: "UPDATE sim_clock SET clock = ?, running = ?, speed = ? WHERE id = 1",
-    args: [clock ? clock.toISOString() : null, running ? 1 : 0, speed],
+    sql: "UPDATE sim_clock SET clock = ?, running = ?, speed = ?, session_start = ?, session_end = ?, session_start_shift = ?, handoff_count = ? WHERE id = 1",
+    args: [
+      clock ? clock.toISOString() : null,
+      running ? 1 : 0,
+      speed,
+      session?.sessionStart ? session.sessionStart.toISOString() : null,
+      session?.sessionEnd ? session.sessionEnd.toISOString() : null,
+      session?.sessionStartShift ?? null,
+      session?.handoffCount ?? 0,
+    ],
   });
 }
 
 export async function dbClearSimClock(): Promise<void> {
   await getClient().execute(
-    "UPDATE sim_clock SET clock = NULL, running = 0, speed = 60 WHERE id = 1",
+    "UPDATE sim_clock SET clock = NULL, running = 0, speed = 60, session_start = NULL, session_end = NULL, session_start_shift = NULL, handoff_count = 0 WHERE id = 1",
   );
 }
 
@@ -645,7 +761,7 @@ export async function dbResetSimulationData(): Promise<void> {
       { sql: "DELETE FROM changeover_log", args: [] },
       { sql: "DELETE FROM db_meta", args: [] },
       {
-        sql: "UPDATE sim_clock SET clock = NULL, running = 0, speed = 60 WHERE id = 1",
+        sql: "UPDATE sim_clock SET clock = NULL, running = 0, speed = 60, session_start = NULL, session_end = NULL, session_start_shift = NULL, handoff_count = 0 WHERE id = 1",
         args: [],
       },
     ],
@@ -661,6 +777,7 @@ export async function dbResetAll(): Promise<void> {
       { sql: "DELETE FROM scan_events", args: [] },
       { sql: "DELETE FROM line_queues", args: [] },
       { sql: "DELETE FROM line_comments", args: [] },
+      { sql: "DELETE FROM line_comments_context", args: [] },
       { sql: "DELETE FROM scrap_log", args: [] },
       { sql: "DELETE FROM downtime_log", args: [] },
       { sql: "DELETE FROM changeover_log", args: [] },
@@ -672,7 +789,7 @@ export async function dbResetAll(): Promise<void> {
         args: [],
       },
       {
-        sql: "UPDATE sim_clock SET clock = NULL, running = 0, speed = 60 WHERE id = 1",
+        sql: "UPDATE sim_clock SET clock = NULL, running = 0, speed = 60, session_start = NULL, session_end = NULL, session_start_shift = NULL, handoff_count = 0 WHERE id = 1",
         args: [],
       },
     ],
@@ -686,6 +803,7 @@ type DowntimeRow = {
   id: string;
   line_id: string;
   shift: "day" | "night";
+  production_date: string;
   reason: string;
   start_time: string;
   end_time: string | null;
@@ -700,6 +818,7 @@ function _parseDowntimeRow(r: DowntimeRow): DowntimeEntry {
     id: r.id,
     lineId: r.line_id,
     shift: r.shift,
+    productionDate: r.production_date,
     reason: r.reason as DowntimeEntry["reason"],
     startTime: r.start_time,
     endTime: r.end_time,
@@ -712,12 +831,13 @@ function _parseDowntimeRow(r: DowntimeRow): DowntimeEntry {
 export async function dbInsertDowntime(entry: DowntimeEntry): Promise<void> {
   await getClient().execute({
     sql: `INSERT INTO downtime_log
-            (id, line_id, shift, reason, start_time, end_time, units_lost, notes, created_by, created_at)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            (id, line_id, shift, production_date, reason, start_time, end_time, units_lost, notes, created_by, created_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     args: [
       entry.id,
       entry.lineId,
       entry.shift,
+      entry.productionDate,
       entry.reason,
       entry.startTime,
       entry.endTime ?? null,
@@ -732,29 +852,43 @@ export async function dbInsertDowntime(entry: DowntimeEntry): Promise<void> {
 export async function dbGetDowntimeEntries(
   lineId: string,
   shift: string,
+  productionDate?: string,
 ): Promise<DowntimeEntry[]> {
-  const result = await getClient().execute({
-    sql: `SELECT id, line_id, shift, reason, start_time, end_time, units_lost, notes, created_by, created_at
-          FROM downtime_log WHERE line_id = ? AND shift = ? ORDER BY start_time DESC`,
-    args: [lineId, shift],
-  });
+  const result = productionDate
+    ? await getClient().execute({
+        sql: `SELECT id, line_id, shift, production_date, reason, start_time, end_time, units_lost, notes, created_by, created_at
+              FROM downtime_log WHERE line_id = ? AND shift = ? AND production_date = ? ORDER BY start_time DESC`,
+        args: [lineId, shift, productionDate],
+      })
+    : await getClient().execute({
+        sql: `SELECT id, line_id, shift, production_date, reason, start_time, end_time, units_lost, notes, created_by, created_at
+              FROM downtime_log WHERE line_id = ? AND shift = ? ORDER BY start_time DESC`,
+        args: [lineId, shift],
+      });
   return (result.rows as unknown as DowntimeRow[]).map(_parseDowntimeRow);
 }
 
 export async function dbGetDowntimeEntriesByShift(
   shift: string,
+  productionDate?: string,
 ): Promise<DowntimeEntry[]> {
-  const result = await getClient().execute({
-    sql: `SELECT id, line_id, shift, reason, start_time, end_time, units_lost, notes, created_by, created_at
-          FROM downtime_log WHERE shift = ? ORDER BY start_time DESC`,
-    args: [shift],
-  });
+  const result = productionDate
+    ? await getClient().execute({
+        sql: `SELECT id, line_id, shift, production_date, reason, start_time, end_time, units_lost, notes, created_by, created_at
+              FROM downtime_log WHERE shift = ? AND production_date = ? ORDER BY start_time DESC`,
+        args: [shift, productionDate],
+      })
+    : await getClient().execute({
+        sql: `SELECT id, line_id, shift, production_date, reason, start_time, end_time, units_lost, notes, created_by, created_at
+              FROM downtime_log WHERE shift = ? ORDER BY start_time DESC`,
+        args: [shift],
+      });
   return (result.rows as unknown as DowntimeRow[]).map(_parseDowntimeRow);
 }
 
 export async function dbGetAllDowntimeEntries(): Promise<DowntimeEntry[]> {
   const result = await getClient().execute(
-    `SELECT id, line_id, shift, reason, start_time, end_time, units_lost, notes, created_by, created_at
+    `SELECT id, line_id, shift, production_date, reason, start_time, end_time, units_lost, notes, created_by, created_at
      FROM downtime_log ORDER BY start_time DESC`,
   );
   return (result.rows as unknown as DowntimeRow[]).map(_parseDowntimeRow);

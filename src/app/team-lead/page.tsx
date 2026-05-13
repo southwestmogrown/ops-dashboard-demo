@@ -5,20 +5,21 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ShiftMetrics, ShiftName } from "@/lib/types/core";
-import type { AdminLineConfig, LineState } from "@/lib/types/mes";
+import type { AdminLineConfig, LineState, SimState } from "@/lib/types/mes";
 import type { ScrapEntry, ScrapStats } from "@/lib/types/quality";
 import type { DowntimeEntry } from "@/lib/types/downtime";
 import { getHourlyTargets } from "@/lib/shiftBreaks";
 import { useAuth } from "@/hooks/useAuth";
 import { queryKeys } from "@/lib/queryKeys";
 import {
-  fetchAdminConfig,
-  fetchDowntime,
-  fetchLineComments,
-  fetchMesState,
-  fetchMetrics,
-  fetchScrapAll,
-} from "@/lib/queryFetchers";
+    fetchAdminConfig,
+    fetchDowntime,
+    fetchLineComments,
+    fetchMesState,
+    fetchMetrics,
+    fetchScrapAll,
+    fetchSimClock,
+  } from "@/lib/queryFetchers";
 import { authFetch } from "@/lib/clientAuth";
 import LineDetailCard from "@/components/team-lead/LineDetailCard";
 import FloorOverview from "@/components/team-lead/FloorOverview";
@@ -44,8 +45,8 @@ export default function TeamLeadPage() {
   });
 
   const mesStatesQuery = useQuery<LineState[]>({
-    queryKey: queryKeys.mesState(),
-    queryFn: fetchMesState,
+    queryKey: queryKeys.mesState(shift),
+    queryFn: () => fetchMesState(shift),
     refetchInterval: 5000,
   });
 
@@ -68,9 +69,15 @@ export default function TeamLeadPage() {
   });
 
   const lineCommentsQuery = useQuery<Record<string, string>>({
-    queryKey: queryKeys.lineComments(selectedLineId ?? ""),
-    queryFn: () => fetchLineComments(selectedLineId ?? ""),
+    queryKey: queryKeys.lineComments(selectedLineId ?? "", shift),
+    queryFn: () => fetchLineComments(selectedLineId ?? "", shift),
     enabled: Boolean(selectedLineId),
+  });
+
+  const simClockQuery = useQuery<SimState>({
+    queryKey: queryKeys.simClock(),
+    queryFn: fetchSimClock,
+    refetchInterval: 5000,
   });
 
   const metrics = metricsQuery.data ?? null;
@@ -93,13 +100,13 @@ export default function TeamLeadPage() {
       await authFetch("/api/line/comments", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ lineId: selectedLineId, hour, comment }),
+        body: JSON.stringify({ lineId: selectedLineId, shift, hour, comment }),
       });
     },
     onSuccess: async () => {
       if (!selectedLineId) return;
       await queryClient.invalidateQueries({
-        queryKey: queryKeys.lineComments(selectedLineId),
+        queryKey: queryKeys.lineComments(selectedLineId, shift),
       });
     },
   });
@@ -155,14 +162,18 @@ export default function TeamLeadPage() {
     const lines = metrics.lines;
     return {
       lines,
-      selectedLine: selectedLineId
-        ? (lines.find((l) => l.id === selectedLineId) ?? null)
-        : null,
-      selectedMesState: selectedLineId
-        ? (mesStates.find((s) => s.lineId === selectedLineId) ?? null)
-        : null,
-    };
-  }, [metrics, selectedLineId, mesStates]);
+          selectedLine: selectedLineId
+            ? (lines.find((l) => l.id === selectedLineId) ?? null)
+            : null,
+          selectedMesState: selectedLineId
+            ? (
+                mesStates.find(
+                  (s) => s.lineId === selectedLineId && s.shift === shift,
+                ) ?? null
+              )
+            : null,
+        };
+  }, [metrics, selectedLineId, mesStates, shift]);
 
   const hourlyTargets = useMemo(
     () =>
@@ -472,6 +483,9 @@ export default function TeamLeadPage() {
               line={selectedLine}
               mesState={selectedMesState}
               shift={shift}
+              currentTime={
+                simClockQuery.data?.clock ? new Date(simClockQuery.data.clock) : null
+              }
               hourlyTargets={hourlyTargets}
               comments={lineCommentsQuery.data ?? {}}
               onSaveComment={saveComment}

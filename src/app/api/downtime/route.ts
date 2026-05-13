@@ -6,6 +6,7 @@ import {
   getAllDowntimeEntriesForShift,
   getAllAdminConfig,
   getAllLineStates,
+  getOperatingTime,
   refreshCacheFromDb,
 } from "@/lib/mesStore";
 import type { DowntimeReason, DowntimeEntry } from "@/lib/types/downtime";
@@ -34,6 +35,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   const { searchParams } = new URL(request.url);
   const lineId = searchParams.get("lineId");
   const shift = searchParams.get("shift") as ShiftName | null;
+  const operatingTime = await getOperatingTime();
 
   if (!shift) {
     return NextResponse.json(
@@ -52,8 +54,8 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 
   async function loadEntries(): Promise<DowntimeEntry[]> {
     return lineId
-      ? getDowntimeEntries(lineId, validatedShift)
-      : getAllDowntimeEntriesForShift(validatedShift);
+      ? getDowntimeEntries(lineId, validatedShift, operatingTime.productionDate)
+      : getAllDowntimeEntriesForShift(validatedShift, operatingTime.productionDate);
   }
 
   let entries = await loadEntries();
@@ -91,6 +93,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   }
 
   const { lineId, shift, reason, startTime, unitsLost, notes } = body;
+  const operatingTime = await getOperatingTime();
 
   if (!lineId || !shift || !reason || !startTime) {
     return NextResponse.json(
@@ -115,6 +118,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     id: "",
     lineId: lineId as string,
     shift: shift as ShiftName,
+    productionDate: operatingTime.productionDate,
     reason: reason as DowntimeReason,
     startTime: startTime as string,
     endTime: null,
@@ -141,6 +145,7 @@ export async function PATCH(request: NextRequest): Promise<NextResponse> {
   }
 
   const { id, endTime, actualEndTime } = body;
+  const operatingTime = await getOperatingTime();
   if (!id) {
     return NextResponse.json({ error: "id is required" }, { status: 400 });
   }
@@ -153,8 +158,8 @@ export async function PATCH(request: NextRequest): Promise<NextResponse> {
         : new Date().toISOString();
 
   const entries = [
-    ...(await getAllDowntimeEntriesForShift("day")),
-    ...(await getAllDowntimeEntriesForShift("night")),
+    ...(await getAllDowntimeEntriesForShift("day", operatingTime.productionDate)),
+    ...(await getAllDowntimeEntriesForShift("night", operatingTime.productionDate)),
   ];
   const entry = entries.find((e) => e.id === id);
   if (!entry) {
@@ -169,7 +174,7 @@ export async function PATCH(request: NextRequest): Promise<NextResponse> {
   const durationMinutes = Math.max(0, Math.floor((endMs - startMs) / 60000));
 
   const [lineStates, adminConfig] = await Promise.all([
-    getAllLineStates(),
+    getAllLineStates({ shift: entry.shift, productionDate: entry.productionDate }),
     getAllAdminConfig(),
   ]);
   const lineState = lineStates.find((s) => s.lineId === entry.lineId);

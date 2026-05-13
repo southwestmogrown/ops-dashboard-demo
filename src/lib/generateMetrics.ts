@@ -107,6 +107,10 @@ export function generateMetrics(
   return {
     shift,
     generatedAt: new Date().toISOString(),
+    productionDate: "baseline",
+    contextKey: `baseline:${shift}`,
+    timeSource: "realtime",
+    mode: "baseline",
     lines,
     trend,
   };

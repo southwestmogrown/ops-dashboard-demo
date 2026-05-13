@@ -5,7 +5,7 @@ import dynamic from "next/dynamic";
 import { usePathname } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import { ShiftMetrics, ShiftName } from "@/lib/types/core";
-import type { AdminLineConfig, LineState } from "@/lib/types/mes";
+import type { AdminLineConfig, LineState, SimState } from "@/lib/types/mes";
 import type { DowntimeEntry } from "@/lib/types/downtime";
 import { getShiftProgress } from "@/lib/shiftTime";
 import Header from "@/components/Header";
@@ -112,8 +112,8 @@ export default function Home() {
   });
 
   const mesStatesQuery = useQuery<LineState[]>({
-    queryKey: queryKeys.mesState(),
-    queryFn: fetchMesState,
+    queryKey: queryKeys.mesState(shift),
+    queryFn: () => fetchMesState(shift),
     refetchInterval: 5000,
   });
 
@@ -123,7 +123,7 @@ export default function Home() {
     refetchInterval: 5000,
   });
 
-  const simClockQuery = useQuery<{ clock: string | null; running: boolean; speed: number }>({
+  const simClockQuery = useQuery<SimState>({
     queryKey: queryKeys.simClock(),
     queryFn: fetchSimClock,
     refetchInterval: 5000,

@@ -3,11 +3,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import type { AdminLineConfig, LineState } from "@/lib/types/mes";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import type { AdminLineConfig, LineState, SimState } from "@/lib/types/mes";
 import type { ShiftName } from "@/lib/types/core";
 import { LINES, LINE_LABELS, getDefaultTarget } from "@/lib/lines";
-import { getShiftWindows } from "@/lib/shiftTime";
 import Header from "@/components/Header";
 import SidebarNav from "@/components/SidebarNav";
 import HourlyTable from "@/components/sim/HourlyTable";
@@ -42,12 +41,11 @@ export default function SimPage() {
   const [speed, setSpeed] = useState(60);
   const speedRef = useRef(speed); // always mirrors speed; used in interval closures
   const [shift, setShift] = useState<ShiftName>("day");
-  const [now, setNow] = useState(new Date());
   const tickInterval = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const statesQuery = useQuery<LineState[]>({
-    queryKey: queryKeys.mesState(),
-    queryFn: fetchMesState,
+    queryKey: queryKeys.mesState(shift),
+    queryFn: () => fetchMesState(shift),
     refetchInterval: 2000,
   });
 
@@ -57,7 +55,7 @@ export default function SimPage() {
     refetchInterval: 2000,
   });
 
-  const simClockQuery = useQuery<{ clock: string | null; running: boolean; speed: number }>({
+  const simClockQuery = useQuery<SimState>({
     queryKey: queryKeys.simClock(),
     queryFn: fetchSimClock,
     refetchInterval: 1000,
@@ -67,6 +65,8 @@ export default function SimPage() {
   const adminConfig = adminConfigQuery.data ?? {};
   const running = simClockQuery.data?.running ?? false;
   const simClock = simClockQuery.data?.clock ? new Date(simClockQuery.data.clock) : null;
+  const currentShift = simClockQuery.data?.currentShift ?? null;
+  const handoffCount = simClockQuery.data?.handoffCount ?? 0;
 
   useEffect(() => {
     if (simClockQuery.data?.speed != null) {
@@ -75,33 +75,38 @@ export default function SimPage() {
     }
   }, [simClockQuery.data?.speed]);
 
-  // ── Clock ─────────────────────────────────────────────────────────────────
   useEffect(() => {
-    const id = setInterval(() => setNow(new Date()), 1000);
-    return () => clearInterval(id);
-  }, []);
+    if (simClockQuery.data?.currentShift) {
+      setShift(simClockQuery.data.currentShift);
+    }
+  }, [simClockQuery.data?.currentShift]);
 
   const refreshSimQueries = useCallback(async () => {
     await Promise.all([
-      queryClient.invalidateQueries({ queryKey: queryKeys.mesState() }),
+      queryClient.invalidateQueries({ queryKey: queryKeys.mesState(shift) }),
       queryClient.invalidateQueries({ queryKey: queryKeys.adminConfig() }),
       queryClient.invalidateQueries({ queryKey: queryKeys.simClock() }),
     ]);
-  }, [queryClient]);
+  }, [queryClient, shift]);
 
   // ── Simulation controls ─────────────────────────────────────────────────────
   async function startSim() {
     if (tickInterval.current) return;
-    const shiftStart = new Date();
-    shiftStart.setUTCHours(getShiftWindows(shift).startHour, 0, 0, 0);
     await authFetch("/api/sim/clock", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        clock: shiftStart.toISOString(),
-        running: true,
-        speed: speedRef.current,
-      }),
+      body: JSON.stringify(
+        simClockQuery.data?.clock
+          ? {
+              running: true,
+              speed: speedRef.current,
+            }
+          : {
+              initializeSession: true,
+              startShift: shift,
+              speed: speedRef.current,
+            },
+      ),
     });
     await refreshSimQueries();
     tickInterval.current = setInterval(async () => {
@@ -381,6 +386,14 @@ export default function SimPage() {
                         {simClock.getMinutes().toString().padStart(2, "0")}
                       </span>
                       <span className="text-[#e1e2ec]/30">sim clock</span>
+                      {currentShift && (
+                        <span className="text-[#e1e2ec]/40 uppercase">
+                          {currentShift}
+                        </span>
+                      )}
+                      <span className="text-[#e1e2ec]/30">
+                        handoffs {handoffCount}
+                      </span>
                     </div>
                   )}
                 </div>

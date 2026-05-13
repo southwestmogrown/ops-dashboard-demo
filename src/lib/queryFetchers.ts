@@ -1,5 +1,5 @@
 import type { ShiftMetrics, ShiftName } from "@/lib/types/core";
-import type { AdminLineConfig, LineState } from "@/lib/types/mes";
+import type { AdminLineConfig, LineState, SimState } from "@/lib/types/mes";
 import type { DowntimeEntry } from "@/lib/types/downtime";
 import type { ScrapEntry } from "@/lib/types/quality";
 import { authFetch } from "@/lib/clientAuth";
@@ -16,22 +16,16 @@ export function fetchMetrics(shift: ShiftName): Promise<ShiftMetrics> {
   return fetchJson<ShiftMetrics>(`/api/metrics?shift=${shift}`);
 }
 
-export function fetchMesState(): Promise<LineState[]> {
-  return fetchJson<LineState[]>("/api/mes/state");
+export function fetchMesState(shift: ShiftName): Promise<LineState[]> {
+  return fetchJson<LineState[]>(`/api/mes/state?shift=${shift}`);
 }
 
 export function fetchAdminConfig(): Promise<Record<string, AdminLineConfig>> {
   return fetchJson<Record<string, AdminLineConfig>>("/api/admin/config");
 }
 
-export function fetchSimClock(): Promise<{
-  clock: string | null;
-  running: boolean;
-  speed: number;
-}> {
-  return fetchJson<{ clock: string | null; running: boolean; speed: number }>(
-    "/api/sim/clock",
-  );
+export function fetchSimClock(): Promise<SimState> {
+  return fetchJson<SimState>("/api/sim/clock");
 }
 
 export function fetchDowntime(shift: ShiftName): Promise<DowntimeEntry[]> {
@@ -42,6 +36,11 @@ export function fetchScrapAll(shift: ShiftName): Promise<ScrapEntry[]> {
   return fetchJson<ScrapEntry[]>(`/api/scrap?lineId=all&shift=${shift}`);
 }
 
-export function fetchLineComments(lineId: string): Promise<Record<string, string>> {
-  return fetchJson<Record<string, string>>(`/api/line/comments?lineId=${lineId}`);
+export function fetchLineComments(
+  lineId: string,
+  shift: ShiftName,
+): Promise<Record<string, string>> {
+  return fetchJson<Record<string, string>>(
+    `/api/line/comments?lineId=${lineId}&shift=${shift}`,
+  );
 }

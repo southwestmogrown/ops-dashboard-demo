@@ -1,45 +1,11 @@
 import type { ShiftName } from "./types";
 
 export interface ShiftWindow {
-  startHour: number;           // clock hour when shift starts, e.g. 6 (day) or 17 (night)
-  endHour: number;              // end hour stored as 24+ for overnight, e.g. 16.5 (day) or 27.5 (night)
-  totalClockMinutes: number;    // 630
-  totalWorkMinutes: number;    // 525 (totalClockMinutes minus 75 min breaks)
+  startHour: number;
+  endHour: number;
+  totalClockMinutes: number;
+  totalWorkMinutes: number;
   breakWindows: { start: number; end: number; paid: boolean }[];
-}
-
-const SHIFT_CONFIG: Record<ShiftName, Omit<ShiftWindow, "totalClockMinutes" | "totalWorkMinutes">> = {
-  day: {
-    startHour: 6,
-    endHour: 16.5,
-    breakWindows: [
-      { start:  8,  end:  8.25, paid: true  },  // 08:00–08:15
-      { start: 10,  end: 10.25, paid: true  },  // 10:00–10:15
-      { start: 12,  end: 12.5,  paid: false },  // 12:00–12:30  lunch
-      { start: 14,  end: 14.25, paid: true  },  // 14:00–14:15
-    ],
-  },
-  night: {
-    startHour: 17,
-    endHour: 27.5,   // 03:30 next day = 27.5
-    breakWindows: [
-      { start: 19,  end: 19.25, paid: true  },  // 19:00–19:15
-      { start: 21.5,end: 22,    paid: false },  // 21:30–22:00  lunch
-      { start: 25,  end: 25.25, paid: true  },  // 01:00–01:15
-      { start: 26,  end: 26.25, paid: true  },  // 02:00–02:15
-    ],
-  },
-};
-
-export function getShiftWindows(shift: ShiftName): ShiftWindow {
-  const cfg = SHIFT_CONFIG[shift];
-  const totalClockMinutes = (cfg.endHour - cfg.startHour) * 60; // 630
-  const breakMinutes = cfg.breakWindows.reduce((sum, b) => sum + (b.end - b.start) * 60, 0); // 75
-  return {
-    ...cfg,
-    totalClockMinutes,
-    totalWorkMinutes: totalClockMinutes - breakMinutes, // 525
-  };
 }
 
 export interface ShiftProgress {
@@ -49,6 +15,113 @@ export interface ShiftProgress {
   elapsedFraction: number;
 }
 
+export interface ShiftContext extends ShiftProgress {
+  shift: ShiftName;
+  productionDate: string;
+  contextKey: string;
+  shiftStart: Date;
+  shiftEnd: Date;
+  currentTime: Date;
+  isActive: boolean;
+  isHandoffGap: boolean;
+}
+
+const SHIFT_CONFIG: Record<
+  ShiftName,
+  Omit<ShiftWindow, "totalClockMinutes" | "totalWorkMinutes">
+> = {
+  day: {
+    startHour: 6,
+    endHour: 16.5,
+    breakWindows: [
+      { start: 8, end: 8.25, paid: true },
+      { start: 10, end: 10.25, paid: true },
+      { start: 12, end: 12.5, paid: false },
+      { start: 14, end: 14.25, paid: true },
+    ],
+  },
+  night: {
+    startHour: 17,
+    endHour: 27.5,
+    breakWindows: [
+      { start: 19, end: 19.25, paid: true },
+      { start: 21.5, end: 22, paid: false },
+      { start: 25, end: 25.25, paid: true },
+      { start: 26, end: 26.25, paid: true },
+    ],
+  },
+};
+
+const DAY_START_HOUR = SHIFT_CONFIG.day.startHour;
+
+function createDateAt(
+  base: Date,
+  hour: number,
+  useUtc: boolean,
+): Date {
+  const out = new Date(base);
+  if (useUtc) {
+    out.setUTCHours(0, 0, 0, 0);
+  } else {
+    out.setHours(0, 0, 0, 0);
+  }
+
+  const wholeHours = Math.floor(hour);
+  const minutes = Math.round((hour - wholeHours) * 60);
+  out.setTime(out.getTime() + (wholeHours * 60 + minutes) * 60_000);
+  return out;
+}
+
+function shiftDate(base: Date, days: number, useUtc: boolean): Date {
+  const out = new Date(base);
+  if (useUtc) {
+    out.setUTCDate(out.getUTCDate() + days);
+  } else {
+    out.setDate(out.getDate() + days);
+  }
+  return out;
+}
+
+function formatDatePart(value: number): string {
+  return String(value).padStart(2, "0");
+}
+
+export function formatProductionDate(
+  date: Date,
+  options?: { useUtc?: boolean },
+): string {
+  const useUtc = options?.useUtc ?? false;
+  const year = useUtc ? date.getUTCFullYear() : date.getFullYear();
+  const month = useUtc ? date.getUTCMonth() + 1 : date.getMonth() + 1;
+  const day = useUtc ? date.getUTCDate() : date.getDate();
+  return `${year}-${formatDatePart(month)}-${formatDatePart(day)}`;
+}
+
+export function parseProductionDate(
+  productionDate: string,
+  options?: { useUtc?: boolean },
+): Date {
+  const useUtc = options?.useUtc ?? false;
+  const [year, month, day] = productionDate.split("-").map(Number);
+  return useUtc
+    ? new Date(Date.UTC(year, month - 1, day))
+    : new Date(year, month - 1, day);
+}
+
+export function getShiftWindows(shift: ShiftName): ShiftWindow {
+  const cfg = SHIFT_CONFIG[shift];
+  const totalClockMinutes = (cfg.endHour - cfg.startHour) * 60;
+  const breakMinutes = cfg.breakWindows.reduce(
+    (sum, current) => sum + (current.end - current.start) * 60,
+    0,
+  );
+  return {
+    ...cfg,
+    totalClockMinutes,
+    totalWorkMinutes: totalClockMinutes - breakMinutes,
+  };
+}
+
 function getDecimalHours(now: Date, useUtc: boolean): number {
   const hours = useUtc ? now.getUTCHours() : now.getHours();
   const minutes = useUtc ? now.getUTCMinutes() : now.getMinutes();
@@ -56,39 +129,94 @@ function getDecimalHours(now: Date, useUtc: boolean): number {
   return hours + minutes / 60 + seconds / 3600;
 }
 
-export function getShiftProgress(
-  shift: ShiftName,
+export function getProductionDateForTime(
   now: Date,
   options?: { useUtc?: boolean },
-): ShiftProgress {
+): string {
+  const useUtc = options?.useUtc ?? false;
+  const decimalHour = getDecimalHours(now, useUtc);
+  const baseDate = decimalHour < DAY_START_HOUR ? shiftDate(now, -1, useUtc) : now;
+  return formatProductionDate(baseDate, { useUtc });
+}
+
+export function getShiftContext(
+  shift: ShiftName,
+  now: Date,
+  options?: { useUtc?: boolean; productionDate?: string },
+): ShiftContext {
+  const useUtc = options?.useUtc ?? false;
+  const productionDate =
+    options?.productionDate ?? getProductionDateForTime(now, { useUtc });
+  const baseDate = parseProductionDate(productionDate, { useUtc });
   const win = getShiftWindows(shift);
+  const shiftStart = createDateAt(baseDate, win.startHour, useUtc);
+  const shiftEnd = createDateAt(baseDate, win.endHour, useUtc);
   const totalHours = win.totalClockMinutes / 60;
-  const nowH = getDecimalHours(now, options?.useUtc ?? false);
-
-  let elapsed: number;
-  if (nowH >= win.startHour) {
-    elapsed = nowH - win.startHour;
-  } else if (win.endHour > 24 && nowH <= win.endHour - 24) {
-    // Overnight shift (endHour stored as 24+, e.g. night = 17→27.5 meaning 03:30 next day).
-    // If current time is in the post-midnight window [00:00, endHour-24], the shift is still running.
-    elapsed = nowH + 24 - win.startHour;
-  } else {
-    // Shift hasn't started yet for this day (or ended before midnight).
-    elapsed = 0;
-  }
-
-  const elapsedHours = Math.max(0, Math.min(totalHours, elapsed));
+  const elapsedMs = now.getTime() - shiftStart.getTime();
+  const elapsedHours = Math.max(
+    0,
+    Math.min(totalHours, elapsedMs / 3_600_000),
+  );
   const remainingHours = Math.max(0, totalHours - elapsedHours);
+  const isActive = now >= shiftStart && now < shiftEnd;
 
   return {
+    shift,
+    productionDate,
+    contextKey: `${productionDate}:${shift}`,
+    shiftStart,
+    shiftEnd,
+    currentTime: now,
     elapsedHours,
     remainingHours,
     totalHours,
     elapsedFraction: totalHours > 0 ? elapsedHours / totalHours : 0,
+    isActive,
+    isHandoffGap: false,
   };
 }
 
-/** Format decimal hours as "3h 24m" (or "45m" if < 1 h, or "10h" if no minutes). */
+export function getShiftForTime(
+  now: Date,
+  options?: { useUtc?: boolean },
+): ShiftName | null {
+  const useUtc = options?.useUtc ?? false;
+  const productionDate = getProductionDateForTime(now, { useUtc });
+  const dayContext = getShiftContext("day", now, { useUtc, productionDate });
+  if (dayContext.isActive) return "day";
+  const nightContext = getShiftContext("night", now, { useUtc, productionDate });
+  if (nightContext.isActive) return "night";
+  return null;
+}
+
+export function getCurrentShiftContext(
+  now: Date,
+  options?: { useUtc?: boolean },
+): ShiftContext | null {
+  const useUtc = options?.useUtc ?? false;
+  const currentShift = getShiftForTime(now, { useUtc });
+  if (!currentShift) return null;
+  return getShiftContext(currentShift, now, { useUtc });
+}
+
+export function getNextShift(shift: ShiftName): ShiftName {
+  return shift === "day" ? "night" : "day";
+}
+
+export function getShiftProgress(
+  shift: ShiftName,
+  now: Date,
+  options?: { useUtc?: boolean; productionDate?: string },
+): ShiftProgress {
+  const context = getShiftContext(shift, now, options);
+  return {
+    elapsedHours: context.elapsedHours,
+    remainingHours: context.remainingHours,
+    totalHours: context.totalHours,
+    elapsedFraction: context.elapsedFraction,
+  };
+}
+
 export function formatShiftTime(hours: number): string {
   const h = Math.floor(hours);
   const m = Math.round((hours - h) * 60);

@@ -17,6 +17,7 @@ interface LineDetailCardProps {
   line: Line;
   mesState: LineState | null;
   shift: ShiftName;
+  currentTime?: Date | null;
   hourlyTargets: HourlyTargetRow[];
   comments: Record<string, string>;
   onSaveComment: (hour: string, comment: string) => Promise<void>;
@@ -32,6 +33,7 @@ export default function LineDetailCard({
   line,
   mesState,
   shift,
+  currentTime = null,
   hourlyTargets,
   comments,
   onSaveComment,
@@ -301,6 +303,7 @@ export default function LineDetailCard({
             comments={comments}
             changeoversByHour={mesState?.hourlyChangeovers ?? {}}
             shift={shift}
+            currentTime={currentTime}
             onSaveComment={onSaveComment}
             hasAnyOutput={(mesState?.totalOutput ?? 0) > 0}
           />

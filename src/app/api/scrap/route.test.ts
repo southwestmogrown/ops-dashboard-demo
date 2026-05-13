@@ -14,6 +14,12 @@ vi.mock("@/lib/mesStore", () => ({
     { id: "SCR-001", lineId: "vs1-l1", shift: "day", kind: "kicked-lid" },
     { id: "SCR-002", lineId: "vs2-l1", shift: "day", kind: "scrapped-panel" },
   ]),
+  getOperatingTime: vi.fn(async () => ({
+    now: new Date("2026-04-12T08:00:00Z"),
+    timeSource: "realtime",
+    currentShift: "day",
+    productionDate: "2026-04-12",
+  })),
   voidScrapEntry: vi.fn(async () => true),
   updateScrapEntry: vi.fn(async (id: string, updates: Record<string, unknown>) => ({
     id,
@@ -42,7 +48,7 @@ describe("GET /api/scrap", () => {
     );
     const res = await GET(req);
     expect(res.status).toBe(200);
-    expect(getScrapEntries).toHaveBeenCalledWith("vs1-l1", "day");
+    expect(getScrapEntries).toHaveBeenCalledWith("vs1-l1", "day", "2026-04-12");
   });
 
   it("returns all entries when lineId=all", async () => {
@@ -51,7 +57,7 @@ describe("GET /api/scrap", () => {
     );
     const res = await GET(req);
     expect(res.status).toBe(200);
-    expect(getAllScrapEntries).toHaveBeenCalledWith("day");
+    expect(getAllScrapEntries).toHaveBeenCalledWith("day", "2026-04-12");
   });
 
   it("returns 400 when shift is missing", async () => {

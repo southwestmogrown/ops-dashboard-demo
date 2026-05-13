@@ -3,6 +3,7 @@ import {
   addScrapEntry,
   getScrapEntries,
   getAllScrapEntries,
+  getOperatingTime,
   refreshCacheFromDb,
   voidScrapEntry,
   updateScrapEntry,
@@ -20,6 +21,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   const { searchParams } = new URL(request.url);
   const lineId = searchParams.get("lineId");
   const shift = searchParams.get("shift") as ShiftName | null;
+  const operatingTime = await getOperatingTime();
 
   if (!shift) {
     return NextResponse.json(
@@ -36,7 +38,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 
   let entries: ScrapEntry[];
   if (lineId === "all") {
-    entries = await getAllScrapEntries(shift);
+    entries = await getAllScrapEntries(shift, operatingTime.productionDate);
   } else if (!lineId) {
     return NextResponse.json(
       {
@@ -46,7 +48,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       { status: 400 },
     );
   } else {
-    entries = await getScrapEntries(lineId, shift);
+    entries = await getScrapEntries(lineId, shift, operatingTime.productionDate);
   }
   return NextResponse.json(entries);
 }
@@ -63,6 +65,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   }
 
   const { kind, lineId, shift, model, panel, damageType } = body;
+  const operatingTime = await getOperatingTime();
 
   if (!kind || !lineId || !shift || !model || !panel || !damageType) {
     return NextResponse.json(
@@ -85,6 +88,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
           kind: "scrapped-panel",
           lineId: lineId as string,
           shift: shift as ShiftName,
+          productionDate: operatingTime.productionDate,
           model: model as string,
           panel: panel as ScrappedPanel["panel"],
           damageType: damageType as ScrappedPanel["damageType"],
@@ -96,6 +100,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
           kind: "kicked-lid",
           lineId: lineId as string,
           shift: shift as ShiftName,
+          productionDate: operatingTime.productionDate,
           model: model as string,
           panel: panel as KickedLid["panel"],
           damageType: damageType as KickedLid["damageType"],

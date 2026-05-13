@@ -5,15 +5,15 @@ import {
   advanceSimClock,
   getSimRunning,
   getSimClock,
+  getSimState,
   addScrapEntry,
   addDowntimeEntry,
-  closeDowntimeEntry,
   getOpenDowntime,
   getSimSpeed,
   claimSimUnits,
   refreshCacheFromDb,
 } from "@/lib/mesStore";
-import { getShiftWindows } from "@/lib/shiftTime";
+import { getCurrentShiftContext, getShiftWindows } from "@/lib/shiftTime";
 import type { ShiftName } from "@/lib/types/core";
 import { PANEL_OPTIONS, pickDefectType } from "@/lib/types/quality";
 import type { DowntimeReason } from "@/lib/types/downtime";
@@ -57,21 +57,9 @@ function getRateMultiplier(simClock: Date): {
   actualUnits: number;
   shiftMinutes: number;
 } {
-  const hour =
-    simClock.getUTCHours() +
-    simClock.getUTCMinutes() / 60 +
-    simClock.getUTCSeconds() / 3600;
-  const shiftName: ShiftName = hour >= 6 && hour < 18 ? "day" : "night";
-  const win = getShiftWindows(shiftName);
-  const totalWorkMinutes = win.totalWorkMinutes;
-
-  let elapsedMinutes: number;
-  if (hour >= win.startHour) {
-    elapsedMinutes = (hour - win.startHour) * 60;
-  } else {
-    elapsedMinutes = (hour + 24 - win.startHour) * 60;
-  }
-  elapsedMinutes = Math.max(0, Math.min(totalWorkMinutes, elapsedMinutes));
+  const context = getCurrentShiftContext(simClock, { useUtc: true });
+  const totalWorkMinutes = context ? getShiftWindows(context.shift).totalWorkMinutes : 0;
+  const elapsedMinutes = context?.elapsedHours != null ? context.elapsedHours * 60 : 0;
 
   let multiplier = 1;
   if (elapsedMinutes < 30) multiplier = 0.6;
@@ -91,8 +79,9 @@ async function maybeInjectDefect(
 
   const line = randomChoice(activeLines);
   const now = (await getSimClock()) ?? new Date();
-  const hour = now.getUTCHours();
-  const shift: ShiftName = hour >= 6 && hour < 18 ? "day" : "night";
+  const context = getCurrentShiftContext(now, { useUtc: true });
+  const shift: ShiftName = context?.shift ?? "day";
+  const productionDate = context?.productionDate ?? "unknown";
   const isVS2 = line.lineId.toLowerCase().includes("vs2");
 
   if (Math.random() < KICKED_LID_INJECTION_PROBABILITY) {
@@ -100,6 +89,7 @@ async function maybeInjectDefect(
       kind: "kicked-lid",
       lineId: line.lineId,
       shift,
+      productionDate,
       model: line.currentOrder ?? "UNKNOWN",
       panel: randomChoice(PANEL_OPTIONS),
       damageType: "kicked-lid",
@@ -121,6 +111,7 @@ async function maybeInjectDefect(
     kind: "scrapped-panel",
     lineId: line.lineId,
     shift,
+    productionDate,
     model: line.currentOrder ?? "UNKNOWN",
     panel: randomChoice(PANEL_OPTIONS),
     damageType: defectType,
@@ -133,12 +124,13 @@ async function maybeInjectDefect(
 async function maybeInjectDowntime(
   lineId: string,
   shift: ShiftName,
+  productionDate: string,
   simClock: Date,
   targetOutput: number,
 ): Promise<void> {
   if (Math.random() >= DOWNTIME_EVENT_PROBABILITY) return;
 
-  const open = await getOpenDowntime(lineId);
+  const open = await getOpenDowntime(lineId, shift, productionDate);
   if (open) return;
 
   const durationMinutes = 2 + Math.floor(Math.random() * 7); // 2-8 min
@@ -151,10 +143,11 @@ async function maybeInjectDowntime(
       ? Math.max(1, Math.round(unitsPerWorkMinute * durationMinutes))
       : 0;
 
-  await addDowntimeEntry({
-    lineId,
-    shift,
-    reason: randomChoice(DOWNTIME_REASONS),
+    await addDowntimeEntry({
+      lineId,
+      shift,
+      productionDate,
+      reason: randomChoice(DOWNTIME_REASONS),
     startTime: simClock.toISOString(),
     endTime: end.toISOString(),
     unitsLost,
@@ -184,15 +177,14 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     if (!stillRunning)
       return NextResponse.json({ scansAdded: 0, stopped: true });
 
-    const states = await getAllLineStates();
+    const simState = await getSimState();
+    const shift = simState.currentShift ?? "day";
+    const productionDate = simState.productionDate ?? "unknown";
+    const states = await getAllLineStates({ shift, productionDate });
     const activeLines = states.filter((s) => s.schedule !== null);
     let scansAdded = 0;
 
     const simClock = (await getSimClock()) ?? new Date();
-    const shift: ShiftName =
-      simClock.getUTCHours() >= 6 && simClock.getUTCHours() < 18
-        ? "day"
-        : "night";
     const { multiplier } = getRateMultiplier(simClock);
 
     const simSpeed = await getSimSpeed();
@@ -212,6 +204,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         await maybeInjectDowntime(
           state.lineId,
           shift,
+          productionDate,
           simClock,
           state.schedule?.totalTarget ?? 0,
         );

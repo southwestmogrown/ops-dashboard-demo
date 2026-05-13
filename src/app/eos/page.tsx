@@ -163,8 +163,8 @@ export default function EOSPage() {
           (r) => r.json() as Promise<ShiftMetrics>,
         ),
         queryClient.fetchQuery({
-          queryKey: queryKeys.mesState(),
-          queryFn: fetchMesState,
+          queryKey: queryKeys.mesState(shift.toLowerCase() as ShiftName),
+          queryFn: () => fetchMesState(shift.toLowerCase() as ShiftName),
           staleTime: 2000,
         }).catch(
           () => [] as LineState[],

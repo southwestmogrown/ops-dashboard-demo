@@ -79,6 +79,7 @@ interface ScrapEntryBase {
   timestamp: string; // ISO 8601, auto-set at creation
   lineId: string; // auto-populated from team-lead context
   shift: ShiftName; // auto-populated from team-lead context
+  productionDate: string; // operational day key
   model: string; // part/model number
   panel: PanelPosition; // which panel position (A–G)
   /** Manual-entry values (Damaged Panel, Bent Extrusion…) or sim-injected codes (kicked-lid, weld-defect…) */
