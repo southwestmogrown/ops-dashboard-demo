@@ -14,6 +14,7 @@ import {
   refreshCacheFromDb,
 } from "@/lib/mesStore";
 import { getShiftContext } from "@/lib/shiftTime";
+import type { DowntimeEntry } from "@/lib/types/downtime";
 import type { TimePoint, ShiftName } from "@/lib/types/core";
 
 export const dynamic = "force-dynamic";
@@ -30,7 +31,7 @@ function determineMetricsMode(args: {
     lineId: string;
     output: number;
     kickedLids: number;
-    downtimeEntries: unknown[];
+    downtimeEntries: DowntimeEntry[];
   }>;
   scheduledLineIds: Set<string>;
 }): "baseline" | "live" {

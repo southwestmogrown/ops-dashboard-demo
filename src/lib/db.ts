@@ -35,6 +35,10 @@ async function addColumnIfMissing(
   definition: string,
 ): Promise<void> {
   // Internal migration helper only. Callers pass hard-coded identifiers defined in this file.
+  const safeIdentifier = /^[a-z_]+$/i;
+  if (!safeIdentifier.test(table) || !safeIdentifier.test(column)) {
+    throw new Error(`Unsafe migration identifier: ${table}.${column}`);
+  }
   try {
     await getClient().execute(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
   } catch (error) {
