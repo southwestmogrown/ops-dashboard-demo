@@ -16,6 +16,24 @@ interface AdminConfigPostBody {
   isRunning?: boolean;
 }
 
+function mergeShiftConfigUpdate(
+  current: ShiftConfig,
+  update: Partial<ShiftConfig>,
+): ShiftConfig {
+  return {
+    ...current,
+    ...(update.supervisor !== undefined
+      ? { supervisor: String(update.supervisor) }
+      : {}),
+    ...(update.dailyTarget !== undefined
+      ? { dailyTarget: Number(update.dailyTarget) }
+      : {}),
+    ...(update.headcount !== undefined
+      ? { headcount: Number(update.headcount) }
+      : {}),
+  };
+}
+
 export async function GET(): Promise<NextResponse> {
   // Keep read access lightweight for all dashboard roles.
   await refreshCacheFromDb();
@@ -43,33 +61,11 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   }
 
   if (body.shift === "day" && body.shiftConfig) {
-    current.day = {
-      ...current.day,
-      ...(body.shiftConfig.supervisor !== undefined
-        ? { supervisor: String(body.shiftConfig.supervisor) }
-        : {}),
-      ...(body.shiftConfig.dailyTarget !== undefined
-        ? { dailyTarget: Number(body.shiftConfig.dailyTarget) }
-        : {}),
-      ...(body.shiftConfig.headcount !== undefined
-        ? { headcount: Number(body.shiftConfig.headcount) }
-        : {}),
-    };
+    current.day = mergeShiftConfigUpdate(current.day, body.shiftConfig);
   }
 
   if (body.shift === "night" && body.shiftConfig) {
-    current.night = {
-      ...current.night,
-      ...(body.shiftConfig.supervisor !== undefined
-        ? { supervisor: String(body.shiftConfig.supervisor) }
-        : {}),
-      ...(body.shiftConfig.dailyTarget !== undefined
-        ? { dailyTarget: Number(body.shiftConfig.dailyTarget) }
-        : {}),
-      ...(body.shiftConfig.headcount !== undefined
-        ? { headcount: Number(body.shiftConfig.headcount) }
-        : {}),
-    };
+    current.night = mergeShiftConfigUpdate(current.night, body.shiftConfig);
   }
 
   await setAdminConfig(body.lineId, current);

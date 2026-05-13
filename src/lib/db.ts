@@ -85,8 +85,16 @@ function defaultAdminConfig(): AdminLineConfig {
 type LegacyAdminConfig = Partial<AdminLineConfig> & {
   target?: number | null;
   headcount?: number | null;
+  // Legacy flat admin config stored the operator_name column under supervisorName in app code.
   supervisorName?: string | null;
 };
+
+function resetAdminConfig(isRunning: boolean): AdminLineConfig {
+  return {
+    ...defaultAdminConfig(),
+    isRunning,
+  };
+}
 
 function normalizeShiftConfig(
   shift: Partial<ShiftConfig> | undefined,
@@ -938,10 +946,7 @@ export async function dbResetAll(): Promise<void> {
 
   const preservedConfigs = Object.entries(existingConfig).map(([lineId, config]) => ({
     lineId,
-    config: JSON.stringify({
-      ...defaultAdminConfig(),
-      isRunning: config.isRunning,
-    }),
+    config: JSON.stringify(resetAdminConfig(config.isRunning)),
   }));
 
   if (preservedConfigs.length > 0) {

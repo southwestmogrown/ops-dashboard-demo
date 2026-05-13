@@ -22,6 +22,8 @@ interface AdminConfigUpdate {
   isRunning?: boolean;
 }
 
+const AUTOSAVE_DEBOUNCE_MS = 600;
+
 interface AdminLineCardProps {
   lineId: string;
   label: string;
@@ -145,7 +147,7 @@ const AdminLineCardInner = forwardRef(function AdminLineCardInner(
     }
     const timeout = window.setTimeout(() => {
       void persistShiftConfig(activeTab);
-    }, 600);
+    }, AUTOSAVE_DEBOUNCE_MS);
     return () => window.clearTimeout(timeout);
   }, [activeTab, config, dirtyTabs, isRunning, persistShiftConfig, shiftConfig]);
 
