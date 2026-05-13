@@ -123,6 +123,7 @@ function _c(): MesCache {
 /** Default MTBF in hours per value stream. */
 const MTBF_VS1 = 4;
 const MTBF_VS2 = 5;
+const UNFILTERED_CONTEXT = "__unfiltered__";
 
 async function _hydrateFromDb(): Promise<void> {
   const c = _c();
@@ -230,8 +231,19 @@ function commentNamespace(
   shift: ShiftName,
   productionDate: string,
 ): string {
-  // Keep a hard separator between the physical line id and the shift context key.
+  // Keep a hard separator between the physical line id and the shift context key so
+  // parsing line ids never has to understand the date/shift sub-format.
   return `${lineId}::${productionDate}:${shift}`;
+}
+
+function getNextShiftProductionDate(
+  shift: ShiftName,
+  productionDate: string,
+): string {
+  if (shift !== "night") return productionDate;
+  const nextDate = new Date(`${productionDate}T00:00:00.000Z`);
+  nextDate.setUTCDate(nextDate.getUTCDate() + 1);
+  return formatProductionDate(nextDate, { useUtc: true });
 }
 
 function getRecordContext(
@@ -574,8 +586,8 @@ export async function getLineState(
   return {
     lineId,
     shift: filterContext?.shift ?? "day",
-    productionDate: filterContext?.productionDate ?? "__unfiltered__",
-    contextKey: filterContext?.contextKey ?? `${lineId}:__unfiltered__`,
+    productionDate: filterContext?.productionDate ?? UNFILTERED_CONTEXT,
+    contextKey: filterContext?.contextKey ?? `${lineId}:${UNFILTERED_CONTEXT}`,
     schedule,
     totalOutput,
     currentOrder,
@@ -950,13 +962,10 @@ export async function startSimSession(
   const nextShift = getNextShift(shift);
   const endContext = getShiftContext(nextShift, startContext.shiftStart, {
     useUtc: true,
-    productionDate:
-      shift === "day"
-        ? startContext.productionDate
-        : formatProductionDate(
-            new Date(startContext.shiftStart.getTime() + 24 * 60 * 60 * 1000),
-            { useUtc: true },
-          ),
+    productionDate: getNextShiftProductionDate(
+      shift,
+      startContext.productionDate,
+    ),
   });
 
   c.simClock = startContext.shiftStart;

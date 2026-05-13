@@ -70,4 +70,14 @@ describe("GET /api/mes/state", () => {
     expect(body).toHaveLength(2);
     expect(getAllLineStates).toHaveBeenCalled();
   });
+
+  it("falls back to the operating shift when query shift is omitted", async () => {
+    const req = new NextRequest("http://localhost/api/mes/state");
+    const res = await GET(req);
+    expect(res.status).toBe(200);
+    expect(getAllLineStates).toHaveBeenCalledWith({
+      shift: "day",
+      productionDate: "2026-04-12",
+    });
+  });
 });

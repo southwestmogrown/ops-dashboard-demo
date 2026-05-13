@@ -34,6 +34,7 @@ async function addColumnIfMissing(
   column: string,
   definition: string,
 ): Promise<void> {
+  // Internal migration helper only. Callers pass hard-coded identifiers defined in this file.
   try {
     await getClient().execute(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
   } catch (error) {

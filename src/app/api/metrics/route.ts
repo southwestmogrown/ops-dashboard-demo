@@ -20,6 +20,10 @@ export const dynamic = "force-dynamic";
 
 const VALID_SHIFTS: ShiftName[] = ["day", "night"];
 
+/**
+ * "baseline" = seeded demo metrics only.
+ * "live" = shift-scoped telemetry from MES/simulator state for the active production context.
+ */
 function determineMetricsMode(args: {
   timeSource: "realtime" | "simulated";
   telemetry: Array<{
