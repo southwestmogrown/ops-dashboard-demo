@@ -15,6 +15,11 @@ vi.mock("@/lib/db", () => ({
   runMigrations: vi.fn(async () => {}),
   dbGetAllScans: vi.fn(async () => []),
   dbGetAllQueues: vi.fn(async () => ({})),
+  dbGetAdminConfig: vi.fn(async () => ({
+    isRunning: true,
+    day: { supervisor: "", dailyTarget: 0, headcount: 0 },
+    night: { supervisor: "", dailyTarget: 0, headcount: 0 },
+  })),
   dbGetAllAdminConfig: vi.fn(async () => ({})),
   dbGetAllComments: vi.fn(async () => ({})),
   dbGetAllScrapEntries: vi.fn(async () => []),
@@ -246,29 +251,42 @@ describe("getLineState", () => {
 // ── Admin config ─────────────────────────────────────────────────────────────
 
 describe("Admin config", () => {
-  it("returns empty config for unconfigured line", async () => {
+  it("returns default config for unconfigured line", async () => {
     const config = await getAdminConfig("vs1-l1");
-    expect(config).toEqual({});
+    expect(config).toEqual({
+      isRunning: true,
+      day: { supervisor: "", dailyTarget: 0, headcount: 0 },
+      night: { supervisor: "", dailyTarget: 0, headcount: 0 },
+    });
   });
 
   it("stores and retrieves config", async () => {
-    await setAdminConfig("vs1-l1", { target: 250, headcount: 50 });
+    await setAdminConfig("vs1-l1", {
+      isRunning: true,
+      day: { supervisor: "Alice", dailyTarget: 250, headcount: 50 },
+      night: { supervisor: "Bob", dailyTarget: 200, headcount: 40 },
+    });
     const config = await getAdminConfig("vs1-l1");
-    expect(config.target).toBe(250);
-    expect(config.headcount).toBe(50);
+    expect(config.day.dailyTarget).toBe(250);
+    expect(config.day.headcount).toBe(50);
+    expect(config.night.supervisor).toBe("Bob");
   });
 
   it("merges updates into existing config", async () => {
-    await setAdminConfig("vs1-l1", { target: 250 });
-    await setAdminConfig("vs1-l1", { headcount: 50 });
+    await setAdminConfig("vs1-l1", {
+      day: { dailyTarget: 250 },
+    });
+    await setAdminConfig("vs1-l1", {
+      day: { headcount: 50 },
+    });
     const config = await getAdminConfig("vs1-l1");
-    expect(config.target).toBe(250);
-    expect(config.headcount).toBe(50);
+    expect(config.day.dailyTarget).toBe(250);
+    expect(config.day.headcount).toBe(50);
   });
 
   it("getAllAdminConfig returns all configs", async () => {
-    await setAdminConfig("vs1-l1", { target: 250 });
-    await setAdminConfig("vs2-l1", { target: 200 });
+    await setAdminConfig("vs1-l1", { day: { dailyTarget: 250 } });
+    await setAdminConfig("vs2-l1", { day: { dailyTarget: 200 } });
     const all = await getAllAdminConfig();
     expect(Object.keys(all)).toContain("vs1-l1");
     expect(Object.keys(all)).toContain("vs2-l1");
@@ -499,7 +517,7 @@ describe("resetAll", () => {
       makeSchedule("vs1-l1", [{ model: "A", qty: 10 }]),
     );
     await tickLine("vs1-l1", 5, new Date("2026-04-12T08:00:00Z"));
-    await setAdminConfig("vs1-l1", { target: 300 });
+    await setAdminConfig("vs1-l1", { day: { dailyTarget: 300 } });
     await setLineComment("vs1-l1", "day", PROD_DATE, "08:00", "note");
 
     await resetAll();

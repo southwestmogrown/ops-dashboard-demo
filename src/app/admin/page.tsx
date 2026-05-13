@@ -3,7 +3,12 @@
 import { useCallback, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import type { AdminLineConfig, LineSchedule, LineState } from "@/lib/types/mes";
+import type {
+  AdminLineConfig,
+  LineSchedule,
+  LineState,
+  ShiftConfig,
+} from "@/lib/types/mes";
 import type { ShiftName } from "@/lib/types/core";
 import { LINES, LINE_ADMIN_LABELS } from "@/lib/lines";
 import Header from "@/components/Header";
@@ -83,20 +88,18 @@ function AdminPageContent() {
 
   async function handleConfigSaved(
     lineId: string,
-    target: number | undefined,
-    headcount: number | undefined,
-    isRunning: boolean,
-    supervisorName: string,
+    update: {
+      shift?: ShiftName;
+      shiftConfig?: Partial<ShiftConfig>;
+      isRunning?: boolean;
+    },
   ) {
     await authFetch("/api/admin/config", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         lineId,
-        target,
-        headcount,
-        isRunning,
-        supervisorName,
+        ...update,
       }),
     });
     await refresh();
@@ -147,11 +150,11 @@ function AdminPageContent() {
   }
 
   const totalTarget = Object.values(adminConfig).reduce(
-    (sum, cfg) => sum + (cfg.target || 0),
+    (sum, cfg) => sum + (cfg[shift]?.dailyTarget || 0),
     0,
   );
   const totalHeadcount = Object.values(adminConfig).reduce(
-    (sum, cfg) => sum + (cfg.headcount || 0),
+    (sum, cfg) => sum + (cfg[shift]?.headcount || 0),
     0,
   );
 
@@ -175,7 +178,7 @@ function AdminPageContent() {
                 Configuration
               </h1>
               <p className="text-[#e1e2ec]/60 max-w-xl text-sm leading-relaxed">
-                Daily target and headcount per production line.
+                Day and night supervisor, target, and headcount per production line.
               </p>
             </div>
             <div className="flex gap-4 items-center bg-surface-low p-4 rounded-sm border-l-2 border-accent">
@@ -210,7 +213,7 @@ function AdminPageContent() {
 
           {/* Bento Grid */}
           <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 mb-8">
-            {LINES.map(({ id, valueStream }) => (
+            {LINES.map(({ id }) => (
               <AdminLineCard
                 key={id}
                 ref={(el: { save: () => Promise<void> } | null) => {
@@ -220,10 +223,8 @@ function AdminPageContent() {
                 label={LINE_ADMIN_LABELS[id] ?? id}
                 schedule={stateFor(id)?.schedule ?? null}
                 queuedSchedules={stateFor(id)?.queue ?? []}
-                savedTarget={adminConfig[id]?.target}
-                savedHeadcount={adminConfig[id]?.headcount}
-                savedIsRunning={adminConfig[id]?.isRunning}
-                savedSupervisorName={adminConfig[id]?.supervisorName}
+                config={adminConfig[id]}
+                currentShift={shift}
                 skippedItems={stateFor(id)?.skippedItems ?? []}
                 onScheduleLoaded={handleScheduleLoaded}
                 onConfigSaved={handleConfigSaved}

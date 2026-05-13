@@ -207,7 +207,7 @@ export default function LineTable({
       const isRunning = adminConfig?.[line.id]?.isRunning;
       const risk = getRiskLevel(line, mesState, shiftProgress, isRunning);
 
-      const plannedHc = adminConfig?.[line.id]?.headcount;
+      const plannedHc = line.headcount;
       const isZeroOutput = !!(
         lastOutputRef &&
         shiftProgress &&

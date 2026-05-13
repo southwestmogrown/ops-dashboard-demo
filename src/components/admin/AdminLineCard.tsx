@@ -1,33 +1,39 @@
 "use client";
 
 import {
+  useCallback,
   forwardRef,
   useEffect,
   useImperativeHandle,
   useRef,
   useState,
 } from "react";
-import type { LineSchedule, RunSheetItem } from "@/lib/types/mes";
-import { authFetch } from "@/lib/clientAuth";
+import type {
+  AdminLineConfig,
+  LineSchedule,
+  RunSheetItem,
+  ShiftConfig,
+} from "@/lib/types/mes";
+import type { ShiftName } from "@/lib/types/core";
+
+interface AdminConfigUpdate {
+  shift?: ShiftName;
+  shiftConfig?: Partial<ShiftConfig>;
+  isRunning?: boolean;
+}
+
+const AUTOSAVE_DEBOUNCE_MS = 600;
 
 interface AdminLineCardProps {
   lineId: string;
   label: string;
   schedule: LineSchedule | null;
   queuedSchedules: LineSchedule[];
-  savedTarget: number | undefined;
-  savedHeadcount: number | undefined;
-  savedIsRunning: boolean | undefined;
-  savedSupervisorName: string | undefined;
+  config: AdminLineConfig | undefined;
+  currentShift: ShiftName;
   skippedItems: RunSheetItem[];
   onScheduleLoaded: (lineId: string, schedule: LineSchedule) => Promise<void>;
-  onConfigSaved: (
-    lineId: string,
-    target: number | undefined,
-    headcount: number | undefined,
-    isRunning: boolean,
-    supervisorName: string,
-  ) => void;
+  onConfigSaved: (lineId: string, update: AdminConfigUpdate) => Promise<void>;
   onRemoveQueued: (lineId: string, index: number) => void;
   onClearSchedule: (lineId: string) => void;
   onSkipOrder: (lineId: string, model: string) => void;
@@ -40,10 +46,8 @@ const AdminLineCardInner = forwardRef(function AdminLineCardInner(
     label,
     schedule,
     queuedSchedules,
-    savedTarget,
-    savedHeadcount,
-    savedIsRunning,
-    savedSupervisorName,
+    config,
+    currentShift,
     skippedItems,
     onScheduleLoaded,
     onConfigSaved,
@@ -67,50 +71,80 @@ const AdminLineCardInner = forwardRef(function AdminLineCardInner(
     null,
   );
 
-  const [target, setTarget] = useState(
-    savedTarget !== undefined ? String(savedTarget) : "",
+  const [activeTab, setActiveTab] = useState<ShiftName>(currentShift);
+  const [shiftConfig, setShiftConfig] = useState<Record<ShiftName, ShiftConfig>>(
+    () => ({
+      day: config?.day ?? { supervisor: "", dailyTarget: 0, headcount: 0 },
+      night: config?.night ?? { supervisor: "", dailyTarget: 0, headcount: 0 },
+    }),
   );
-  const [headcount, setHeadcount] = useState(
-    savedHeadcount !== undefined ? String(savedHeadcount) : "",
-  );
-  const [isRunning, setIsRunning] = useState(
-    savedIsRunning !== undefined ? savedIsRunning : true,
-  );
-  const [supervisorName, setSupervisorName] = useState(
-    savedSupervisorName ?? "",
-  );
+  const [dirtyTabs, setDirtyTabs] = useState<Record<ShiftName, boolean>>({
+    day: false,
+    night: false,
+  });
+  const [isRunning, setIsRunning] = useState(config?.isRunning ?? true);
   const [saved, setSaved] = useState(false);
 
   useEffect(() => {
-    setTarget(savedTarget !== undefined ? String(savedTarget) : "");
-  }, [savedTarget]);
+    setShiftConfig({
+      day: config?.day ?? { supervisor: "", dailyTarget: 0, headcount: 0 },
+      night: config?.night ?? { supervisor: "", dailyTarget: 0, headcount: 0 },
+    });
+    setDirtyTabs({ day: false, night: false });
+    setIsRunning(config?.isRunning ?? true);
+  }, [config]);
 
-  useEffect(() => {
-    setHeadcount(savedHeadcount !== undefined ? String(savedHeadcount) : "");
-  }, [savedHeadcount]);
+  const flashSaved = useCallback(() => {
+    setSaved(true);
+    setTimeout(() => setSaved(false), 1500);
+  }, []);
 
-  useEffect(() => {
-    setIsRunning(savedIsRunning !== undefined ? savedIsRunning : true);
-  }, [savedIsRunning]);
-
-  useEffect(() => {
-    setSupervisorName(savedSupervisorName ?? "");
-  }, [savedSupervisorName]);
+  const persistShiftConfig = useCallback(
+    async (shift: ShiftName) => {
+      await onConfigSaved(lineId, {
+        shift,
+        shiftConfig: shiftConfig[shift],
+      });
+      setDirtyTabs((current) => ({ ...current, [shift]: false }));
+      flashSaved();
+    },
+    [flashSaved, lineId, onConfigSaved, shiftConfig],
+  );
 
   // Expose a save() method so the parent can trigger save-all
   useImperativeHandle(
     ref,
     () => ({
       save: async () => {
-        const t = target !== "" ? Number(target) : undefined;
-        const hc = headcount !== "" ? Number(headcount) : undefined;
-        await onConfigSaved(lineId, t, hc, isRunning, supervisorName);
-        setSaved(true);
-        setTimeout(() => setSaved(false), 1500);
+        await onConfigSaved(lineId, { isRunning });
+        await persistShiftConfig("day");
+        await persistShiftConfig("night");
       },
     }),
-    [target, headcount, isRunning, supervisorName, lineId, onConfigSaved],
+    [isRunning, lineId, onConfigSaved, persistShiftConfig],
   );
+
+  useEffect(() => {
+    if (!isRunning) return;
+    if (!dirtyTabs[activeTab]) return;
+    const savedShift = config?.[activeTab] ?? {
+      supervisor: "",
+      dailyTarget: 0,
+      headcount: 0,
+    };
+    const currentShiftConfig = shiftConfig[activeTab];
+    if (
+      currentShiftConfig.supervisor === savedShift.supervisor &&
+      currentShiftConfig.dailyTarget === savedShift.dailyTarget &&
+      currentShiftConfig.headcount === savedShift.headcount
+    ) {
+      return;
+    }
+    const timeout = window.setTimeout(() => {
+      void persistShiftConfig(activeTab);
+    }, AUTOSAVE_DEBOUNCE_MS);
+    return () => window.clearTimeout(timeout);
+  }, [activeTab, config, dirtyTabs, isRunning, persistShiftConfig, shiftConfig]);
 
   async function handleFile(file: File) {
     if (!file.name.endsWith(".pdf")) {
@@ -152,11 +186,8 @@ const AdminLineCardInner = forwardRef(function AdminLineCardInner(
   }
 
   async function handleSave() {
-    const t = target !== "" ? Number(target) : undefined;
-    const hc = headcount !== "" ? Number(headcount) : undefined;
-    await onConfigSaved(lineId, t, hc, isRunning, supervisorName);
-    setSaved(true);
-    setTimeout(() => setSaved(false), 1500);
+    await onConfigSaved(lineId, { isRunning });
+    await persistShiftConfig(activeTab);
   }
 
   // Prefer pending (just-parsed) over persisted schedule; clear pending once server confirms
@@ -222,18 +253,7 @@ const AdminLineCardInner = forwardRef(function AdminLineCardInner(
               onChange={async () => {
                 const next = !isRunning;
                 setIsRunning(next);
-                await authFetch("/api/admin/config", {
-                  method: "POST",
-                  headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({ lineId, isRunning: next }),
-                });
-                onConfigSaved(
-                  lineId,
-                  undefined,
-                  undefined,
-                  next,
-                  supervisorName,
-                );
+                await onConfigSaved(lineId, { isRunning: next });
               }}
               className="sr-only peer"
             />
@@ -306,51 +326,101 @@ const AdminLineCardInner = forwardRef(function AdminLineCardInner(
             />
           </div>
 
-          {/* Target & Headcount */}
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-1">
-              <label className="kc-micro-label font-black">
-                Daily Target
-              </label>
-              <input
-                type="number"
-                min={0}
-                disabled={!isRunning}
-                value={target}
-                onChange={(e) => setTarget(e.target.value)}
-                placeholder="e.g. 215"
-                className="kc-input-admin font-['Space_Grotesk',sans-serif] font-bold disabled:opacity-50 disabled:cursor-not-allowed"
-              />
-            </div>
-            <div className="space-y-1">
-              <label className="kc-micro-label font-black">
-                Headcount
-              </label>
-              <input
-                type="number"
-                min={0}
-                disabled={!isRunning}
-                value={headcount}
-                onChange={(e) => setHeadcount(e.target.value)}
-                placeholder="e.g. 8"
-                className="kc-input-admin font-['Space_Grotesk',sans-serif] font-bold disabled:opacity-50 disabled:cursor-not-allowed"
-              />
-            </div>
+          <div className="flex gap-1 mb-4">
+            {(["day", "night"] as const).map((shift) => (
+              <button
+                key={shift}
+                onClick={async () => {
+                  if (shift !== activeTab && dirtyTabs[activeTab]) {
+                    await persistShiftConfig(activeTab);
+                  }
+                  setActiveTab(shift);
+                }}
+                className={`px-3 py-1 rounded-sm text-[10px] font-bold uppercase tracking-widest transition-colors ${
+                  activeTab === shift
+                    ? "bg-accent text-black"
+                    : "bg-surface-highest text-[#e1e2ec]/40 hover:text-[#e1e2ec]/70"
+                }`}
+              >
+                {shift === "day" ? "☀ Day" : "☽ Night"}
+              </button>
+            ))}
           </div>
 
-          {/* Supervisor */}
-          <div className="space-y-1">
-            <label className="kc-micro-label font-black">
-              Supervisor
-            </label>
-            <input
-              type="text"
-              disabled={!isRunning}
-              value={supervisorName}
-              onChange={(e) => setSupervisorName(e.target.value)}
-              placeholder="Name"
-              className="w-full bg-surface-highest border-0 border-l-2 border-vs2/50 rounded-sm px-3 py-2.5 text-sm font-['Space_Grotesk',sans-serif] font-bold outline-none focus:ring-1 focus:ring-vs2/30 disabled:opacity-50 disabled:cursor-not-allowed placeholder:text-[#e1e2ec]/20"
-            />
+          <div className="space-y-4">
+            <div className="space-y-1">
+              <label className="kc-micro-label font-black">
+                Supervisor
+              </label>
+              <input
+                type="text"
+                disabled={!isRunning}
+                value={shiftConfig[activeTab].supervisor}
+                onChange={(e) => {
+                  setDirtyTabs((current) => ({ ...current, [activeTab]: true }));
+                  setShiftConfig((current) => ({
+                    ...current,
+                    [activeTab]: {
+                      ...current[activeTab],
+                      supervisor: e.target.value,
+                    },
+                  }));
+                }}
+                placeholder="Name"
+                className="kc-input-admin disabled:opacity-50 disabled:cursor-not-allowed"
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1">
+                <label className="kc-micro-label font-black">
+                  Daily Target
+                </label>
+                <input
+                  type="number"
+                  min={0}
+                  disabled={!isRunning}
+                  value={shiftConfig[activeTab].dailyTarget}
+                  onChange={(e) => {
+                    setDirtyTabs((current) => ({ ...current, [activeTab]: true }));
+                    setShiftConfig((current) => ({
+                      ...current,
+                      [activeTab]: {
+                        ...current[activeTab],
+                        dailyTarget:
+                          e.target.value === "" ? 0 : Number(e.target.value),
+                      },
+                    }));
+                  }}
+                  placeholder="e.g. 215"
+                  className="kc-input-admin font-['Space_Grotesk',sans-serif] font-bold disabled:opacity-50 disabled:cursor-not-allowed"
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="kc-micro-label font-black">
+                  Headcount
+                </label>
+                <input
+                  type="number"
+                  min={0}
+                  disabled={!isRunning}
+                  value={shiftConfig[activeTab].headcount}
+                  onChange={(e) => {
+                    setDirtyTabs((current) => ({ ...current, [activeTab]: true }));
+                    setShiftConfig((current) => ({
+                      ...current,
+                      [activeTab]: {
+                        ...current[activeTab],
+                        headcount:
+                          e.target.value === "" ? 0 : Number(e.target.value),
+                      },
+                    }));
+                  }}
+                  placeholder="e.g. 8"
+                  className="kc-input-admin font-['Space_Grotesk',sans-serif] font-bold disabled:opacity-50 disabled:cursor-not-allowed"
+                />
+              </div>
+            </div>
           </div>
 
           {/* Save Button */}

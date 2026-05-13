@@ -181,7 +181,7 @@ export async function PATCH(request: NextRequest): Promise<NextResponse> {
 
   const targetOutput =
     lineState?.schedule?.totalTarget ??
-    adminConfig[entry.lineId]?.target ??
+    adminConfig[entry.lineId]?.[entry.shift]?.dailyTarget ??
     getDefaultTarget(entry.lineId);
 
   const { totalWorkMinutes } = getShiftWindows(entry.shift);

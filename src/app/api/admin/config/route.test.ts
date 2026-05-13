@@ -2,10 +2,23 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { NextRequest } from "next/server";
 
 vi.mock("@/lib/mesStore", () => ({
+  getAdminConfig: vi.fn(async () => ({
+    isRunning: true,
+    day: { supervisor: "", dailyTarget: 225, headcount: 45 },
+    night: { supervisor: "", dailyTarget: 200, headcount: 40 },
+  })),
   setAdminConfig: vi.fn(async () => {}),
   getAllAdminConfig: vi.fn(async () => ({
-    "vs1-l1": { target: 225, headcount: 45 },
-    "vs2-l1": { target: 200, headcount: 40 },
+    "vs1-l1": {
+      isRunning: true,
+      day: { supervisor: "", dailyTarget: 225, headcount: 45 },
+      night: { supervisor: "", dailyTarget: 200, headcount: 40 },
+    },
+    "vs2-l1": {
+      isRunning: true,
+      day: { supervisor: "", dailyTarget: 200, headcount: 40 },
+      night: { supervisor: "", dailyTarget: 180, headcount: 35 },
+    },
   })),
   refreshCacheFromDb: vi.fn(async () => {}),
 }));
@@ -16,7 +29,7 @@ vi.mock("@/lib/apiAuth", () => ({
 }));
 
 import { GET, POST } from "@/app/api/admin/config/route";
-import { setAdminConfig, getAllAdminConfig } from "@/lib/mesStore";
+import { getAdminConfig, setAdminConfig, getAllAdminConfig } from "@/lib/mesStore";
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -29,7 +42,7 @@ describe("GET /api/admin/config", () => {
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body["vs1-l1"]).toBeDefined();
-    expect(body["vs1-l1"].target).toBe(225);
+    expect(body["vs1-l1"].day.dailyTarget).toBe(225);
     expect(getAllAdminConfig).toHaveBeenCalled();
   });
 });
@@ -38,21 +51,30 @@ describe("POST /api/admin/config", () => {
   it("updates config and returns 200", async () => {
     const req = new NextRequest("http://localhost/api/admin/config", {
       method: "POST",
-      body: JSON.stringify({ lineId: "vs1-l1", target: 250, headcount: 50 }),
+      body: JSON.stringify({
+        lineId: "vs1-l1",
+        shift: "day",
+        shiftConfig: { dailyTarget: 250, headcount: 50 },
+      }),
       headers: { "content-type": "application/json" },
     });
     const res = await POST(req);
     expect(res.status).toBe(200);
-    expect(setAdminConfig).toHaveBeenCalledWith("vs1-l1", expect.objectContaining({
-      target: 250,
-      headcount: 50,
-    }));
+    expect(setAdminConfig).toHaveBeenCalledWith(
+      "vs1-l1",
+      expect.objectContaining({
+        day: expect.objectContaining({
+          dailyTarget: 250,
+          headcount: 50,
+        }),
+      }),
+    );
   });
 
   it("returns 400 when lineId is missing", async () => {
     const req = new NextRequest("http://localhost/api/admin/config", {
       method: "POST",
-      body: JSON.stringify({ target: 250 }),
+      body: JSON.stringify({ shift: "day", shiftConfig: { dailyTarget: 250 } }),
       headers: { "content-type": "application/json" },
     });
     const res = await POST(req);
@@ -66,7 +88,7 @@ describe("POST /api/admin/config", () => {
     );
     const req = new NextRequest("http://localhost/api/admin/config", {
       method: "POST",
-      body: JSON.stringify({ lineId: "vs1-l1", target: 250 }),
+      body: JSON.stringify({ lineId: "vs1-l1", shift: "day", shiftConfig: { dailyTarget: 250 } }),
       headers: { "content-type": "application/json" },
     });
     const res = await POST(req);
@@ -79,18 +101,27 @@ describe("POST /api/admin/config", () => {
       method: "POST",
       body: JSON.stringify({
         lineId: "vs1-l1",
-        target: "300",
+        shift: "night",
+        shiftConfig: {
+          dailyTarget: "300",
+          supervisor: "Jane",
+        },
         isRunning: true,
-        supervisorName: "Jane",
       }),
       headers: { "content-type": "application/json" },
     });
     const res = await POST(req);
     expect(res.status).toBe(200);
-    expect(setAdminConfig).toHaveBeenCalledWith("vs1-l1", expect.objectContaining({
-      target: 300,
-      isRunning: true,
-      supervisorName: "Jane",
-    }));
+    expect(getAdminConfig).toHaveBeenCalledWith("vs1-l1");
+    expect(setAdminConfig).toHaveBeenCalledWith(
+      "vs1-l1",
+      expect.objectContaining({
+        isRunning: true,
+        night: expect.objectContaining({
+          dailyTarget: 300,
+          supervisor: "Jane",
+        }),
+      }),
+    );
   });
 });

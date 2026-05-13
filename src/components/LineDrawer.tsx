@@ -202,7 +202,7 @@ export default function LineDrawer({
   const statusLabel = (() => {
     if (!line) return null;
     const isRunning = adminConfig?.[line.id]?.isRunning;
-    const plannedHc = adminConfig?.[line.id]?.headcount;
+    const plannedHc = adminConfig?.[line.id]?.[shift]?.headcount;
 
     const reasons = getStatusReasons(
       line,
@@ -256,7 +256,7 @@ export default function LineDrawer({
 
   // ─── Contact info ────────────────────────────────────────────────────────────
   const supervisorName = line
-    ? adminConfig?.[line.id]?.supervisorName
+    ? adminConfig?.[line.id]?.[shift]?.supervisor
     : undefined;
   const hasContact = Boolean(supervisorName);
 

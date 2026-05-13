@@ -4,12 +4,18 @@
 export type LineComments = Record<string, string>;
 
 /** Per-line admin configuration overrides */
+export interface ShiftConfig {
+  supervisor: string;
+  dailyTarget: number;
+  headcount: number;
+}
+
+/** Per-line admin configuration overrides */
 export interface AdminLineConfig {
-  target?: number;
-  headcount?: number;
   /** false = line not running today; hidden from dashboard */
-  isRunning?: boolean;
-  supervisorName?: string;
+  isRunning: boolean;
+  day: ShiftConfig;
+  night: ShiftConfig;
 }
 
 /** One work order on a run sheet */

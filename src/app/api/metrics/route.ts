@@ -114,9 +114,10 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     const output = telemetry?.output ?? 0;
     const kickedLids = telemetry?.kickedLids ?? 0;
     const downtimeEntries = telemetry?.downtimeEntries ?? [];
+    const shiftConfig = telemetry?.admin[shift];
 
-    line.target = telemetry?.admin.target ?? getDefaultTarget(line.id);
-    line.headcount = telemetry?.admin.headcount ?? getDefaultHeadcount(line.id);
+    line.target = shiftConfig?.dailyTarget || getDefaultTarget(line.id);
+    line.headcount = shiftConfig?.headcount || getDefaultHeadcount(line.id);
 
     if (!hasLiveContextData || !telemetry) {
       continue;
