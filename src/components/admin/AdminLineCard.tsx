@@ -59,7 +59,6 @@ const AdminLineCardInner = forwardRef(function AdminLineCardInner(
   ref,
 ) {
   const inputRef = useRef<HTMLInputElement>(null);
-  const hasMountedRef = useRef(false);
 
   const [parsing, setParsing] = useState(false);
   const [parseError, setParseError] = useState<string | null>(null);
@@ -126,10 +125,6 @@ const AdminLineCardInner = forwardRef(function AdminLineCardInner(
   );
 
   useEffect(() => {
-    if (!hasMountedRef.current) {
-      hasMountedRef.current = true;
-      return;
-    }
     if (!isRunning) return;
     if (!dirtyTabs[activeTab]) return;
     const savedShift = config?.[activeTab] ?? {
@@ -335,9 +330,9 @@ const AdminLineCardInner = forwardRef(function AdminLineCardInner(
             {(["day", "night"] as const).map((shift) => (
               <button
                 key={shift}
-                onClick={() => {
+                onClick={async () => {
                   if (shift !== activeTab && dirtyTabs[activeTab]) {
-                    void persistShiftConfig(activeTab);
+                    await persistShiftConfig(activeTab);
                   }
                   setActiveTab(shift);
                 }}

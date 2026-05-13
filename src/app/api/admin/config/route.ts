@@ -54,7 +54,12 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ error: "shift must be day or night" }, { status: 400 });
   }
 
-  const current = structuredClone(await getAdminConfig(body.lineId));
+  const existing = await getAdminConfig(body.lineId);
+  const current = {
+    ...existing,
+    day: { ...existing.day },
+    night: { ...existing.night },
+  };
 
   if (body.isRunning !== undefined) {
     current.isRunning = Boolean(body.isRunning);
