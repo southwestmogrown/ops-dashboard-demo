@@ -20,6 +20,21 @@ import type { DowntimeEntry } from "./downtimeTypes";
 // ── Client singleton (globalThis survives HMR in dev mode) ───────────────────
 
 const _G = globalThis as unknown as { __turso_client__?: Client };
+const SAFE_MIGRATION_TABLES = new Set([
+  "scan_events",
+  "scrap_log",
+  "downtime_log",
+  "changeover_log",
+  "sim_clock",
+  "admin_config",
+]);
+const SAFE_MIGRATION_COLUMNS = new Set([
+  "production_date",
+  "session_start",
+  "session_end",
+  "session_start_shift",
+  "handoff_count",
+]);
 
 export function getClient(): Client {
   if (_G.__turso_client__) return _G.__turso_client__;
@@ -35,9 +50,7 @@ async function addColumnIfMissing(
   column: string,
   definition: string,
 ): Promise<void> {
-  // Internal migration helper only. Callers pass hard-coded identifiers defined in this file.
-  const safeIdentifier = /^[a-z_]+$/i;
-  if (!safeIdentifier.test(table) || !safeIdentifier.test(column)) {
+  if (!SAFE_MIGRATION_TABLES.has(table) || !SAFE_MIGRATION_COLUMNS.has(column)) {
     throw new Error(`Unsafe migration identifier: ${table}.${column}`);
   }
   try {
@@ -117,8 +130,7 @@ function normalizeAdminConfig(config?: LegacyAdminConfig | null): AdminLineConfi
 }
 
 async function getTableColumns(table: string): Promise<string[]> {
-  const safeIdentifier = /^[a-z_]+$/i;
-  if (!safeIdentifier.test(table)) {
+  if (!SAFE_MIGRATION_TABLES.has(table)) {
     throw new Error(`Unsafe migration identifier: ${table}`);
   }
 
@@ -150,13 +162,21 @@ async function migrateAdminConfigV2(): Promise<void> {
       operator_name: string | null;
     }>;
 
-    await client.execute("ALTER TABLE admin_config RENAME TO admin_config_legacy");
-    await client.execute(`
-      CREATE TABLE admin_config (
-        line_id TEXT PRIMARY KEY,
-        config  TEXT NOT NULL
-      )
-    `);
+    try {
+      await client.execute("ALTER TABLE admin_config RENAME TO admin_config_legacy");
+      await client.execute(`
+        CREATE TABLE admin_config (
+          line_id TEXT PRIMARY KEY,
+          config  TEXT NOT NULL
+        )
+      `);
+    } catch (error) {
+      throw new Error(
+        `admin_config_v2 migration failed during table rebuild: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+    }
 
     if (oldRows.length > 0) {
       await client.batch(
@@ -178,7 +198,15 @@ async function migrateAdminConfigV2(): Promise<void> {
       );
     }
 
-    await client.execute("DROP TABLE admin_config_legacy");
+    try {
+      await client.execute("DROP TABLE admin_config_legacy");
+    } catch (error) {
+      throw new Error(
+        `admin_config_v2 migration failed while dropping legacy table: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+    }
   } else if (!hasJsonSchema) {
     await client.execute(`
       CREATE TABLE IF NOT EXISTS admin_config (

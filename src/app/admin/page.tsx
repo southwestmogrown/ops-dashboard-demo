@@ -174,13 +174,13 @@ function AdminPageContent() {
           {/* Header */}
           <header className="flex flex-col lg:flex-row lg:items-end justify-between gap-6 mb-10">
             <div>
-               <h1 className="font-['Space_Grotesk',sans-serif] text-4xl font-bold tracking-tight mb-2">
-                 Configuration
-               </h1>
-               <p className="text-[#e1e2ec]/60 max-w-xl text-sm leading-relaxed">
-                 Day and night supervisor, target, and headcount per production line.
-               </p>
-             </div>
+              <h1 className="font-['Space_Grotesk',sans-serif] text-4xl font-bold tracking-tight mb-2">
+                Configuration
+              </h1>
+              <p className="text-[#e1e2ec]/60 max-w-xl text-sm leading-relaxed">
+                Day and night supervisor, target, and headcount per production line.
+              </p>
+            </div>
             <div className="flex gap-4 items-center bg-surface-low p-4 rounded-sm border-l-2 border-accent">
               <div className="flex flex-col pr-6 border-r border-border">
                 <span className="kc-micro-label-base text-accent mb-1">

@@ -36,15 +36,30 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ error: "shift must be day or night" }, { status: 400 });
   }
 
-  const current = await getAdminConfig(body.lineId);
+  const current = structuredClone(await getAdminConfig(body.lineId));
 
   if (body.isRunning !== undefined) {
     current.isRunning = Boolean(body.isRunning);
   }
 
-  if (body.shift && body.shiftConfig) {
-    current[body.shift] = {
-      ...current[body.shift],
+  if (body.shift === "day" && body.shiftConfig) {
+    current.day = {
+      ...current.day,
+      ...(body.shiftConfig.supervisor !== undefined
+        ? { supervisor: String(body.shiftConfig.supervisor) }
+        : {}),
+      ...(body.shiftConfig.dailyTarget !== undefined
+        ? { dailyTarget: Number(body.shiftConfig.dailyTarget) }
+        : {}),
+      ...(body.shiftConfig.headcount !== undefined
+        ? { headcount: Number(body.shiftConfig.headcount) }
+        : {}),
+    };
+  }
+
+  if (body.shift === "night" && body.shiftConfig) {
+    current.night = {
+      ...current.night,
       ...(body.shiftConfig.supervisor !== undefined
         ? { supervisor: String(body.shiftConfig.supervisor) }
         : {}),

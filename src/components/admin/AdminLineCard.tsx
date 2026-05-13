@@ -77,6 +77,10 @@ const AdminLineCardInner = forwardRef(function AdminLineCardInner(
       night: config?.night ?? { supervisor: "", dailyTarget: 0, headcount: 0 },
     }),
   );
+  const [dirtyTabs, setDirtyTabs] = useState<Record<ShiftName, boolean>>({
+    day: false,
+    night: false,
+  });
   const [isRunning, setIsRunning] = useState(config?.isRunning ?? true);
   const [saved, setSaved] = useState(false);
 
@@ -85,6 +89,7 @@ const AdminLineCardInner = forwardRef(function AdminLineCardInner(
       day: config?.day ?? { supervisor: "", dailyTarget: 0, headcount: 0 },
       night: config?.night ?? { supervisor: "", dailyTarget: 0, headcount: 0 },
     });
+    setDirtyTabs({ day: false, night: false });
     setIsRunning(config?.isRunning ?? true);
   }, [config]);
 
@@ -99,6 +104,7 @@ const AdminLineCardInner = forwardRef(function AdminLineCardInner(
         shift,
         shiftConfig: shiftConfig[shift],
       });
+      setDirtyTabs((current) => ({ ...current, [shift]: false }));
       flashSaved();
     },
     [flashSaved, lineId, onConfigSaved, shiftConfig],
@@ -123,6 +129,7 @@ const AdminLineCardInner = forwardRef(function AdminLineCardInner(
       return;
     }
     if (!isRunning) return;
+    if (!dirtyTabs[activeTab]) return;
     const savedShift = config?.[activeTab] ?? {
       supervisor: "",
       dailyTarget: 0,
@@ -140,7 +147,7 @@ const AdminLineCardInner = forwardRef(function AdminLineCardInner(
       void persistShiftConfig(activeTab);
     }, 600);
     return () => window.clearTimeout(timeout);
-  }, [activeTab, config, isRunning, persistShiftConfig, shiftConfig]);
+  }, [activeTab, config, dirtyTabs, isRunning, persistShiftConfig, shiftConfig]);
 
   async function handleFile(file: File) {
     if (!file.name.endsWith(".pdf")) {
@@ -347,15 +354,16 @@ const AdminLineCardInner = forwardRef(function AdminLineCardInner(
                 type="text"
                 disabled={!isRunning}
                 value={shiftConfig[activeTab].supervisor}
-                onChange={(e) =>
+                onChange={(e) => {
+                  setDirtyTabs((current) => ({ ...current, [activeTab]: true }));
                   setShiftConfig((current) => ({
                     ...current,
                     [activeTab]: {
                       ...current[activeTab],
                       supervisor: e.target.value,
                     },
-                  }))
-                }
+                  }));
+                }}
                 placeholder="Name"
                 className="kc-input-admin disabled:opacity-50 disabled:cursor-not-allowed"
               />
@@ -371,7 +379,8 @@ const AdminLineCardInner = forwardRef(function AdminLineCardInner(
                   min={0}
                   disabled={!isRunning}
                   value={shiftConfig[activeTab].dailyTarget}
-                  onChange={(e) =>
+                  onChange={(e) => {
+                    setDirtyTabs((current) => ({ ...current, [activeTab]: true }));
                     setShiftConfig((current) => ({
                       ...current,
                       [activeTab]: {
@@ -379,8 +388,8 @@ const AdminLineCardInner = forwardRef(function AdminLineCardInner(
                         dailyTarget:
                           e.target.value === "" ? 0 : Number(e.target.value),
                       },
-                    }))
-                  }
+                    }));
+                  }}
                   placeholder="e.g. 215"
                   className="kc-input-admin font-['Space_Grotesk',sans-serif] font-bold disabled:opacity-50 disabled:cursor-not-allowed"
                 />
@@ -394,7 +403,8 @@ const AdminLineCardInner = forwardRef(function AdminLineCardInner(
                   min={0}
                   disabled={!isRunning}
                   value={shiftConfig[activeTab].headcount}
-                  onChange={(e) =>
+                  onChange={(e) => {
+                    setDirtyTabs((current) => ({ ...current, [activeTab]: true }));
                     setShiftConfig((current) => ({
                       ...current,
                       [activeTab]: {
@@ -402,8 +412,8 @@ const AdminLineCardInner = forwardRef(function AdminLineCardInner(
                         headcount:
                           e.target.value === "" ? 0 : Number(e.target.value),
                       },
-                    }))
-                  }
+                    }));
+                  }}
                   placeholder="e.g. 8"
                   className="kc-input-admin font-['Space_Grotesk',sans-serif] font-bold disabled:opacity-50 disabled:cursor-not-allowed"
                 />
