@@ -230,6 +230,7 @@ function commentNamespace(
   shift: ShiftName,
   productionDate: string,
 ): string {
+  // Keep a hard separator between the physical line id and the shift context key.
   return `${lineId}::${productionDate}:${shift}`;
 }
 
@@ -573,8 +574,8 @@ export async function getLineState(
   return {
     lineId,
     shift: filterContext?.shift ?? "day",
-    productionDate: filterContext?.productionDate ?? "all",
-    contextKey: filterContext?.contextKey ?? `${lineId}:all`,
+    productionDate: filterContext?.productionDate ?? "__unfiltered__",
+    contextKey: filterContext?.contextKey ?? `${lineId}:__unfiltered__`,
     schedule,
     totalOutput,
     currentOrder,

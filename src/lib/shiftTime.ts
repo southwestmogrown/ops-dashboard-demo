@@ -82,7 +82,7 @@ function shiftDate(base: Date, days: number, useUtc: boolean): Date {
   return out;
 }
 
-function formatDatePart(value: number): string {
+function padDateComponent(value: number): string {
   return String(value).padStart(2, "0");
 }
 
@@ -94,7 +94,7 @@ export function formatProductionDate(
   const year = useUtc ? date.getUTCFullYear() : date.getFullYear();
   const month = useUtc ? date.getUTCMonth() + 1 : date.getMonth() + 1;
   const day = useUtc ? date.getUTCDate() : date.getDate();
-  return `${year}-${formatDatePart(month)}-${formatDatePart(day)}`;
+  return `${year}-${padDateComponent(month)}-${padDateComponent(day)}`;
 }
 
 export function parseProductionDate(

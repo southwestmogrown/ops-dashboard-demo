@@ -20,6 +20,28 @@ export const dynamic = "force-dynamic";
 
 const VALID_SHIFTS: ShiftName[] = ["day", "night"];
 
+function determineMetricsMode(args: {
+  timeSource: "realtime" | "simulated";
+  telemetry: Array<{
+    lineId: string;
+    output: number;
+    kickedLids: number;
+    downtimeEntries: unknown[];
+  }>;
+  scheduledLineIds: Set<string>;
+}): "baseline" | "live" {
+  if (args.timeSource === "simulated") return "live";
+  return args.telemetry.some(
+    (entry) =>
+      entry.output > 0 ||
+      entry.kickedLids > 0 ||
+      entry.downtimeEntries.length > 0 ||
+      args.scheduledLineIds.has(entry.lineId),
+  )
+    ? "live"
+    : "baseline";
+}
+
 export async function GET(request: NextRequest): Promise<NextResponse> {
   await refreshCacheFromDb();
 
@@ -72,15 +94,14 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     })),
   );
   const telemetryMap = new Map(liveTelemetry.map((entry) => [entry.lineId, entry]));
-  const hasLiveContextData =
-    operatingTime.timeSource === "simulated" ||
-    liveTelemetry.some(
-      (entry) =>
-        entry.output > 0 ||
-        entry.kickedLids > 0 ||
-        entry.downtimeEntries.length > 0 ||
-        (stateMap.get(entry.lineId)?.schedule ?? null) !== null,
-    );
+  const metricsMode = determineMetricsMode({
+    timeSource: operatingTime.timeSource,
+    telemetry: liveTelemetry,
+    scheduledLineIds: new Set(
+      states.filter((state) => state.schedule !== null).map((state) => state.lineId),
+    ),
+  });
+  const hasLiveContextData = metricsMode === "live";
 
   for (const line of metrics.lines) {
     const telemetry = telemetryMap.get(line.id);
@@ -164,12 +185,14 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
           ) / 10000;
   }
 
-  metrics.mode = hasLiveContextData ? "live" : "baseline";
+  metrics.mode = metricsMode;
 
   if (!hasLiveContextData) {
     return NextResponse.json(metrics);
   }
 
+  // Two 30-minute buckets per hour, plus one final point so the trend includes
+  // both the shift start and the shift end.
   const intervalCount = Math.round(shiftContext.totalHours * 2) + 1;
   const liveTrend: TimePoint[] = [];
 
