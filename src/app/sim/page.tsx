@@ -68,19 +68,6 @@ export default function SimPage() {
   const currentShift = simClockQuery.data?.currentShift ?? null;
   const handoffCount = simClockQuery.data?.handoffCount ?? 0;
 
-  useEffect(() => {
-    if (simClockQuery.data?.speed != null) {
-      setSpeed(simClockQuery.data.speed);
-      speedRef.current = simClockQuery.data.speed;
-    }
-  }, [simClockQuery.data?.speed]);
-
-  useEffect(() => {
-    if (simClockQuery.data?.currentShift) {
-      setShift(simClockQuery.data.currentShift);
-    }
-  }, [simClockQuery.data?.currentShift]);
-
   const refreshSimQueries = useCallback(async () => {
     await Promise.all([
       queryClient.invalidateQueries({ queryKey: queryKeys.mesState(shift) }),

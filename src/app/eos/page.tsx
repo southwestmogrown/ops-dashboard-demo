@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { usePathname } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
-import type { ShiftMetrics } from "@/lib/types/core";
+import type { ShiftMetrics, ShiftName } from "@/lib/types/core";
 import Header from "@/components/Header";
 import type { AdminLineConfig, LineState } from "@/lib/types/mes";
 import type {

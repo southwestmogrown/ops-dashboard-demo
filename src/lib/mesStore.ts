@@ -22,12 +22,10 @@ import type { DowntimeEntry } from "./downtimeTypes";
 import type { ShiftName } from "./types";
 import {
   formatProductionDate,
-  getCurrentShiftContext,
   getNextShift,
   getProductionDateForTime,
   getShiftContext,
   getShiftForTime,
-  getShiftWindows,
 } from "./shiftTime";
 import {
   runMigrations,
