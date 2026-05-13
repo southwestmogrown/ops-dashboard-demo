@@ -179,7 +179,8 @@ export default function SimPage() {
 
       const totalTarget = runningLineIds.reduce(
         (sum, lineId) =>
-          sum + (adminConfig[lineId]?.target ?? getDefaultTarget(lineId)),
+          sum +
+          (adminConfig[lineId]?.[shift]?.dailyTarget ?? getDefaultTarget(lineId)),
         0,
       );
 
@@ -192,7 +193,7 @@ export default function SimPage() {
           ? Math.round((totalOutput / totalTarget) * 1000) / 10
           : 0;
       return { totalOutput, totalTarget, scheduledLines, efficiency };
-    }, [states, adminConfig]);
+    }, [states, adminConfig, shift]);
 
   const stateMap = useMemo(
     () => new Map(states.map((s) => [s.lineId, s])),

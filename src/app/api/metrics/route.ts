@@ -113,14 +113,15 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     const state = stateMap.get(line.id);
     const output = telemetry?.output ?? 0;
     const kickedLids = telemetry?.kickedLids ?? 0;
-    const downtimeEntries = telemetry?.downtimeEntries ?? [];
+      const downtimeEntries = telemetry?.downtimeEntries ?? [];
+      const shiftConfig = telemetry?.admin[shift];
 
-    line.target = telemetry?.admin.target ?? getDefaultTarget(line.id);
-    line.headcount = telemetry?.admin.headcount ?? getDefaultHeadcount(line.id);
+      line.target = shiftConfig?.dailyTarget || getDefaultTarget(line.id);
+      line.headcount = shiftConfig?.headcount || getDefaultHeadcount(line.id);
 
-    if (!hasLiveContextData || !telemetry) {
-      continue;
-    }
+      if (!hasLiveContextData || !telemetry) {
+        continue;
+      }
 
     line.output = output;
     line.changeovers = state?.totalChangeovers ?? 0;

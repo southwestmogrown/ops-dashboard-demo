@@ -11,6 +11,7 @@ import type {
   ChangeoverEvent,
   LineSchedule,
   ScanEvent,
+  ShiftConfig,
 } from "./mesTypes";
 import type { LineComments } from "./mesTypes";
 import type { ScrapEntry } from "./reworkTypes";
@@ -52,6 +53,146 @@ async function addColumnIfMissing(
   }
 }
 
+function defaultShiftConfig(): ShiftConfig {
+  return {
+    supervisor: "",
+    dailyTarget: 0,
+    headcount: 0,
+  };
+}
+
+function defaultAdminConfig(): AdminLineConfig {
+  return {
+    isRunning: true,
+    day: defaultShiftConfig(),
+    night: defaultShiftConfig(),
+  };
+}
+
+type LegacyAdminConfig = Partial<AdminLineConfig> & {
+  target?: number | null;
+  headcount?: number | null;
+  supervisorName?: string | null;
+};
+
+function normalizeShiftConfig(
+  shift: Partial<ShiftConfig> | undefined,
+  fallback: ShiftConfig,
+): ShiftConfig {
+  return {
+    supervisor:
+      typeof shift?.supervisor === "string"
+        ? shift.supervisor
+        : fallback.supervisor,
+    dailyTarget:
+      typeof shift?.dailyTarget === "number" && Number.isFinite(shift.dailyTarget)
+        ? shift.dailyTarget
+        : fallback.dailyTarget,
+    headcount:
+      typeof shift?.headcount === "number" && Number.isFinite(shift.headcount)
+        ? shift.headcount
+        : fallback.headcount,
+  };
+}
+
+function normalizeAdminConfig(config?: LegacyAdminConfig | null): AdminLineConfig {
+  const sharedFallback: ShiftConfig = {
+    supervisor:
+      typeof config?.supervisorName === "string" ? config.supervisorName : "",
+    dailyTarget:
+      typeof config?.target === "number" && Number.isFinite(config.target)
+        ? config.target
+        : 0,
+    headcount:
+      typeof config?.headcount === "number" && Number.isFinite(config.headcount)
+        ? config.headcount
+        : 0,
+  };
+
+  return {
+    isRunning: config?.isRunning ?? true,
+    day: normalizeShiftConfig(config?.day, sharedFallback),
+    night: normalizeShiftConfig(config?.night, sharedFallback),
+  };
+}
+
+async function getTableColumns(table: string): Promise<string[]> {
+  const safeIdentifier = /^[a-z_]+$/i;
+  if (!safeIdentifier.test(table)) {
+    throw new Error(`Unsafe migration identifier: ${table}`);
+  }
+
+  const result = await getClient().execute(`PRAGMA table_info(${table})`);
+  const rows = result.rows as unknown as Array<{ name: string }>;
+  return rows.map((row) => row.name);
+}
+
+async function migrateAdminConfigV2(): Promise<void> {
+  const client = getClient();
+  const migrated = await client.execute(
+    "SELECT value FROM db_meta WHERE key = 'admin_config_v2'",
+  );
+  if (migrated.rows.length > 0) return;
+
+  const columns = await getTableColumns("admin_config");
+  const hasLegacySchema = columns.includes("target");
+  const hasJsonSchema = columns.includes("config");
+
+  if (hasLegacySchema) {
+    const oldRowsResult = await client.execute(
+      "SELECT line_id, target, headcount, is_running, operator_name FROM admin_config",
+    );
+    const oldRows = oldRowsResult.rows as unknown as Array<{
+      line_id: string;
+      target: number | null;
+      headcount: number | null;
+      is_running: number | null;
+      operator_name: string | null;
+    }>;
+
+    await client.execute("ALTER TABLE admin_config RENAME TO admin_config_legacy");
+    await client.execute(`
+      CREATE TABLE admin_config (
+        line_id TEXT PRIMARY KEY,
+        config  TEXT NOT NULL
+      )
+    `);
+
+    if (oldRows.length > 0) {
+      await client.batch(
+        oldRows.map((row) => ({
+          sql: "INSERT INTO admin_config (line_id, config) VALUES (?, ?)",
+          args: [
+            row.line_id,
+            JSON.stringify(
+              normalizeAdminConfig({
+                isRunning: row.is_running !== 0,
+                target: row.target,
+                headcount: row.headcount,
+                supervisorName: row.operator_name,
+              }),
+            ),
+          ],
+        })),
+        "write",
+      );
+    }
+
+    await client.execute("DROP TABLE admin_config_legacy");
+  } else if (!hasJsonSchema) {
+    await client.execute(`
+      CREATE TABLE IF NOT EXISTS admin_config (
+        line_id TEXT PRIMARY KEY,
+        config  TEXT NOT NULL
+      )
+    `);
+  }
+
+  await client.execute(
+    "INSERT OR REPLACE INTO db_meta (key, value) VALUES ('admin_config_v2', '1')",
+  );
+}
+
 // ── Migrations ────────────────────────────────────────────────────────────────
 
 export async function runMigrations(): Promise<void> {
@@ -73,12 +214,8 @@ export async function runMigrations(): Promise<void> {
     );
 
     CREATE TABLE IF NOT EXISTS admin_config (
-      line_id           TEXT PRIMARY KEY,
-      target            REAL,
-      headcount         INTEGER,
-      is_running        INTEGER DEFAULT 1,
-      operator_name     TEXT,
-      team_lead_contact TEXT
+      line_id TEXT PRIMARY KEY,
+      config  TEXT NOT NULL
     );
 
     CREATE TABLE IF NOT EXISTS line_comments_context (
@@ -159,6 +296,7 @@ export async function runMigrations(): Promise<void> {
   await addColumnIfMissing("sim_clock", "session_end", "TEXT");
   await addColumnIfMissing("sim_clock", "session_start_shift", "TEXT");
   await addColumnIfMissing("sim_clock", "handoff_count", "INTEGER DEFAULT 0");
+  await migrateAdminConfigV2();
 }
 
 // ── Serial helpers ─────────────────────────────────────────────────────────────
@@ -307,51 +445,29 @@ export async function dbGetAdminConfig(
   lineId: string,
 ): Promise<AdminLineConfig> {
   const result = await getClient().execute({
-    sql: "SELECT target, headcount, is_running, operator_name, team_lead_contact FROM admin_config WHERE line_id = ?",
+    sql: "SELECT config FROM admin_config WHERE line_id = ?",
     args: [lineId],
   });
-  const row = result.rows[0] as unknown as
-    | {
-        target: number | null;
-        headcount: number | null;
-        is_running: number | null;
-        operator_name: string | null;
-        team_lead_contact: string | null;
-      }
-    | undefined;
-  if (!row) return {};
-  return {
-    ...(row.target !== null ? { target: row.target } : {}),
-    ...(row.headcount !== null ? { headcount: row.headcount } : {}),
-    ...(row.is_running !== null ? { isRunning: row.is_running !== 0 } : {}),
-    ...(row.operator_name !== null
-      ? { supervisorName: row.operator_name }
-      : {}),
-  };
+  const row = result.rows[0] as unknown as { config: string } | undefined;
+  if (!row) {
+    const config = defaultAdminConfig();
+    await dbSetAdminConfig(lineId, config);
+    return config;
+  }
+  return normalizeAdminConfig(JSON.parse(row.config) as LegacyAdminConfig);
 }
 
 export async function dbGetAllAdminConfig(): Promise<
   Record<string, AdminLineConfig>
 > {
-  const result = await getClient().execute(
-    "SELECT line_id, target, headcount, is_running, operator_name, team_lead_contact FROM admin_config",
-  );
+  const result = await getClient().execute("SELECT line_id, config FROM admin_config");
   const rows = result.rows as unknown as {
     line_id: string;
-    target: number | null;
-    headcount: number | null;
-    is_running: number | null;
-    operator_name: string | null;
-    team_lead_contact: string | null;
+    config: string;
   }[];
   const out: Record<string, AdminLineConfig> = {};
   for (const r of rows) {
-    out[r.line_id] = {
-      ...(r.target !== null ? { target: r.target } : {}),
-      ...(r.headcount !== null ? { headcount: r.headcount } : {}),
-      ...(r.is_running !== null ? { isRunning: r.is_running !== 0 } : {}),
-      ...(r.operator_name !== null ? { supervisorName: r.operator_name } : {}),
-    };
+    out[r.line_id] = normalizeAdminConfig(JSON.parse(r.config) as LegacyAdminConfig);
   }
   return out;
 }
@@ -360,18 +476,10 @@ export async function dbSetAdminConfig(
   lineId: string,
   config: AdminLineConfig,
 ): Promise<void> {
-  const existing = await dbGetAdminConfig(lineId);
-  const merged = { ...existing, ...config };
+  const normalized = normalizeAdminConfig(config);
   await getClient().execute({
-    sql: "INSERT OR REPLACE INTO admin_config (line_id, target, headcount, is_running, operator_name, team_lead_contact) VALUES (?, ?, ?, ?, ?, ?)",
-    args: [
-      lineId,
-      merged.target ?? null,
-      merged.headcount ?? null,
-      merged.isRunning !== undefined ? (merged.isRunning ? 1 : 0) : null,
-      merged.supervisorName ?? null,
-      null,
-    ],
+    sql: "INSERT OR REPLACE INTO admin_config (line_id, config) VALUES (?, ?)",
+    args: [lineId, JSON.stringify(normalized)],
   });
 }
 
@@ -777,6 +885,7 @@ export async function dbResetSimulationData(): Promise<void> {
 // ── Full reset ─────────────────────────────────────────────────────────────────
 
 export async function dbResetAll(): Promise<void> {
+  const existingConfig = await dbGetAllAdminConfig();
   await getClient().batch(
     [
       { sql: "DELETE FROM scan_events", args: [] },
@@ -787,10 +896,8 @@ export async function dbResetAll(): Promise<void> {
       { sql: "DELETE FROM downtime_log", args: [] },
       { sql: "DELETE FROM changeover_log", args: [] },
       { sql: "DELETE FROM db_meta", args: [] },
-      // Null out target/headcount overrides so lines revert to seeded defaults after a reset.
-      // isRunning is preserved — structural floor layout survives a sim reset.
       {
-        sql: "UPDATE admin_config SET target = NULL, headcount = NULL",
+        sql: "DELETE FROM admin_config",
         args: [],
       },
       {
@@ -800,6 +907,24 @@ export async function dbResetAll(): Promise<void> {
     ],
     "write",
   );
+
+  const preservedConfigs = Object.entries(existingConfig).map(([lineId, config]) => ({
+    lineId,
+    config: JSON.stringify({
+      ...defaultAdminConfig(),
+      isRunning: config.isRunning,
+    }),
+  }));
+
+  if (preservedConfigs.length > 0) {
+    await getClient().batch(
+      preservedConfigs.map((entry) => ({
+        sql: "INSERT INTO admin_config (line_id, config) VALUES (?, ?)",
+        args: [entry.lineId, entry.config],
+      })),
+      "write",
+    );
+  }
 }
 
 // ── Downtime log ──────────────────────────────────────────────────────────────

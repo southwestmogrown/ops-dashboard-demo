@@ -29,6 +29,7 @@ import {
 } from "./shiftTime";
 import {
   runMigrations,
+  dbGetAdminConfig,
   dbGetAllScans,
   dbGetAllQueues,
   dbGetAllAdminConfig,
@@ -124,6 +125,38 @@ function _c(): MesCache {
 const MTBF_VS1 = 4;
 const MTBF_VS2 = 5;
 const UNFILTERED_CONTEXT = "__unfiltered__";
+
+function defaultAdminConfig(): AdminLineConfig {
+  return {
+    isRunning: true,
+    day: { supervisor: "", dailyTarget: 0, headcount: 0 },
+    night: { supervisor: "", dailyTarget: 0, headcount: 0 },
+  };
+}
+
+type AdminLineConfigUpdate = Partial<Omit<AdminLineConfig, "day" | "night">> & {
+  day?: Partial<AdminLineConfig["day"]>;
+  night?: Partial<AdminLineConfig["night"]>;
+};
+
+function mergeAdminConfig(
+  current: AdminLineConfig | undefined,
+  next: AdminLineConfigUpdate,
+): AdminLineConfig {
+  const base = current ?? defaultAdminConfig();
+  return {
+    ...base,
+    ...next,
+    day: {
+      ...base.day,
+      ...next.day,
+    },
+    night: {
+      ...base.night,
+      ...next.night,
+    },
+  };
+}
 
 async function _hydrateFromDb(): Promise<void> {
   const c = _c();
@@ -642,18 +675,22 @@ export async function getOutputForLineShift(
 
 export async function setAdminConfig(
   lineId: string,
-  config: AdminLineConfig,
+  config: AdminLineConfigUpdate,
 ): Promise<void> {
   await ensureInit();
   const c = _c();
-  const merged = { ...c.adminConfig[lineId], ...config };
+  const merged = mergeAdminConfig(c.adminConfig[lineId], config);
   c.adminConfig[lineId] = merged;
   await dbSetAdminConfig(lineId, merged);
 }
 
 export async function getAdminConfig(lineId: string): Promise<AdminLineConfig> {
   await ensureInit();
-  return _c().adminConfig[lineId] ?? {};
+  const c = _c();
+  if (!c.adminConfig[lineId]) {
+    c.adminConfig[lineId] = await dbGetAdminConfig(lineId);
+  }
+  return c.adminConfig[lineId];
 }
 
 export async function getAllAdminConfig(): Promise<
