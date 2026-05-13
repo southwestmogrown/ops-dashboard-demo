@@ -15,6 +15,11 @@ vi.mock("@/lib/db", () => ({
   runMigrations: vi.fn(async () => {}),
   dbGetAllScans: vi.fn(async () => []),
   dbGetAllQueues: vi.fn(async () => ({})),
+  dbGetAdminConfig: vi.fn(async () => ({
+    isRunning: true,
+    day: { supervisor: "", dailyTarget: 0, headcount: 0 },
+    night: { supervisor: "", dailyTarget: 0, headcount: 0 },
+  })),
   dbGetAllAdminConfig: vi.fn(async () => ({})),
   dbGetAllComments: vi.fn(async () => ({})),
   dbGetAllScrapEntries: vi.fn(async () => []),
