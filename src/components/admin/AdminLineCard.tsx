@@ -335,7 +335,12 @@ const AdminLineCardInner = forwardRef(function AdminLineCardInner(
             {(["day", "night"] as const).map((shift) => (
               <button
                 key={shift}
-                onClick={() => setActiveTab(shift)}
+                onClick={() => {
+                  if (shift !== activeTab && dirtyTabs[activeTab]) {
+                    void persistShiftConfig(activeTab);
+                  }
+                  setActiveTab(shift);
+                }}
                 className={`px-3 py-1 rounded-sm text-[10px] font-bold uppercase tracking-widest transition-colors ${
                   activeTab === shift
                     ? "bg-accent text-black"
