@@ -88,19 +88,12 @@ export default function Header({
 
   // Only calculate shift-related data if shift is being used
   const shouldShowShiftPill = Boolean(shift && onShiftChange);
-  const currentTimeText = useUtcClock
-    ? displayTime.toLocaleTimeString([], {
-        hour: "2-digit",
-        minute: "2-digit",
-        second: "2-digit",
-        timeZone: "UTC",
-      })
-    : displayTime.toLocaleTimeString([], {
-        hour: "2-digit",
-        minute: "2-digit",
-        second: "2-digit",
-        timeZone: PLANT_TIME_ZONE,
-      });
+  const currentTimeText = displayTime.toLocaleTimeString([], {
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    timeZone: useUtcClock ? "UTC" : PLANT_TIME_ZONE,
+  });
 
   return (
     <header className="shrink-0 z-50 bg-background border-b border-border font-['Space_Grotesk',sans-serif] tracking-tight">

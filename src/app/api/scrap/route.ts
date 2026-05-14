@@ -83,6 +83,12 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       { status: 400 },
     );
   }
+  if (reasonCode === undefined) {
+    return NextResponse.json(
+      { error: "reasonCode is required" },
+      { status: 400 },
+    );
+  }
   if (reasonCode !== undefined && !isReasonCode(reasonCode)) {
     return NextResponse.json(
       { error: "reasonCode must be one of the supported scrap reason codes" },
