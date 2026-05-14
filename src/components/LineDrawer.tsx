@@ -831,8 +831,8 @@ export default function LineDrawer({
                                 <Tooltip
                                   cursor={{ stroke: "#1e2433", strokeWidth: 1 }}
                                   {...tooltipStyle}
-                                  formatter={(value: number | null) => [
-                                    value === null ? "—" : value.toFixed(2),
+                                  formatter={(value) => [
+                                    typeof value === "number" ? value.toFixed(2) : "—",
                                     "HPU",
                                   ]}
                                   labelFormatter={(label, payload) => {
