@@ -57,6 +57,7 @@ import {
   dbInsertChangeover,
   dbGetAllChangeovers,
 } from "./db";
+import { getTotalChangeovers } from "./changeovers";
 
 // ── Cache shape ──────────────────────────────────────────────────────────────
 
@@ -582,6 +583,7 @@ export async function getLineState(
     const key = `${String(h).padStart(2, "0")}:00`;
     hourlyChangeovers[key] = (hourlyChangeovers[key] ?? 0) + 1;
   }
+  const totalChangeovers = getTotalChangeovers(hourlyChangeovers);
 
   let currentOrder: string | null = null;
   let remainingOnOrder = 0;
@@ -631,7 +633,7 @@ export async function getLineState(
     queue: queue.slice(1),
     hourlyOutput,
     hourlyChangeovers,
-    totalChangeovers: lineChangeovers.length,
+    totalChangeovers,
     skippedItems,
     changeoverRemaining: c.changeoverRemaining[lineId] ?? 0,
     repairRemaining: c.repairRemaining[lineId] ?? 0,

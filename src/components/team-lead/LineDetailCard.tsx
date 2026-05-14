@@ -11,6 +11,7 @@ import DowntimeForm from "./DowntimeForm";
 import type { HourlyTargetRow } from "@/lib/shiftBreaks";
 import type { ScrapEntry, ScrapStats } from "@/lib/types/quality";
 import type { DowntimeEntry } from "@/lib/types/downtime";
+import { getTotalChangeovers } from "@/lib/changeovers";
 import { getFpyColor, getHpuColor, getOutputColor } from "@/lib/status";
 
 interface LineDetailCardProps {
@@ -49,7 +50,9 @@ export default function LineDetailCard({
   const [resolveDowntime, setResolveDowntime] = useState<DowntimeEntry | null>(
     null,
   );
-  const changeoverCount = mesState?.totalChangeovers ?? line.changeovers;
+  const changeoverCount = mesState
+    ? getTotalChangeovers(mesState.hourlyChangeovers)
+    : line.changeovers;
 
   // Team-lead progress tracks actual output vs configured line target.
   const orderPct =
