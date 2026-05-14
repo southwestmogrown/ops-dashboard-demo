@@ -94,7 +94,7 @@ interface ScrapEntryBase {
   productionDate: string; // operational day key
   model: string; // part/model number
   panel: PanelPosition; // which panel position (A–G)
-  /** Optional for legacy and simulated entries. */
+  /** Stored as optional for legacy and simulated entries; manual POSTs require it. */
   reasonCode?: ReasonCode;
   /** Manual-entry values (Damaged Panel, Bent Extrusion…) or sim-injected codes (kicked-lid, weld-defect…) */
   damageType: DamageType | DefectType;

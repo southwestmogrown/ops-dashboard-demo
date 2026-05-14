@@ -14,6 +14,11 @@ import {
 
 const PLANT_TIME_ZONE = "America/Chicago";
 const PLANT_TIME_LABEL = "CST";
+const TIME_FORMAT_OPTIONS = {
+  hour: "2-digit",
+  minute: "2-digit",
+  second: "2-digit",
+} as const;
 
 interface HeaderProps {
   shift?: ShiftName;
@@ -89,9 +94,7 @@ export default function Header({
   // Only calculate shift-related data if shift is being used
   const shouldShowShiftPill = Boolean(shift && onShiftChange);
   const currentTimeText = displayTime.toLocaleTimeString([], {
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
+    ...TIME_FORMAT_OPTIONS,
     timeZone: useUtcClock ? "UTC" : PLANT_TIME_ZONE,
   });
 
