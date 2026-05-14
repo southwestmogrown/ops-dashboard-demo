@@ -269,6 +269,7 @@ export default function LineDrawer({
   })();
 
   // ─── Contact info ────────────────────────────────────────────────────────────
+  const lineId = line?.id ?? null;
   const supervisorName = line
     ? adminConfig?.[line.id]?.[shift]?.supervisor
     : undefined;
@@ -276,12 +277,12 @@ export default function LineDrawer({
 
   // ─── Downtime fetch (when tab is active) ────────────────────────────────────
   useEffect(() => {
-    if (!isOpen || activeTab !== "downtime" || !line) return;
-    authFetch(`/api/downtime?lineId=${line.id}&shift=${shift}`)
+    if (!isOpen || activeTab !== "downtime" || !lineId) return;
+    authFetch(`/api/downtime?lineId=${lineId}&shift=${shift}`)
       .then((r) => r.json())
       .then((data: DowntimeEntry[]) => setDowntimeEntries(data))
       .catch(() => setDowntimeEntries([]));
-  }, [isOpen, activeTab, line, shift]);
+  }, [activeTab, isOpen, lineId, shift]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -334,8 +335,7 @@ export default function LineDrawer({
     [hpuTrendData],
   );
   const currentHpuPoint = populatedHpuTrend.at(-1) ?? null;
-  const previousHpuPoint =
-    populatedHpuTrend.length > 1 ? populatedHpuTrend[populatedHpuTrend.length - 2] : null;
+  const previousHpuPoint = populatedHpuTrend.at(-2) ?? null;
   const { bestHpuPoint, worstHpuPoint } = populatedHpuTrend.reduce<{
     bestHpuPoint: typeof currentHpuPoint;
     worstHpuPoint: typeof currentHpuPoint;
