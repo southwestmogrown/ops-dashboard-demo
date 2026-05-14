@@ -10,8 +10,7 @@ import {
   refreshCacheFromDb,
 } from "@/lib/mesStore";
 import {
-  ACTIVE_DOWNTIME_REASONS,
-  type DowntimeReason,
+  isActiveDowntimeReason,
   type DowntimeEntry,
 } from "@/lib/types/downtime";
 import type { ShiftName } from "@/lib/types/core";
@@ -100,7 +99,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       { status: 400 },
     );
   }
-  if (!ACTIVE_DOWNTIME_REASONS.includes(reason as DowntimeReason)) {
+  if (!isActiveDowntimeReason(reason)) {
     return NextResponse.json(
       { error: "invalid reason value" },
       { status: 400 },
@@ -112,7 +111,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     lineId: lineId as string,
     shift: shift as ShiftName,
     productionDate: operatingTime.productionDate,
-    reason: reason as DowntimeReason,
+    reason,
     startTime: startTime as string,
     endTime: null,
     unitsLost: typeof unitsLost === "number" ? unitsLost : 0,

@@ -34,6 +34,15 @@ export const ACTIVE_DOWNTIME_REASONS: ActiveDowntimeReason[] = [
   "other",
 ];
 
+export function isActiveDowntimeReason(
+  value: unknown,
+): value is ActiveDowntimeReason {
+  return (
+    typeof value === "string" &&
+    ACTIVE_DOWNTIME_REASONS.includes(value as ActiveDowntimeReason)
+  );
+}
+
 export interface DowntimeEntry {
   id: string; // "DT-001"
   lineId: string;
