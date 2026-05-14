@@ -234,6 +234,7 @@ export default function LineTable({
 
       const isSelected = line.id === selectedLineId;
       const dramaticOff = offSet.has(line.id);
+      const lineOeePercent = line.oee * 100;
       // Highlight top 1-2 rows under performance sort (worst-first), plus existing dramatic-off check
       const sortedHighlight = sortHighlightIdx > 0 && idx < sortHighlightIdx;
 
@@ -294,8 +295,8 @@ export default function LineTable({
           </td>
 
           {/* OEE */}
-          <td className={`px-4 py-4 text-center font-mono text-sm ${getOeeColor(line.oee)}`}>
-            {line.oee.toFixed(1)}%
+          <td className={`px-4 py-4 text-center font-mono text-sm ${getOeeColor(lineOeePercent)}`}>
+            {lineOeePercent.toFixed(1)}%
           </td>
 
           {/* Pace */}
