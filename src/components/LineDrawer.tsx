@@ -20,7 +20,7 @@ import { DOWNTIME_REASON_LABELS } from "@/lib/types/downtime";
 import type { ShiftProgress } from "@/lib/shiftTime";
 import { getHourlyTargets } from "@/lib/shiftBreaks";
 import { isLineRunningForShift } from "@/lib/adminConfig";
-import { buildHpuTrend } from "@/lib/hpuTrend";
+import { buildHpuTrend, roundHpu } from "@/lib/hpuTrend";
 import {
   getFpyColor,
   getHpuColor,
@@ -49,6 +49,16 @@ function buildMesHourlyData(hourlyOutput: Record<string, number>) {
   return Object.entries(hourlyOutput)
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([time, output]) => ({ time, output }));
+}
+
+function formatHpuDelta(delta: number | null): string {
+  if (delta === null) return "—";
+  return `${delta > 0 ? "+" : ""}${delta.toFixed(2)}`;
+}
+
+function describeHpuDelta(delta: number | null): string {
+  if (delta === null) return "Need more scans";
+  return delta <= 0 ? "Improving" : "Rising";
 }
 
 const tooltipStyle = {
@@ -348,7 +358,7 @@ export default function LineDrawer({
   );
   const hpuDelta =
     currentHpuPoint && previousHpuPoint && currentHpuPoint.hpu !== null && previousHpuPoint.hpu !== null
-      ? Math.round((currentHpuPoint.hpu - previousHpuPoint.hpu) * 100) / 100
+      ? roundHpu(currentHpuPoint.hpu - previousHpuPoint.hpu)
       : null;
 
   const linePace =
@@ -789,14 +799,10 @@ export default function LineDrawer({
                                       : "text-status-red"
                                 }`}
                               >
-                                {hpuDelta === null ? "—" : `${hpuDelta > 0 ? "+" : ""}${hpuDelta.toFixed(2)}`}
+                                {formatHpuDelta(hpuDelta)}
                               </p>
                               <p className="text-[10px] text-[#e1e2ec]/30 mt-1">
-                                {hpuDelta === null
-                                  ? "Need more scans"
-                                  : hpuDelta <= 0
-                                    ? "Improving"
-                                    : "Rising"}
+                                {describeHpuDelta(hpuDelta)}
                               </p>
                             </div>
                           </div>
