@@ -13,6 +13,7 @@ import type { ScrapEntry, ScrapStats } from "@/lib/types/quality";
 import type { DowntimeEntry } from "@/lib/types/downtime";
 import { getTotalChangeovers } from "@/lib/changeovers";
 import { getFpyColor, getHpuColor, getOutputColor } from "@/lib/status";
+import { isRevolverLine } from "@/lib/types/quality";
 
 interface LineDetailCardProps {
   line: Line;
@@ -60,6 +61,9 @@ export default function LineDetailCard({
       ? Math.min(100, Math.round((line.output / line.target) * 100))
       : 0;
   const completed = line.output;
+  const primaryScrapLabel = isRevolverLine(line.id)
+    ? "Extrusions"
+    : "Scrapped Panels";
 
   const handleScrapCreated = useCallback(() => {
     onRefreshScrap();
@@ -239,7 +243,7 @@ export default function LineDetailCard({
               <div className="flex justify-between items-center bg-background/40 p-3">
                 <div>
                   <span className="block text-sm font-bold">
-                    Scrapped Panels
+                    {primaryScrapLabel}
                   </span>
                   <span className="text-[11px] text-[#e1e2ec]/55 font-mono">
                     No FPY impact

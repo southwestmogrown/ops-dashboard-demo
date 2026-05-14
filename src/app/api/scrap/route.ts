@@ -91,6 +91,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
           productionDate: operatingTime.productionDate,
           model: model as string,
           panel: panel as ScrappedPanel["panel"],
+          reasonCode: body.reasonCode as ScrappedPanel["reasonCode"],
           damageType: damageType as ScrappedPanel["damageType"],
           stationFound: (body.stationFound as string) ?? "",
           howDamaged: (body.howDamaged as string) ?? "",
@@ -103,6 +104,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
           productionDate: operatingTime.productionDate,
           model: model as string,
           panel: panel as KickedLid["panel"],
+          reasonCode: body.reasonCode as KickedLid["reasonCode"],
           damageType: damageType as KickedLid["damageType"],
           affectedArea: (body.affectedArea as "panel" | "extrusion") ?? "panel",
           auditorInitials: ((body.auditorInitials as string) ?? "")

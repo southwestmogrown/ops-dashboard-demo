@@ -374,11 +374,11 @@ export default function SimPage() {
 
                   {simClock && (
                     <div className="ml-auto flex items-center gap-2 text-xs">
-                      <span className="w-2 h-2 rounded-full bg-accent animate-pulse" />
-                      <span className="font-mono text-accent">
-                        {simClock.getHours().toString().padStart(2, "0")}:
-                        {simClock.getMinutes().toString().padStart(2, "0")}
-                      </span>
+                       <span className="w-2 h-2 rounded-full bg-accent animate-pulse" />
+                       <span className="font-mono text-accent">
+                         {simClock.getUTCHours().toString().padStart(2, "0")}:
+                         {simClock.getUTCMinutes().toString().padStart(2, "0")}
+                       </span>
                       <span className="text-[#e1e2ec]/30">sim clock</span>
                       {currentShift && (
                         <span className="text-[#e1e2ec]/40 uppercase">
