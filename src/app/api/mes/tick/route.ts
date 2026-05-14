@@ -43,12 +43,19 @@ const DOWNTIME_REASONS: DowntimeReason[] = [
 function getShiftTimelineHour(simClock: Date, shift: ShiftName): number {
   const hours = simClock.getUTCHours() + simClock.getUTCMinutes() / 60;
   const shiftWindow = getShiftWindows(shift);
+  // Night shift spans midnight, so post-midnight hours must be projected onto
+  // the same 24+ hour timeline as the 17:00 start (e.g. 01:00 → 25:00).
   if (shift === "night" && hours < shiftWindow.startHour) {
     return hours + 24;
   }
   return hours;
 }
 
+/**
+ * Converts elapsed clock time into productive work minutes for the active shift.
+ * Break windows are subtracted from the elapsed span, and `isOnBreak` reports
+ * whether the current simulated time falls inside one of those windows.
+ */
 function getElapsedWorkMinutes(
   simClock: Date,
   shift: ShiftName,
