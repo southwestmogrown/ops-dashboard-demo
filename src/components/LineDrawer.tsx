@@ -61,6 +61,7 @@ const tooltipStyle = {
   labelStyle: { color: "#e1e2ec", opacity: 0.5 },
   itemStyle: { color: "#e1e2ec" },
 };
+const HPU_AXIS_ROUNDING_FACTOR = 10;
 
 const DOWNTIME_BADGE_COLORS: Record<string, string> = {
   "machine-failure": "bg-status-red/20 text-status-red border-status-red/30",
@@ -325,19 +326,25 @@ export default function LineDrawer({
   const currentHpuPoint = populatedHpuTrend.at(-1) ?? null;
   const previousHpuPoint =
     populatedHpuTrend.length > 1 ? populatedHpuTrend[populatedHpuTrend.length - 2] : null;
-  const bestHpuPoint = populatedHpuTrend.reduce<typeof currentHpuPoint>(
-    (best, point) =>
-      !best || (point.hpu ?? Number.POSITIVE_INFINITY) < (best.hpu ?? Number.POSITIVE_INFINITY)
-        ? point
-        : best,
-    null,
-  );
-  const worstHpuPoint = populatedHpuTrend.reduce<typeof currentHpuPoint>(
-    (worst, point) =>
-      !worst || (point.hpu ?? Number.NEGATIVE_INFINITY) > (worst.hpu ?? Number.NEGATIVE_INFINITY)
-        ? point
-        : worst,
-    null,
+  const { bestHpuPoint, worstHpuPoint } = populatedHpuTrend.reduce<{
+    bestHpuPoint: typeof currentHpuPoint;
+    worstHpuPoint: typeof currentHpuPoint;
+  }>(
+    (acc, point) => ({
+      bestHpuPoint:
+        !acc.bestHpuPoint ||
+        (point.hpu ?? Number.POSITIVE_INFINITY) <
+          (acc.bestHpuPoint.hpu ?? Number.POSITIVE_INFINITY)
+          ? point
+          : acc.bestHpuPoint,
+      worstHpuPoint:
+        !acc.worstHpuPoint ||
+        (point.hpu ?? Number.NEGATIVE_INFINITY) >
+          (acc.worstHpuPoint.hpu ?? Number.NEGATIVE_INFINITY)
+          ? point
+          : acc.worstHpuPoint,
+    }),
+    { bestHpuPoint: null, worstHpuPoint: null },
   );
   const hpuDelta =
     currentHpuPoint && previousHpuPoint && currentHpuPoint.hpu !== null && previousHpuPoint.hpu !== null
@@ -823,7 +830,15 @@ export default function LineDrawer({
                                     fontSize: 10,
                                   }}
                                   tickFormatter={(value: number) => value.toFixed(2)}
-                                  domain={[0, (dataMax: number) => Math.max(0.5, Math.ceil(dataMax * 10) / 10)]}
+                                  domain={[
+                                    0,
+                                    (dataMax: number) =>
+                                      Math.max(
+                                        0.5,
+                                        Math.ceil(dataMax * HPU_AXIS_ROUNDING_FACTOR) /
+                                          HPU_AXIS_ROUNDING_FACTOR,
+                                      ),
+                                  ]}
                                   axisLine={false}
                                   tickLine={false}
                                   width={34}
