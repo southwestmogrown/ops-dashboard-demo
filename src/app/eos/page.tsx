@@ -194,15 +194,10 @@ export default function EOSPage() {
         .filter(([, config]) => !isLineRunningForShift(config, shiftKey))
         .map(([lineId]) => lineIdToLineKey(lineId));
       const currentTime = new Date(metrics.generatedAt);
-      const downtimeByLine = new Map<string, DowntimeEntry[]>();
-      for (const entry of downtimeEntries) {
-        const existing = downtimeByLine.get(entry.lineId);
-        if (existing) {
-          existing.push(entry);
-        } else {
-          downtimeByLine.set(entry.lineId, [entry]);
-        }
-      }
+      const downtimeByLine = downtimeEntries.reduce((grouped, entry) => {
+        grouped.set(entry.lineId, [...(grouped.get(entry.lineId) ?? []), entry]);
+        return grouped;
+      }, new Map<string, DowntimeEntry[]>());
 
       setOmittedLines(new Set(toOmit));
 

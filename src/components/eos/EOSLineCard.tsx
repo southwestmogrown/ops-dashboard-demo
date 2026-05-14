@@ -1,6 +1,7 @@
 "use client";
 
 import type { EOSLineEntry } from "@/lib/types/eos";
+import { getDowntimeReasonBadgeClass } from "@/lib/types/downtime";
 
 interface Props {
   lineKey: string;
@@ -22,23 +23,6 @@ const FIELDS: { key: keyof EOSLineEntry; label: string; type: string; readOnly?:
   { key: "remainingOnRunSheet", label: "Remaining on Run Sheet", type: "number" },
   { key: "changeovers",         label: "Changeovers",            type: "number" },
 ];
-
-function getDowntimeBadge(reason: string): string {
-  const map: Record<string, string> = {
-    "Angle Saw Down": "bg-status-red/20 text-status-red border-status-red/20",
-    "Panel Saw Down": "bg-status-red/20 text-status-red border-status-red/20",
-    "Vacuum Table Down": "bg-status-red/20 text-status-red border-status-red/20",
-    "Bander Down": "bg-status-red/20 text-status-red border-status-red/20",
-    "Waiting for Material":
-      "bg-status-amber/20 text-status-amber border-status-amber/20",
-    "Waiting for Rails/Sides/Tophats/Extrusion":
-      "bg-status-amber/20 text-status-amber border-status-amber/20",
-    "Quality Hold": "bg-status-amber/20 text-status-amber border-status-amber/20",
-    "Planned Maintenance": "bg-blue-500/20 text-blue-400 border-blue-400/20",
-    Other: "bg-slate-500/20 text-slate-400 border-slate-400/20",
-  };
-  return map[reason] ?? "bg-slate-500/20 text-slate-400 border-slate-400/20";
-}
 
 export default function EOSLineCard({ lineKey, vsId, line, vsName, data, onChange, onHide }: Props) {
   const hasOutput = Boolean(data.output);
@@ -130,7 +114,7 @@ export default function EOSLineCard({ lineKey, vsId, line, vsName, data, onChang
           </div>
           {data.latestDowntimeReason && (
             <span
-              className={`mt-2 inline-flex w-fit items-center px-2 py-0.5 rounded-sm text-[9px] font-bold border uppercase ${getDowntimeBadge(data.latestDowntimeReason)}`}
+              className={`mt-2 inline-flex w-fit items-center px-2 py-0.5 rounded-sm text-[9px] font-bold border uppercase ${getDowntimeReasonBadgeClass(data.latestDowntimeReason)}`}
             >
               {data.latestDowntimeReason}
             </span>

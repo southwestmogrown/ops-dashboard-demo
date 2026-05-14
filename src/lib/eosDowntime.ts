@@ -29,10 +29,12 @@ export function summarizeDowntimeEntries(
     return sum + Math.max(0, Math.floor((end - start) / 60000));
   }, 0);
 
-  const latestEntry = [...entries].sort(
-    (a, b) =>
-      new Date(b.startTime).getTime() - new Date(a.startTime).getTime(),
-  )[0];
+  const latestEntry = entries.reduce<DowntimeEntry | null>((latest, entry) => {
+    if (!latest) return entry;
+    return new Date(entry.startTime).getTime() > new Date(latest.startTime).getTime()
+      ? entry
+      : latest;
+  }, null);
 
   return {
     downtimeMinutes: String(downtimeMinutes),
