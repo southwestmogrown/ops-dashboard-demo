@@ -642,7 +642,9 @@ function _parseScrapRow(r: ScrapRow): ScrapEntry {
   const panel = r.panel as ScrapEntry["panel"];
   const damageType = r.damage_type as ScrapEntry["damageType"];
   const reasonCode =
-    typeof extra.reasonCode === "string" ? extra.reasonCode : undefined;
+    typeof extra.reasonCode === "string"
+      ? (extra.reasonCode as ScrapEntry["reasonCode"])
+      : undefined;
   if (r.kind === "scrapped-panel") {
     return {
         id: r.id,
