@@ -225,6 +225,7 @@ export default function Home() {
 
   const hasSchedule = mesStates.some((s) => s.schedule !== null);
   const mesTotal = mesStates.reduce((sum, s) => sum + s.totalOutput, 0);
+  const avgOeePercent = avgOee * 100;
   const pacedOutput =
     shiftProgress.elapsedHours >= 0.25
       ? Math.round(
@@ -316,16 +317,16 @@ export default function Home() {
             />
             <KpiCard
               label="Avg OEE"
-              value={avgOee.toFixed(1)}
+              value={avgOeePercent.toFixed(1)}
               unit="%"
               subtext={
-                avgOee >= 85
+                avgOeePercent >= 85
                   ? "World-class"
-                  : avgOee >= 70
+                  : avgOeePercent >= 70
                   ? "Typical plant avg"
                   : "Below target"
               }
-              valueColor={getOeeColor(avgOee)}
+              valueColor={getOeeColor(avgOeePercent)}
               accentClass="bg-vs2"
               tooltip={
                 <div>
@@ -343,7 +344,7 @@ export default function Home() {
                       = {avgAvailability.toFixed(1)}% × {avgPerformance.toFixed(1)}% × {avgFpy.toFixed(1)}%
                     </div>
                     <div className="mt-1 text-accent">
-                      = {avgOee.toFixed(1)}%
+                      = {avgOeePercent.toFixed(1)}%
                     </div>
                   </div>
                   <div className="mt-2 space-y-0.5 text-[9px] text-[#e1e2ec]/50 leading-relaxed">

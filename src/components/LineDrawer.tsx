@@ -4,6 +4,8 @@ import { useEffect, useMemo, useState } from "react";
 import {
   BarChart,
   Bar,
+  LineChart,
+  Line as RechartsLine,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -18,6 +20,7 @@ import { DOWNTIME_REASON_LABELS } from "@/lib/types/downtime";
 import type { ShiftProgress } from "@/lib/shiftTime";
 import { getHourlyTargets } from "@/lib/shiftBreaks";
 import { isLineRunningForShift } from "@/lib/adminConfig";
+import { buildHpuTrend, roundHpu, type HpuTrendPoint } from "@/lib/hpuTrend";
 import {
   getFpyColor,
   getHpuColor,
@@ -48,6 +51,16 @@ function buildMesHourlyData(hourlyOutput: Record<string, number>) {
     .map(([time, output]) => ({ time, output }));
 }
 
+function formatHpuDelta(delta: number | null): string {
+  if (delta === null) return "—";
+  return `${delta > 0 ? "+" : ""}${delta.toFixed(2)}`;
+}
+
+function describeHpuDelta(delta: number | null): string {
+  if (delta === null) return "Need more scans";
+  return delta <= 0 ? "Improving" : "Rising";
+}
+
 const tooltipStyle = {
   contentStyle: {
     backgroundColor: "#131720",
@@ -58,6 +71,7 @@ const tooltipStyle = {
   labelStyle: { color: "#e1e2ec", opacity: 0.5 },
   itemStyle: { color: "#e1e2ec" },
 };
+const HPU_AXIS_ROUNDING_FACTOR = 10;
 
 const DOWNTIME_BADGE_COLORS: Record<string, string> = {
   "machine-failure": "bg-status-red/20 text-status-red border-status-red/30",
@@ -191,7 +205,6 @@ export default function LineDrawer({
   mesState,
   shiftProgress,
   onClose,
-  nowOverride,
   adminConfig,
   shift,
 }: LineDrawerProps) {
@@ -256,6 +269,7 @@ export default function LineDrawer({
   })();
 
   // ─── Contact info ────────────────────────────────────────────────────────────
+  const lineId = line?.id ?? null;
   const supervisorName = line
     ? adminConfig?.[line.id]?.[shift]?.supervisor
     : undefined;
@@ -263,12 +277,12 @@ export default function LineDrawer({
 
   // ─── Downtime fetch (when tab is active) ────────────────────────────────────
   useEffect(() => {
-    if (!isOpen || activeTab !== "downtime" || !line) return;
-    authFetch(`/api/downtime?lineId=${line.id}&shift=${shift}`)
+    if (!isOpen || activeTab !== "downtime" || !lineId) return;
+    authFetch(`/api/downtime?lineId=${lineId}&shift=${shift}`)
       .then((r) => r.json())
       .then((data: DowntimeEntry[]) => setDowntimeEntries(data))
       .catch(() => setDowntimeEntries([]));
-  }, [isOpen, activeTab, line?.id, shift]);
+  }, [activeTab, isOpen, lineId, shift]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -281,11 +295,12 @@ export default function LineDrawer({
 
   // Only show charts when MES has actual data
   const hasMesData = mesState && mesState.schedule !== null;
-  const hasMesHourly =
-    mesState && Object.keys(mesState.hourlyOutput).length > 0;
+  const hasMesHourly = Boolean(
+    mesState && Object.keys(mesState.hourlyOutput).length > 0,
+  );
   const hourlyBarData = useMemo(
-    () => (hasMesHourly ? buildMesHourlyData(mesState!.hourlyOutput) : []),
-    [hasMesHourly, mesState?.hourlyOutput],
+    () => (mesState ? buildMesHourlyData(mesState.hourlyOutput) : []),
+    [mesState],
   );
 
   // Hourly target reference line value
@@ -301,7 +316,53 @@ export default function LineDrawer({
     return Math.round(
       nonBreakRows.reduce((s, r) => s + r.planned, 0) / nonBreakRows.length,
     );
-  }, [line, hasMesHourly, mesState?.hourlyOutput, shift]);
+  }, [line, hasMesHourly, mesState, shift]);
+
+  const hpuTrendData = useMemo(
+    () =>
+      line && hasMesHourly
+        ? buildHpuTrend(
+            mesState?.hourlyOutput ?? {},
+            shift,
+            line.headcount,
+            shiftProgress.elapsedHours,
+          )
+        : [],
+    [line, hasMesHourly, mesState, shift, shiftProgress.elapsedHours],
+  );
+  const populatedHpuTrend = useMemo(
+    () => hpuTrendData.filter((point) => point.hpu !== null),
+    [hpuTrendData],
+  );
+  const currentHpuPoint = populatedHpuTrend.at(-1) ?? null;
+  const previousHpuPoint = populatedHpuTrend.at(-2) ?? null;
+  const { bestHpuPoint, worstHpuPoint } = populatedHpuTrend.reduce<{
+    bestHpuPoint: typeof currentHpuPoint;
+    worstHpuPoint: typeof currentHpuPoint;
+  }>(
+    (acc, point) => ({
+      bestHpuPoint:
+        !acc.bestHpuPoint ||
+        (point.hpu ?? Number.POSITIVE_INFINITY) <
+          (acc.bestHpuPoint.hpu ?? Number.POSITIVE_INFINITY)
+          ? point
+          : acc.bestHpuPoint,
+      worstHpuPoint:
+        !acc.worstHpuPoint ||
+        (point.hpu ?? Number.NEGATIVE_INFINITY) >
+          (acc.worstHpuPoint.hpu ?? Number.NEGATIVE_INFINITY)
+          ? point
+          : acc.worstHpuPoint,
+    }),
+    { bestHpuPoint: null, worstHpuPoint: null },
+  );
+  const hpuDelta = (() => {
+    if (!currentHpuPoint || !previousHpuPoint) return null;
+    const currentHpu = currentHpuPoint.hpu;
+    const previousHpu = previousHpuPoint.hpu;
+    if (currentHpu === null || previousHpu === null) return null;
+    return roundHpu(currentHpu - previousHpu);
+  })();
 
   const linePace =
     shiftProgress.elapsedHours >= 0.25
@@ -690,17 +751,181 @@ export default function LineDrawer({
                   )}
 
                   {/* HPU TAB */}
-                  {activeTab === "hpu" && (
-                    <div>
+                  {activeTab === "hpu" && line && (
+                    <div className="space-y-4">
                       <p className="text-[9px] font-black uppercase tracking-widest text-[#e1e2ec]/40 mb-3">
                         HPU Trend
                         <span className="ml-2 text-vs2/60 normal-case font-normal">
                           · from scan log
                         </span>
                       </p>
-                      <div className="h-8 flex items-center justify-center text-[#e1e2ec]/20 text-xs italic">
-                        Trend tracking — coming soon
-                      </div>
+
+                      {populatedHpuTrend.length > 0 ? (
+                        <>
+                          <div className="grid grid-cols-3 gap-3">
+                            <div className="bg-surface-high rounded-sm p-3">
+                              <p className="text-[9px] font-black uppercase tracking-widest text-[#e1e2ec]/40 mb-1">
+                                Current
+                              </p>
+                              <p
+                                className={`text-2xl font-bold font-['Space_Grotesk',sans-serif] ${getHpuColor(currentHpuPoint?.hpu ?? line.hpu)}`}
+                              >
+                                {(currentHpuPoint?.hpu ?? line.hpu).toFixed(2)}
+                              </p>
+                              <p className="text-[10px] text-[#e1e2ec]/30 mt-1">
+                                {currentHpuPoint?.cumulativeOutput ?? line.output} units
+                              </p>
+                            </div>
+                            <div className="bg-surface-high rounded-sm p-3">
+                              <p className="text-[9px] font-black uppercase tracking-widest text-[#e1e2ec]/40 mb-1">
+                                Best
+                              </p>
+                              <p
+                                className={`text-2xl font-bold font-['Space_Grotesk',sans-serif] ${getHpuColor(bestHpuPoint?.hpu ?? line.hpu)}`}
+                              >
+                                {(bestHpuPoint?.hpu ?? line.hpu).toFixed(2)}
+                              </p>
+                              <p className="text-[10px] text-[#e1e2ec]/30 mt-1">
+                                {bestHpuPoint?.time ?? "—"}
+                              </p>
+                            </div>
+                            <div className="bg-surface-high rounded-sm p-3">
+                              <p className="text-[9px] font-black uppercase tracking-widest text-[#e1e2ec]/40 mb-1">
+                                Trend
+                              </p>
+                              <p
+                                className={`text-2xl font-bold font-['Space_Grotesk',sans-serif] ${
+                                  hpuDelta === null
+                                    ? "text-[#e1e2ec]/30"
+                                    : hpuDelta <= 0
+                                      ? "text-status-green"
+                                      : "text-status-red"
+                                }`}
+                              >
+                                {formatHpuDelta(hpuDelta)}
+                              </p>
+                              <p className="text-[10px] text-[#e1e2ec]/30 mt-1">
+                                {describeHpuDelta(hpuDelta)}
+                              </p>
+                            </div>
+                          </div>
+
+                          <div className="bg-surface-high rounded-sm p-4">
+                            <ResponsiveContainer width="100%" height={200}>
+                              <LineChart
+                                data={hpuTrendData}
+                                margin={{ top: 4, right: 12, left: 4, bottom: 0 }}
+                              >
+                                <CartesianGrid
+                                  strokeDasharray="3 3"
+                                  stroke="#1e2433"
+                                  vertical={false}
+                                />
+                                <XAxis
+                                  dataKey="time"
+                                  tick={{
+                                    fill: "#e1e2ec",
+                                    fillOpacity: 0.4,
+                                    fontSize: 10,
+                                  }}
+                                  axisLine={{ stroke: "#1e2433" }}
+                                  tickLine={false}
+                                  interval={0}
+                                />
+                                <YAxis
+                                  tick={{
+                                    fill: "#e1e2ec",
+                                    fillOpacity: 0.4,
+                                    fontSize: 10,
+                                  }}
+                                  tickFormatter={(value: number) => value.toFixed(2)}
+                                  domain={[
+                                    0,
+                                    (dataMax: number) =>
+                                      Math.max(
+                                        0.5,
+                                        Math.ceil(dataMax * HPU_AXIS_ROUNDING_FACTOR) /
+                                          HPU_AXIS_ROUNDING_FACTOR,
+                                      ),
+                                  ]}
+                                  axisLine={false}
+                                  tickLine={false}
+                                  width={34}
+                                />
+                                <Tooltip
+                                  cursor={{ stroke: "#1e2433", strokeWidth: 1 }}
+                                  {...tooltipStyle}
+                                  formatter={(value) => [
+                                    typeof value === "number" ? value.toFixed(2) : "—",
+                                    "HPU",
+                                  ]}
+                                  labelFormatter={(label, payload) => {
+                                    const point = payload?.[0]?.payload as HpuTrendPoint | undefined;
+                                    if (!point) return label;
+                                    return `${label} · ${point.cumulativeOutput ?? 0} units · ${(
+                                      point.elapsedHours ?? 0
+                                    ).toFixed(2)} hrs`;
+                                  }}
+                                />
+                                <ReferenceLine
+                                  y={0.35}
+                                  stroke="#22c55e"
+                                  strokeDasharray="4 3"
+                                  strokeOpacity={0.45}
+                                  label={{
+                                    value: "Green ≤ 0.35",
+                                    position: "insideTopLeft",
+                                    fill: "#22c55e",
+                                    fillOpacity: 0.7,
+                                    fontSize: 9,
+                                  }}
+                                />
+                                <ReferenceLine
+                                  y={0.45}
+                                  stroke="#f59e0b"
+                                  strokeDasharray="4 3"
+                                  strokeOpacity={0.45}
+                                  label={{
+                                    value: "Amber ≤ 0.45",
+                                    position: "insideBottomLeft",
+                                    fill: "#f59e0b",
+                                    fillOpacity: 0.7,
+                                    fontSize: 9,
+                                  }}
+                                />
+                                <RechartsLine
+                                  type="monotone"
+                                  dataKey="hpu"
+                                  name="HPU"
+                                  stroke="#f97316"
+                                  strokeWidth={2}
+                                  dot={{ r: 2.5, fill: "#f97316", strokeWidth: 0 }}
+                                  activeDot={{ r: 4, fill: "#f97316", strokeWidth: 0 }}
+                                  isAnimationActive={false}
+                                  connectNulls={false}
+                                />
+                              </LineChart>
+                            </ResponsiveContainer>
+                          </div>
+
+                          <div className="grid grid-cols-2 gap-3 text-[10px] text-[#e1e2ec]/35">
+                            <div className="bg-surface-low rounded-sm p-3 border-l-2 border-accent/25">
+                              Lower is better. HPU rises when output slows relative to staffing.
+                            </div>
+                            <div className="bg-surface-low rounded-sm p-3 border-l-2 border-vs2/25">
+                              Peak this shift:{" "}
+                              <span className={getHpuColor(worstHpuPoint?.hpu ?? line.hpu)}>
+                                {(worstHpuPoint?.hpu ?? line.hpu).toFixed(2)}
+                              </span>
+                              {worstHpuPoint?.time ? ` at ${worstHpuPoint.time}` : ""}
+                            </div>
+                          </div>
+                        </>
+                      ) : (
+                        <div className="h-40 flex items-center justify-center text-[#e1e2ec]/20 text-xs italic">
+                          No scan-derived HPU points yet
+                        </div>
+                      )}
                     </div>
                   )}
 

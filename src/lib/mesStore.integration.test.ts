@@ -177,6 +177,15 @@ describe("tickLine", () => {
     expect(output).toBe(0);
   });
 
+  it("does not record output during the handoff gap", async () => {
+    const sched = makeSchedule("vs1-l1", [{ model: "M1", qty: 100 }]);
+    await setSchedule("vs1-l1", sched);
+
+    await tickLine("vs1-l1", 5, new Date("2026-04-12T16:45:00Z"));
+    const output = await getOutputForLine("vs1-l1");
+    expect(output).toBe(0);
+  });
+
   it("tracks hourly output", async () => {
     const sched = makeSchedule("vs1-l1", [{ model: "M1", qty: 100 }]);
     await setSchedule("vs1-l1", sched);

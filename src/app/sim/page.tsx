@@ -7,6 +7,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import type { AdminLineConfig, LineState, SimState } from "@/lib/types/mes";
 import type { ShiftName } from "@/lib/types/core";
 import { LINES, LINE_LABELS, getDefaultTarget } from "@/lib/lines";
+import { getShiftWindows } from "@/lib/shiftTime";
 import Header from "@/components/Header";
 import SidebarNav from "@/components/SidebarNav";
 import HourlyTable from "@/components/sim/HourlyTable";
@@ -27,9 +28,13 @@ const SPEED_OPTIONS = [
   { label: "15×", value: 900, desc: "Fast" },
 ] as const;
 
-function unitsForSpeed(speed: number): number {
+function unitsForSpeed(speed: number, shift: ShiftName): number {
   // Fractional units are accumulated server-side so 1x stays realistic without starving output.
-  return speed / 100;
+  const shiftWindow = getShiftWindows(shift);
+  return (
+    (speed / 100) *
+    (shiftWindow.totalClockMinutes / shiftWindow.totalWorkMinutes)
+  );
 }
 
 // ── Page ─────────────────────────────────────────────────────────────────────
@@ -100,7 +105,7 @@ export default function SimPage() {
     tickInterval.current = setInterval(async () => {
       // Scale units with speed so production stays in a realistic band while
       // still accelerating smoothly at higher sim speeds.
-      const units = unitsForSpeed(speedRef.current);
+      const units = unitsForSpeed(speedRef.current, currentShift ?? shift);
       const res = await authFetch("/api/mes/tick", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -722,7 +727,7 @@ export default function SimPage() {
                         Tick Rate
                       </p>
                       <p className="text-sm font-mono">
-                        {unitsForSpeed(speed).toFixed(1)} units/tick
+                        {unitsForSpeed(speed, currentShift ?? shift).toFixed(1)} units/tick
                       </p>
                     </div>
                   </div>

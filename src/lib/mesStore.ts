@@ -283,8 +283,9 @@ function getNextShiftProductionDate(
 function getRecordContext(
   time: Date,
   shift?: ShiftName,
-): { shift: ShiftName; productionDate: string; contextKey: string } {
-  const resolvedShift = shift ?? getShiftForTime(time, { useUtc: true }) ?? "day";
+): { shift: ShiftName; productionDate: string; contextKey: string } | null {
+  const resolvedShift = shift ?? getShiftForTime(time, { useUtc: true });
+  if (!resolvedShift) return null;
   const context = getShiftContext(resolvedShift, time, { useUtc: true });
   return {
     shift: resolvedShift,
@@ -425,6 +426,7 @@ export async function tickLine(
   const effectiveNow =
     c.simRunning && c.simClock ? c.simClock : (now ?? new Date());
   const recordContext = getRecordContext(effectiveNow);
+  if (!recordContext) return;
   const simMinsPerTick = c.simSpeed / 60;
   const simHoursPerTick = c.simSpeed / 3600;
 
