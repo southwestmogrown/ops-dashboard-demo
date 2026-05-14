@@ -17,8 +17,8 @@ vi.mock("@/lib/db", () => ({
   dbGetAllQueues: vi.fn(async () => ({})),
   dbGetAdminConfig: vi.fn(async () => ({
     isRunning: true,
-    day: { supervisor: "", dailyTarget: 0, headcount: 0 },
-    night: { supervisor: "", dailyTarget: 0, headcount: 0 },
+    day: { supervisor: "", dailyTarget: 0, headcount: 0, isRunning: true },
+    night: { supervisor: "", dailyTarget: 0, headcount: 0, isRunning: true },
   })),
   dbGetAllAdminConfig: vi.fn(async () => ({})),
   dbGetAllComments: vi.fn(async () => ({})),
@@ -283,21 +283,33 @@ describe("Admin config", () => {
     const config = await getAdminConfig("vs1-l1");
     expect(config).toEqual({
       isRunning: true,
-      day: { supervisor: "", dailyTarget: 0, headcount: 0 },
-      night: { supervisor: "", dailyTarget: 0, headcount: 0 },
+      day: { supervisor: "", dailyTarget: 0, headcount: 0, isRunning: true },
+      night: { supervisor: "", dailyTarget: 0, headcount: 0, isRunning: true },
     });
   });
 
   it("stores and retrieves config", async () => {
     await setAdminConfig("vs1-l1", {
       isRunning: true,
-      day: { supervisor: "Alice", dailyTarget: 250, headcount: 50 },
-      night: { supervisor: "Bob", dailyTarget: 200, headcount: 40 },
+      day: {
+        supervisor: "Alice",
+        dailyTarget: 250,
+        headcount: 50,
+        isRunning: true,
+      },
+      night: {
+        supervisor: "Bob",
+        dailyTarget: 200,
+        headcount: 40,
+        isRunning: false,
+      },
     });
     const config = await getAdminConfig("vs1-l1");
     expect(config.day.dailyTarget).toBe(250);
     expect(config.day.headcount).toBe(50);
     expect(config.night.supervisor).toBe("Bob");
+    expect(config.night.isRunning).toBe(false);
+    expect(config.isRunning).toBe(true);
   });
 
   it("merges updates into existing config", async () => {
@@ -310,6 +322,22 @@ describe("Admin config", () => {
     const config = await getAdminConfig("vs1-l1");
     expect(config.day.dailyTarget).toBe(250);
     expect(config.day.headcount).toBe(50);
+  });
+
+  it("derives the legacy top-level running flag from both shifts", async () => {
+    await setAdminConfig("vs1-l1", {
+      day: { isRunning: false },
+      night: { isRunning: true },
+    });
+    expect((await getAdminConfig("vs1-l1")).isRunning).toBe(true);
+
+    await setAdminConfig("vs1-l1", {
+      night: { isRunning: false },
+    });
+    const config = await getAdminConfig("vs1-l1");
+    expect(config.day.isRunning).toBe(false);
+    expect(config.night.isRunning).toBe(false);
+    expect(config.isRunning).toBe(false);
   });
 
   it("getAllAdminConfig returns all configs", async () => {

@@ -21,6 +21,7 @@ import {
     fetchSimClock,
   } from "@/lib/queryFetchers";
 import { authFetch } from "@/lib/clientAuth";
+import { isLineRunningForShift } from "@/lib/adminConfig";
 import LineDetailCard from "@/components/team-lead/LineDetailCard";
 import FloorOverview from "@/components/team-lead/FloorOverview";
 import FloorAlertStrip from "@/components/team-lead/FloorAlertStrip";
@@ -206,7 +207,7 @@ export default function TeamLeadPage() {
   function getLineStatus(lineId: string) {
     const state = stateMap.get(lineId);
     const line = lines.find((l) => l.id === lineId);
-    const isRunning = adminConfig?.[lineId]?.isRunning !== false;
+    const isRunning = isLineRunningForShift(adminConfig?.[lineId], shift);
 
     if (!isRunning) {
       return {
@@ -384,7 +385,7 @@ export default function TeamLeadPage() {
 
           <div className="flex-1 overflow-y-auto custom-scrollbar p-2 space-y-1">
             {filteredLines.map((line) => {
-              const isRunning = adminConfig?.[line.id]?.isRunning !== false;
+              const isRunning = isLineRunningForShift(adminConfig?.[line.id], shift);
               const status = getLineStatus(line.id);
               const isSelected = selectedLineId === line.id;
               return (
@@ -524,12 +525,14 @@ export default function TeamLeadPage() {
                 lines={metrics.lines}
                 mesStates={mesStates}
                 adminConfig={adminConfig}
+                shift={shift}
               />
               <FloorOverview
                 metrics={metrics}
                 mesStates={mesStates}
                 scrapEntries={allScrapEntries}
                 adminConfig={adminConfig}
+                shift={shift}
                 onSelectLine={(lineId) => {
                   setSelectedLineId(lineId);
                   setViewMode("detail");

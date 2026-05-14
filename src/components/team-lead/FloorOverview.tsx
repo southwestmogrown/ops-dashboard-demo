@@ -1,9 +1,10 @@
 "use client";
 
-import type { ShiftMetrics } from "@/lib/types/core";
+import type { ShiftMetrics, ShiftName } from "@/lib/types/core";
 import type { LineState } from "@/lib/types/mes";
 import type { AdminLineConfig } from "@/lib/types/mes";
 import type { ScrapEntry } from "@/lib/types/quality";
+import { isLineRunningForShift } from "@/lib/adminConfig";
 import {
   getRiskLevel,
   getFpyColor,
@@ -16,6 +17,7 @@ interface FloorOverviewProps {
   mesStates: LineState[];
   scrapEntries: ScrapEntry[];
   adminConfig: Record<string, AdminLineConfig>;
+  shift: ShiftName;
   onSelectLine: (lineId: string) => void;
 }
 
@@ -184,6 +186,7 @@ export default function FloorOverview({
   mesStates,
   scrapEntries,
   adminConfig,
+  shift,
   onSelectLine,
 }: FloorOverviewProps) {
   const stateMap = new Map(mesStates.map((s) => [s.lineId, s]));
@@ -217,7 +220,7 @@ export default function FloorOverview({
       <div className="grid grid-cols-2 gap-3 xl:grid-cols-3">
         {metrics.lines.map((line) => {
           const mesState = stateMap.get(line.id);
-          const isRunning = adminConfig?.[line.id]?.isRunning !== false;
+          const isRunning = isLineRunningForShift(adminConfig?.[line.id], shift);
           const risk = getRiskLevel(line, mesState, undefined, isRunning);
 
           return (

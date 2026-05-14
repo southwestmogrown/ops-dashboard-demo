@@ -14,6 +14,7 @@ import type {
   RunSheetItem,
   ShiftConfig,
 } from "@/lib/types/mes";
+import { defaultShiftConfig } from "@/lib/adminConfig";
 import type { ShiftName } from "@/lib/types/core";
 
 interface AdminConfigUpdate {
@@ -74,25 +75,25 @@ const AdminLineCardInner = forwardRef(function AdminLineCardInner(
   const [activeTab, setActiveTab] = useState<ShiftName>(currentShift);
   const [shiftConfig, setShiftConfig] = useState<Record<ShiftName, ShiftConfig>>(
     () => ({
-      day: config?.day ?? { supervisor: "", dailyTarget: 0, headcount: 0 },
-      night: config?.night ?? { supervisor: "", dailyTarget: 0, headcount: 0 },
+      day: config?.day ?? defaultShiftConfig(),
+      night: config?.night ?? defaultShiftConfig(),
     }),
   );
   const [dirtyTabs, setDirtyTabs] = useState<Record<ShiftName, boolean>>({
     day: false,
     night: false,
   });
-  const [isRunning, setIsRunning] = useState(config?.isRunning ?? true);
   const [saved, setSaved] = useState(false);
 
   useEffect(() => {
     setShiftConfig({
-      day: config?.day ?? { supervisor: "", dailyTarget: 0, headcount: 0 },
-      night: config?.night ?? { supervisor: "", dailyTarget: 0, headcount: 0 },
+      day: config?.day ?? defaultShiftConfig(),
+      night: config?.night ?? defaultShiftConfig(),
     });
     setDirtyTabs({ day: false, night: false });
-    setIsRunning(config?.isRunning ?? true);
   }, [config]);
+
+  const activeShiftIsRunning = shiftConfig[activeTab].isRunning;
 
   const flashSaved = useCallback(() => {
     setSaved(true);
@@ -116,27 +117,28 @@ const AdminLineCardInner = forwardRef(function AdminLineCardInner(
     ref,
     () => ({
       save: async () => {
-        await onConfigSaved(lineId, { isRunning });
         await persistShiftConfig("day");
         await persistShiftConfig("night");
       },
     }),
-    [isRunning, lineId, onConfigSaved, persistShiftConfig],
+    [persistShiftConfig],
   );
 
   useEffect(() => {
-    if (!isRunning) return;
+    if (!activeShiftIsRunning) return;
     if (!dirtyTabs[activeTab]) return;
     const savedShift = config?.[activeTab] ?? {
       supervisor: "",
       dailyTarget: 0,
       headcount: 0,
+      isRunning: true,
     };
     const currentShiftConfig = shiftConfig[activeTab];
     if (
       currentShiftConfig.supervisor === savedShift.supervisor &&
       currentShiftConfig.dailyTarget === savedShift.dailyTarget &&
-      currentShiftConfig.headcount === savedShift.headcount
+      currentShiftConfig.headcount === savedShift.headcount &&
+      currentShiftConfig.isRunning === savedShift.isRunning
     ) {
       return;
     }
@@ -144,7 +146,7 @@ const AdminLineCardInner = forwardRef(function AdminLineCardInner(
       void persistShiftConfig(activeTab);
     }, AUTOSAVE_DEBOUNCE_MS);
     return () => window.clearTimeout(timeout);
-  }, [activeTab, config, dirtyTabs, isRunning, persistShiftConfig, shiftConfig]);
+  }, [activeShiftIsRunning, activeTab, config, dirtyTabs, persistShiftConfig, shiftConfig]);
 
   async function handleFile(file: File) {
     if (!file.name.endsWith(".pdf")) {
@@ -186,7 +188,6 @@ const AdminLineCardInner = forwardRef(function AdminLineCardInner(
   }
 
   async function handleSave() {
-    await onConfigSaved(lineId, { isRunning });
     await persistShiftConfig(activeTab);
   }
 
@@ -244,16 +245,26 @@ const AdminLineCardInner = forwardRef(function AdminLineCardInner(
         </div>
         <label className="flex items-center gap-2 cursor-pointer group">
           <span className="text-[10px] font-bold tracking-widest text-[#e1e2ec]/40 group-hover:text-[#e1e2ec] transition-colors uppercase">
-            Running
+            {activeTab === "day" ? "Day" : "Night"} Running
           </span>
           <div className="relative inline-flex items-center h-5 w-9">
             <input
               type="checkbox"
-              checked={isRunning}
+              checked={activeShiftIsRunning}
               onChange={async () => {
-                const next = !isRunning;
-                setIsRunning(next);
-                await onConfigSaved(lineId, { isRunning: next });
+                const next = !activeShiftIsRunning;
+                setShiftConfig((current) => ({
+                  ...current,
+                  [activeTab]: {
+                    ...current[activeTab],
+                    isRunning: next,
+                  },
+                }));
+                await onConfigSaved(lineId, {
+                  shift: activeTab,
+                  shiftConfig: { isRunning: next },
+                });
+                flashSaved();
               }}
               className="sr-only peer"
             />
@@ -275,9 +286,9 @@ const AdminLineCardInner = forwardRef(function AdminLineCardInner(
                 : loadedFlash
                   ? "border-status-green bg-status-green/5"
                   : "border-border bg-background/50 hover:border-accent/40"
-            } ${!isRunning ? "pointer-events-none" : "cursor-pointer"}`}
+            } ${!activeShiftIsRunning ? "pointer-events-none" : "cursor-pointer"}`}
             onDragOver={(e) => {
-              if (isRunning) {
+              if (activeShiftIsRunning) {
                 e.preventDefault();
                 setIsDragOver(true);
               }
@@ -285,7 +296,7 @@ const AdminLineCardInner = forwardRef(function AdminLineCardInner(
             onDragLeave={() => setIsDragOver(false)}
             onDrop={onDrop}
             onClick={() => {
-              if (isRunning) inputRef.current?.click();
+              if (activeShiftIsRunning) inputRef.current?.click();
             }}
           >
             <span
@@ -316,7 +327,7 @@ const AdminLineCardInner = forwardRef(function AdminLineCardInner(
               ref={inputRef}
               type="file"
               accept=".pdf"
-              disabled={!isRunning}
+              disabled={!activeShiftIsRunning}
               className="absolute inset-0 opacity-0 cursor-pointer"
               onChange={(e) => {
                 const f = e.target.files?.[0];
@@ -354,7 +365,7 @@ const AdminLineCardInner = forwardRef(function AdminLineCardInner(
               </label>
               <input
                 type="text"
-                disabled={!isRunning}
+                disabled={!activeShiftIsRunning}
                 value={shiftConfig[activeTab].supervisor}
                 onChange={(e) => {
                   setDirtyTabs((current) => ({ ...current, [activeTab]: true }));
@@ -379,7 +390,7 @@ const AdminLineCardInner = forwardRef(function AdminLineCardInner(
                 <input
                   type="number"
                   min={0}
-                  disabled={!isRunning}
+                  disabled={!activeShiftIsRunning}
                   value={shiftConfig[activeTab].dailyTarget}
                   onChange={(e) => {
                     setDirtyTabs((current) => ({ ...current, [activeTab]: true }));
@@ -403,7 +414,7 @@ const AdminLineCardInner = forwardRef(function AdminLineCardInner(
                 <input
                   type="number"
                   min={0}
-                  disabled={!isRunning}
+                  disabled={!activeShiftIsRunning}
                   value={shiftConfig[activeTab].headcount}
                   onChange={(e) => {
                     setDirtyTabs((current) => ({ ...current, [activeTab]: true }));
@@ -426,7 +437,7 @@ const AdminLineCardInner = forwardRef(function AdminLineCardInner(
           {/* Save Button */}
           <button
             onClick={handleSave}
-            disabled={!isRunning}
+            disabled={!activeShiftIsRunning}
             className={`kc-btn-primary-wide ${
               saved
                 ? "bg-status-green text-black"
@@ -440,7 +451,7 @@ const AdminLineCardInner = forwardRef(function AdminLineCardInner(
         {/* Right: RunSheet Preview */}
         {hasSchedule ? (
           <div
-            className={`bg-background p-4 border border-border/40 rounded-sm flex flex-col ${!isRunning ? "opacity-40 grayscale" : ""}`}
+            className={`bg-background p-4 border border-border/40 rounded-sm flex flex-col ${!activeShiftIsRunning ? "opacity-40 grayscale" : ""}`}
           >
             <div className="flex items-center justify-between mb-4 pb-2 border-b border-border/40">
               <span className="text-[10px] uppercase font-black tracking-widest">
@@ -603,7 +614,7 @@ const AdminLineCardInner = forwardRef(function AdminLineCardInner(
           </div>
         ) : (
           <div
-            className={`bg-background p-4 border border-border/40 rounded-sm flex flex-col items-center justify-center min-h-[200px] ${!isRunning ? "opacity-40 grayscale" : ""}`}
+            className={`bg-background p-4 border border-border/40 rounded-sm flex flex-col items-center justify-center min-h-[200px] ${!activeShiftIsRunning ? "opacity-40 grayscale" : ""}`}
           >
             <span className="material-symbols-outlined text-[#e1e2ec]/10 text-5xl">
               inventory

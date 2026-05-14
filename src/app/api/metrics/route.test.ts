@@ -35,8 +35,8 @@ vi.mock("@/lib/generateMetrics", () => ({
 vi.mock("@/lib/mesStore", () => ({
   getAdminConfig: vi.fn(async () => ({
     isRunning: true,
-    day: { supervisor: "", dailyTarget: 0, headcount: 0 },
-    night: { supervisor: "", dailyTarget: 0, headcount: 0 },
+    day: { supervisor: "", dailyTarget: 0, headcount: 0, isRunning: true },
+    night: { supervisor: "", dailyTarget: 0, headcount: 0, isRunning: true },
   })),
   getAllLineStates: vi.fn(async () => [
     {

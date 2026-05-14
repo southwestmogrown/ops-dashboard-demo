@@ -21,6 +21,10 @@ import type { NewScrapEntry, ScrapEntry } from "./reworkTypes";
 import type { DowntimeEntry } from "./downtimeTypes";
 import type { ShiftName } from "./types";
 import {
+  defaultAdminLineConfig,
+  withDerivedLineRunning,
+} from "./adminConfig";
+import {
   formatProductionDate,
   getNextShift,
   getProductionDateForTime,
@@ -128,11 +132,7 @@ const MTBF_VS2 = 5;
 const UNFILTERED_CONTEXT = "__unfiltered__";
 
 function defaultAdminConfig(): AdminLineConfig {
-  return {
-    isRunning: true,
-    day: { supervisor: "", dailyTarget: 0, headcount: 0 },
-    night: { supervisor: "", dailyTarget: 0, headcount: 0 },
-  };
+  return defaultAdminLineConfig();
 }
 
 type AdminLineConfigUpdate = Partial<Omit<AdminLineConfig, "day" | "night">> & {
@@ -145,7 +145,7 @@ function mergeAdminConfig(
   next: AdminLineConfigUpdate,
 ): AdminLineConfig {
   const base = current ?? defaultAdminConfig();
-  return {
+  return withDerivedLineRunning({
     ...base,
     ...next,
     day: {
@@ -156,7 +156,7 @@ function mergeAdminConfig(
       ...base.night,
       ...next.night,
     },
-  };
+  });
 }
 
 async function _hydrateFromDb(): Promise<void> {
@@ -1148,6 +1148,6 @@ export async function resetAll(): Promise<void> {
   c.initPromise = null;
   await dbResetAll();
   // Re-load admin config — target/headcount are now NULL so lines fall back to seeded defaults;
-  // isRunning flags are preserved so floor layout is unchanged.
+  // per-shift running flags are preserved so floor layout is unchanged for each shift.
   c.adminConfig = await dbGetAllAdminConfig();
 }

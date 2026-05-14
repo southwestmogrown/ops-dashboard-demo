@@ -8,6 +8,7 @@ export interface ShiftConfig {
   supervisor: string;
   dailyTarget: number;
   headcount: number;
+  isRunning: boolean;
 }
 
 /** Per-line admin configuration overrides */
