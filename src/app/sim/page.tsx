@@ -524,14 +524,14 @@ export default function SimPage() {
                               <p className="text-[10px] text-[#e1e2ec]/40 uppercase tracking-widest">
                                 Order: {st.currentOrder ?? "Complete"}
                               </p>
-                              {st.completedOrders > 0 && (
+                              {st.totalChangeovers > 0 && (
                                 <div className="mt-2 flex items-center gap-2">
                                   <span className="text-[9px] text-[#e1e2ec]/35 uppercase tracking-widest">
                                     Changeovers
                                   </span>
                                   <div className="flex items-end gap-1">
                                     {Array.from({
-                                      length: Math.min(st.completedOrders, 8),
+                                      length: Math.min(st.totalChangeovers, 8),
                                     }).map((_, idx) => (
                                       <span
                                         key={idx}
@@ -540,7 +540,7 @@ export default function SimPage() {
                                     ))}
                                   </div>
                                   <span className="text-[10px] font-mono text-status-amber/80">
-                                    {st.completedOrders}
+                                    {st.totalChangeovers}
                                   </span>
                                 </div>
                               )}

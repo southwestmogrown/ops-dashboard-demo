@@ -214,7 +214,7 @@ export default function EOSPage() {
             orderAtPackout: state.currentOrder ?? "",
             remainingOnOrder: String(state.remainingOnOrder),
             remainingOnRunSheet: String(state.remainingOnRunSheet),
-            changeovers: String(state.completedOrders),
+            changeovers: String(state.totalChangeovers),
           };
         });
 
