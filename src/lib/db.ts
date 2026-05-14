@@ -83,11 +83,11 @@ function resetAdminConfig(config: AdminLineConfig): AdminLineConfig {
     ...defaultAdminLineConfig(),
     day: {
       ...createDefaultShiftConfig(),
-      isRunning: config.day.isRunning,
+      isRunning: config.day?.isRunning ?? true,
     },
     night: {
       ...createDefaultShiftConfig(),
-      isRunning: config.night.isRunning,
+      isRunning: config.night?.isRunning ?? true,
     },
   });
 }

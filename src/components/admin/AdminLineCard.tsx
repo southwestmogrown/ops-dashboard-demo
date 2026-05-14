@@ -25,6 +25,18 @@ interface AdminConfigUpdate {
 
 const AUTOSAVE_DEBOUNCE_MS = 600;
 
+function scheduleSignature(schedule: LineSchedule): string {
+  return JSON.stringify({
+    lineId: schedule.lineId,
+    date: schedule.date,
+    totalTarget: schedule.totalTarget,
+    items: schedule.items.map((item) => ({
+      model: item.model,
+      qty: item.qty,
+    })),
+  });
+}
+
 interface AdminLineCardProps {
   lineId: string;
   label: string;
@@ -71,6 +83,9 @@ const AdminLineCardInner = forwardRef(function AdminLineCardInner(
   const [pendingSchedule, setPendingSchedule] = useState<LineSchedule | null>(
     null,
   );
+  const [pendingQueuedSchedules, setPendingQueuedSchedules] = useState<
+    LineSchedule[]
+  >([]);
 
   const [activeTab, setActiveTab] = useState<ShiftName>(currentShift);
   const [shiftConfig, setShiftConfig] = useState<Record<ShiftName, ShiftConfig>>(
@@ -162,8 +177,14 @@ const AdminLineCardInner = forwardRef(function AdminLineCardInner(
         setParseError("No orders found");
         return;
       }
-      // Show preview immediately — the API call is just persistence
-      setPendingSchedule(s);
+      const hasExistingSchedule =
+        pendingSchedule !== null || schedule !== null || queuedSchedules.length > 0;
+      if (hasExistingSchedule) {
+        setPendingQueuedSchedules((current) => [...current, s]);
+      } else {
+        // Show preview immediately when replacing an empty line — the API call is just persistence
+        setPendingSchedule(s);
+      }
       setLoadedFlash(true);
       setTimeout(() => setLoadedFlash(false), 1500);
       // POST to API in the background; refresh() will pick up the canonical state
@@ -172,6 +193,9 @@ const AdminLineCardInner = forwardRef(function AdminLineCardInner(
       } catch {
         setParseError("Failed to save schedule — please retry");
         setPendingSchedule(null);
+        setPendingQueuedSchedules((current) =>
+          current.filter((queued) => scheduleSignature(queued) !== scheduleSignature(s)),
+        );
       }
     } catch (e) {
       setParseError(e instanceof Error ? e.message : "Parse failed");
@@ -198,12 +222,21 @@ const AdminLineCardInner = forwardRef(function AdminLineCardInner(
   const serverConfirmed =
     schedule !== null &&
     pendingSchedule !== null &&
-    schedule.lineId === pendingSchedule.lineId &&
-    schedule.date === pendingSchedule.date;
+    scheduleSignature(schedule) === scheduleSignature(pendingSchedule);
 
   useEffect(() => {
     if (serverConfirmed) setPendingSchedule(null);
   }, [serverConfirmed]);
+
+  useEffect(() => {
+    if (queuedSchedules.length === 0 && pendingQueuedSchedules.length === 0) return;
+    const serverQueueSignatures = new Set(queuedSchedules.map(scheduleSignature));
+    setPendingQueuedSchedules((current) =>
+      current.filter(
+        (queued) => !serverQueueSignatures.has(scheduleSignature(queued)),
+      ),
+    );
+  }, [pendingQueuedSchedules.length, queuedSchedules]);
 
   const pct = activeSchedule
     ? Math.round(
@@ -213,7 +246,11 @@ const AdminLineCardInner = forwardRef(function AdminLineCardInner(
       )
     : 0;
 
-  const queuedCount = queuedSchedules.length;
+  const displayedQueuedSchedules = [
+    ...queuedSchedules.map((sched) => ({ schedule: sched, pending: false })),
+    ...pendingQueuedSchedules.map((sched) => ({ schedule: sched, pending: true })),
+  ];
+  const queuedCount = displayedQueuedSchedules.length;
   const hasSchedule = activeSchedule !== null;
   const statusLabel = hasSchedule
     ? queuedCount > 0
@@ -250,6 +287,7 @@ const AdminLineCardInner = forwardRef(function AdminLineCardInner(
           <div className="relative inline-flex items-center h-5 w-9">
             <input
               type="checkbox"
+              aria-label={`${label} ${activeTab === "day" ? "day" : "night"} running`}
               checked={activeShiftIsRunning}
               onChange={async () => {
                 const next = !activeShiftIsRunning;
@@ -570,22 +608,29 @@ const AdminLineCardInner = forwardRef(function AdminLineCardInner(
                 </button>
                 {queueOpen && (
                   <div className="flex flex-col gap-1">
-                    {queuedSchedules.map((sched, i) => (
+                    {displayedQueuedSchedules.map(({ schedule: sched, pending }, i) => (
                       <div
-                        key={i}
+                        key={`${scheduleSignature(sched)}-${pending ? "pending" : "saved"}`}
                         className="flex items-center justify-between gap-2 text-[10px]"
                       >
                         <span className="text-[#e1e2ec]/60 font-mono">
                           {sched.date} &middot; {sched.items.length} orders
                           &middot; {sched.totalTarget} units
+                          {pending ? " · syncing…" : ""}
                         </span>
-                        <button
-                          onClick={() => onRemoveQueued(lineId, i + 1)}
-                          title="Remove from queue"
-                          className="text-[#e1e2ec]/30 hover:text-status-red bg-transparent border-none cursor-pointer transition-colors"
-                        >
-                          remove
-                        </button>
+                        {pending ? (
+                          <span className="text-[#e1e2ec]/25 uppercase tracking-widest">
+                            pending
+                          </span>
+                        ) : (
+                          <button
+                            onClick={() => onRemoveQueued(lineId, i + 1)}
+                            title="Remove from queue"
+                            className="text-[#e1e2ec]/30 hover:text-status-red bg-transparent border-none cursor-pointer transition-colors"
+                          >
+                            remove
+                          </button>
+                        )}
                       </div>
                     ))}
                   </div>
@@ -604,6 +649,7 @@ const AdminLineCardInner = forwardRef(function AdminLineCardInner(
               <button
                 onClick={() => {
                   setPendingSchedule(null);
+                  setPendingQueuedSchedules([]);
                   onClearSchedule(lineId);
                 }}
                 className="kc-btn-compact-danger"
