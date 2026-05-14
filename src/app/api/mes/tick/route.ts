@@ -12,12 +12,14 @@ import {
   getSimSpeed,
   claimSimUnits,
   refreshCacheFromDb,
+  getAdminConfig,
 } from "@/lib/mesStore";
 import { getCurrentShiftContext, getShiftWindows } from "@/lib/shiftTime";
 import type { ShiftName } from "@/lib/types/core";
 import { PANEL_OPTIONS, pickDefectType } from "@/lib/types/quality";
 import type { DowntimeReason } from "@/lib/types/downtime";
 import { requireRole } from "@/lib/apiAuth";
+import { isLineRunningForShift } from "@/lib/adminConfig";
 
 interface TickBody {
   lineId?: string;
@@ -38,8 +40,61 @@ const DOWNTIME_REASONS: DowntimeReason[] = [
   "changeover",
 ];
 
-function unitsForSpeed(speed: number): number {
-  return speed / 100;
+function getShiftTimelineHour(simClock: Date, shift: ShiftName): number {
+  const hours = simClock.getUTCHours() + simClock.getUTCMinutes() / 60;
+  const shiftWindow = getShiftWindows(shift);
+  if (shift === "night" && hours < shiftWindow.startHour) {
+    return hours + 24;
+  }
+  return hours;
+}
+
+function getElapsedWorkMinutes(
+  simClock: Date,
+  shift: ShiftName,
+): { elapsedWorkMinutes: number; isOnBreak: boolean } {
+  const context = getCurrentShiftContext(simClock, { useUtc: true });
+  const shiftWindow = getShiftWindows(shift);
+  const timelineHour = getShiftTimelineHour(simClock, shift);
+  const elapsedClockMinutes = context
+    ? Math.max(
+        0,
+        Math.min(
+          shiftWindow.totalClockMinutes,
+          (simClock.getTime() - context.shiftStart.getTime()) / 60_000,
+        ),
+      )
+    : 0;
+
+  let elapsedWorkMinutes = elapsedClockMinutes;
+  let isOnBreak = false;
+
+  for (const breakWindow of shiftWindow.breakWindows) {
+    if (timelineHour >= breakWindow.start && timelineHour < breakWindow.end) {
+      isOnBreak = true;
+    }
+
+    const breakStartMinutes =
+      (breakWindow.start - shiftWindow.startHour) * 60;
+    const breakEndMinutes = (breakWindow.end - shiftWindow.startHour) * 60;
+    const elapsedBreakMinutes = Math.max(
+      0,
+      Math.min(elapsedClockMinutes, breakEndMinutes) - breakStartMinutes,
+    );
+    elapsedWorkMinutes -= elapsedBreakMinutes;
+  }
+
+  return {
+    elapsedWorkMinutes: Math.max(0, elapsedWorkMinutes),
+    isOnBreak,
+  };
+}
+
+function unitsForSpeed(speed: number, shift: ShiftName): number {
+  const shiftWindow = getShiftWindows(shift);
+  const workMinuteCompensation =
+    shiftWindow.totalClockMinutes / shiftWindow.totalWorkMinutes;
+  return (speed / 100) * workMinuteCompensation;
 }
 
 function randomChoice<T>(arr: readonly T[]): T {
@@ -54,18 +109,36 @@ function randomChoice<T>(arr: readonly T[]): T {
  */
 function getRateMultiplier(simClock: Date): {
   multiplier: number;
-  actualUnits: number;
+  isProductionPaused: boolean;
   shiftMinutes: number;
+  shift: ShiftName | null;
 } {
   const context = getCurrentShiftContext(simClock, { useUtc: true });
-  const totalWorkMinutes = context ? getShiftWindows(context.shift).totalWorkMinutes : 0;
-  const elapsedMinutes = context?.elapsedHours != null ? context.elapsedHours * 60 : 0;
+  if (!context) {
+    return {
+      multiplier: 0,
+      isProductionPaused: true,
+      shiftMinutes: 0,
+      shift: null,
+    };
+  }
+
+  const totalWorkMinutes = getShiftWindows(context.shift).totalWorkMinutes;
+  const { elapsedWorkMinutes, isOnBreak } = getElapsedWorkMinutes(
+    simClock,
+    context.shift,
+  );
 
   let multiplier = 1;
-  if (elapsedMinutes < 30) multiplier = 0.6;
-  else if (elapsedMinutes > totalWorkMinutes - 30) multiplier = 0.75;
+  if (elapsedWorkMinutes < 30) multiplier = 0.6;
+  else if (elapsedWorkMinutes > totalWorkMinutes - 30) multiplier = 0.75;
 
-  return { multiplier, actualUnits: 0, shiftMinutes: elapsedMinutes };
+  return {
+    multiplier: isOnBreak ? 0 : multiplier,
+    isProductionPaused: isOnBreak,
+    shiftMinutes: elapsedWorkMinutes,
+    shift: context.shift,
+  };
 }
 
 // ── M17.3: Multi-defect scrap injection ──────────────────────────────────────
@@ -178,18 +251,31 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       return NextResponse.json({ scansAdded: 0, stopped: true });
 
     const simState = await getSimState();
-    const shift = simState.currentShift ?? "day";
+    const shift = simState.currentShift;
     const productionDate = simState.productionDate ?? "unknown";
-    const states = await getAllLineStates({ shift, productionDate });
-    const activeLines = states.filter((s) => s.schedule !== null);
-    let scansAdded = 0;
 
     const simClock = (await getSimClock()) ?? new Date();
-    const { multiplier } = getRateMultiplier(simClock);
+    const { multiplier, shift: activeShift } = getRateMultiplier(simClock);
+    if (!shift || !activeShift || multiplier <= 0) {
+      return NextResponse.json({ scansAdded: 0 });
+    }
+
+    const states = await getAllLineStates({ shift: activeShift, productionDate });
+    const eligibleLineStates = await Promise.all(
+      states
+        .filter((s) => s.schedule !== null)
+        .map(async (state) => ({
+          state,
+          config: await getAdminConfig(state.lineId),
+        })),
+    );
+    const activeLines = eligibleLineStates
+      .filter(({ config }) => isLineRunningForShift(config, activeShift))
+      .map(({ state }) => state);
+    let scansAdded = 0;
 
     const simSpeed = await getSimSpeed();
-    const requestedUnits =
-      body.units > 0 ? body.units : unitsForSpeed(simSpeed);
+    const requestedUnits = unitsForSpeed(simSpeed, activeShift);
     const requestedTickUnits = requestedUnits * multiplier;
 
     if (requestedTickUnits <= 0) {
@@ -235,9 +321,19 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   }
 
   const simClock = (await getSimClock()) ?? new Date();
-  const { multiplier } = getRateMultiplier(simClock);
+  const { multiplier, shift } = getRateMultiplier(simClock);
+  if (!shift || multiplier <= 0) {
+    return NextResponse.json({ scansAdded: 0 });
+  }
+
+  const config = await getAdminConfig(body.lineId);
+  if (!isLineRunningForShift(config, shift)) {
+    return NextResponse.json({ scansAdded: 0 });
+  }
+
   const simSpeed = await getSimSpeed();
-  const requestedUnits = body.units > 0 ? body.units : unitsForSpeed(simSpeed);
+  const requestedUnits =
+    body.units > 0 ? body.units : unitsForSpeed(simSpeed, shift);
   const actualUnits = await claimSimUnits(
     body.lineId,
     requestedUnits * multiplier,
