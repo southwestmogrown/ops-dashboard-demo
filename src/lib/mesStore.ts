@@ -816,6 +816,7 @@ export async function updateScrapEntry(
   updates: {
     model?: string;
     panel?: string;
+    reasonCode?: string;
     damageType?: string;
     boughtIn?: boolean;
   },
@@ -827,6 +828,9 @@ export async function updateScrapEntry(
     (entry as unknown as Record<string, unknown>).model = updates.model;
   if (updates.panel)
     (entry as unknown as Record<string, unknown>).panel = updates.panel;
+  if (updates.reasonCode)
+    (entry as unknown as Record<string, unknown>).reasonCode =
+      updates.reasonCode;
   if (updates.damageType)
     (entry as unknown as Record<string, unknown>).damageType =
       updates.damageType;

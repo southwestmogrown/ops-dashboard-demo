@@ -2,7 +2,12 @@
 
 import { useState } from "react";
 import type { ScrapEntry } from "@/lib/types/quality";
-import { PANEL_OPTIONS, DAMAGE_TYPES } from "@/lib/types/quality";
+import {
+  PANEL_OPTIONS,
+  DAMAGE_TYPES,
+  REASON_CODES,
+  isRevolverLine,
+} from "@/lib/types/quality";
 import type { ShiftName } from "@/lib/types/core";
 import { authFetch } from "@/lib/clientAuth";
 
@@ -21,9 +26,15 @@ export default function ScrapForm({
   onClose,
   onCreated,
 }: ScrapFormProps) {
+  const revolverLine = isRevolverLine(lineId);
+  const primaryKindLabel = revolverLine ? "Extrusion" : "Scrapped Panel";
+  const panelLabel = revolverLine ? "Extrusion" : "Panel";
   const [kind, setKind] = useState<FormKind>("scrapped-panel");
   const [model, setModel] = useState("");
   const [panel, setPanel] = useState<(typeof PANEL_OPTIONS)[number]>("A");
+  const [reasonCode, setReasonCode] = useState<(typeof REASON_CODES)[number]>(
+    REASON_CODES[0],
+  );
   const [damageType, setDamageType] = useState<(typeof DAMAGE_TYPES)[number]>(
     DAMAGE_TYPES[0],
   );
@@ -47,6 +58,7 @@ export default function ScrapForm({
         shift,
         model,
         panel,
+        reasonCode,
         damageType,
       };
 
@@ -117,7 +129,7 @@ export default function ScrapForm({
                     : "bg-transparent text-[#e1e2ec]/40 border-border hover:border-[#e1e2ec]/30"
                 }`}
               >
-                {k === "scrapped-panel" ? "Scrapped Panel" : "Kicked Lid"}
+                {k === "scrapped-panel" ? primaryKindLabel : "Kicked Lid"}
               </button>
             ))}
           </div>
@@ -136,7 +148,7 @@ export default function ScrapForm({
 
           {/* Panel */}
           <div>
-            <label className={labelClass}>Panel</label>
+            <label className={labelClass}>{panelLabel}</label>
             <div className="flex gap-2">
               {PANEL_OPTIONS.map((p) => (
                 <button
@@ -155,7 +167,23 @@ export default function ScrapForm({
             </div>
           </div>
 
-          {/* Damage type */}
+          <div>
+            <label className={labelClass}>Reason Code</label>
+            <select
+              value={reasonCode}
+              onChange={(e) =>
+                setReasonCode(e.target.value as (typeof REASON_CODES)[number])
+              }
+              className={inputClass}
+            >
+              {REASON_CODES.map((code) => (
+                <option key={code} value={code}>
+                  {code}
+                </option>
+              ))}
+            </select>
+          </div>
+
           <div>
             <label className={labelClass}>Type of Damage</label>
             <select

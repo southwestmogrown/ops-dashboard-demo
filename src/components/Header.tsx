@@ -12,6 +12,14 @@ import {
   formatShiftTime,
 } from "@/lib/shiftTime";
 
+const PLANT_TIME_ZONE = "America/Chicago";
+const PLANT_TIME_LABEL = "CST";
+const TIME_FORMAT_OPTIONS = {
+  hour: "2-digit",
+  minute: "2-digit",
+  second: "2-digit",
+} as const;
+
 interface HeaderProps {
   shift?: ShiftName;
   onShiftChange?: (shift: ShiftName) => void;
@@ -85,6 +93,10 @@ export default function Header({
 
   // Only calculate shift-related data if shift is being used
   const shouldShowShiftPill = Boolean(shift && onShiftChange);
+  const currentTimeText = displayTime.toLocaleTimeString([], {
+    ...TIME_FORMAT_OPTIONS,
+    timeZone: useUtcClock ? "UTC" : PLANT_TIME_ZONE,
+  });
 
   return (
     <header className="shrink-0 z-50 bg-background border-b border-border font-['Space_Grotesk',sans-serif] tracking-tight">
@@ -192,12 +204,12 @@ export default function Header({
                     Current Time
                   </span>
                   <span className="text-sm font-medium font-mono text-[#e1e2ec] leading-tight">
-                    {displayTime.toLocaleTimeString([], {
-                      hour: "2-digit",
-                      minute: "2-digit",
-                      second: "2-digit",
-                      timeZone: useUtcClock ? "UTC" : undefined,
-                    })}
+                    {currentTimeText}
+                    {!useUtcClock && (
+                      <span className="ml-1 text-[#e1e2ec]/40">
+                        {PLANT_TIME_LABEL}
+                      </span>
+                    )}
                   </span>
                 </div>
               </div>

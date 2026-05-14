@@ -321,7 +321,10 @@ export default function TeamLeadPage() {
                 ))}
               </div>
               <span className="text-[#e1e2ec]/60 tabular-nums text-[11px]">
-                {now.toLocaleTimeString("en-GB")} UTC
+                {now.toLocaleTimeString("en-GB", {
+                  timeZone: "America/Chicago",
+                })}{" "}
+                CST
               </span>
             </div>
             {isTeamLeadGated && (

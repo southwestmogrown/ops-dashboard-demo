@@ -594,6 +594,7 @@ export async function dbClearComments(): Promise<void> {
 
 export async function dbInsertScrap(entry: ScrapEntry): Promise<void> {
   const extra: Record<string, unknown> = {};
+  if (entry.reasonCode) extra.reasonCode = entry.reasonCode;
   if (entry.kind === "scrapped-panel") {
     extra.stationFound = entry.stationFound;
     extra.howDamaged = entry.howDamaged;
@@ -640,6 +641,10 @@ function _parseScrapRow(r: ScrapRow): ScrapEntry {
   const extra = JSON.parse(r.extra) as Record<string, unknown>;
   const panel = r.panel as ScrapEntry["panel"];
   const damageType = r.damage_type as ScrapEntry["damageType"];
+  const reasonCode =
+    typeof extra.reasonCode === "string"
+      ? (extra.reasonCode as ScrapEntry["reasonCode"])
+      : undefined;
   if (r.kind === "scrapped-panel") {
     return {
         id: r.id,
@@ -648,6 +653,7 @@ function _parseScrapRow(r: ScrapRow): ScrapEntry {
         productionDate: r.production_date,
         model: r.model,
       panel,
+      reasonCode,
       damageType,
       boughtIn: !!r.bought_in,
       kind: "scrapped-panel",
@@ -664,6 +670,7 @@ function _parseScrapRow(r: ScrapRow): ScrapEntry {
         productionDate: r.production_date,
         model: r.model,
       panel,
+      reasonCode,
       damageType,
       boughtIn: !!r.bought_in,
       kind: "kicked-lid",
@@ -724,6 +731,7 @@ export async function dbUpdateScrapEntry(
   updates: {
     model?: string;
     panel?: string;
+    reasonCode?: string;
     damageType?: string;
     boughtIn?: boolean;
   },
@@ -739,6 +747,7 @@ export async function dbUpdateScrapEntry(
   const extra = JSON.parse(row.extra) as Record<string, unknown>;
   if (updates.model) extra["model"] = updates.model;
   if (updates.panel) extra["panel"] = updates.panel;
+  if (updates.reasonCode) extra["reasonCode"] = updates.reasonCode;
   if (updates.damageType) extra["damageType"] = updates.damageType;
   if (updates.boughtIn !== undefined) extra["boughtIn"] = updates.boughtIn;
   await getClient().execute({

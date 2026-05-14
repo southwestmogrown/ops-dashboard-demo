@@ -9,12 +9,24 @@ import type { ShiftName } from "./core";
 export const PANEL_OPTIONS = ["A", "B", "C", "D", "E", "F", "G"] as const;
 export type PanelPosition = (typeof PANEL_OPTIONS)[number];
 
+export const REASON_CODES = [
+  "MC / MIS-CUT / FABRICATED INCORRECTLY",
+  "WS / WORKSTATION SURFACE",
+  "HT / HAND TOOL / IMPACT",
+  "DP / DROPPED PANEL",
+  "WC / WIP CART",
+  "AI / ASSEMBLED INCORRECTLY",
+  "SQ / SUPPLIER QUALITY ISSUE",
+] as const;
+export type ReasonCode = (typeof REASON_CODES)[number];
+
 export const DAMAGE_TYPES = [
-  "Damaged Panel",
-  "Bent Extrusion",
-  "Wrong Part",
-  "Missing Hardware",
-  "Other",
+  "MC / MIS-CUT / FABRICATED INCORRECTLY",
+  "SC / SCRATCH",
+  "HP / HOLE / PUNCTURE",
+  "DE / DENT",
+  "AI / ASSEMBLED INCORRECTLY",
+  "SQ / SUPPLIER QUALITY ISSUE",
 ] as const;
 export type DamageType = (typeof DAMAGE_TYPES)[number];
 
@@ -82,6 +94,8 @@ interface ScrapEntryBase {
   productionDate: string; // operational day key
   model: string; // part/model number
   panel: PanelPosition; // which panel position (A–G)
+  /** Stored as optional in the shared type; the API enforces it for manual form submissions. */
+  reasonCode?: ReasonCode;
   /** Manual-entry values (Damaged Panel, Bent Extrusion…) or sim-injected codes (kicked-lid, weld-defect…) */
   damageType: DamageType | DefectType;
   /** Placeholder for future ERP / external-system integration */
@@ -123,4 +137,15 @@ export interface ScrapStats {
   kickedLids: number; // count of KickedLid entries
   scrappedPanels: number; // count of ScrappedPanel entries
   totalBoughtIn: number; // count where boughtIn === true
+}
+
+export function isRevolverLine(lineId: string): boolean {
+  return lineId.startsWith("vs2-");
+}
+
+export function isReasonCode(value: unknown): value is ReasonCode {
+  return (
+    typeof value === "string" &&
+    REASON_CODES.includes(value as (typeof REASON_CODES)[number])
+  );
 }

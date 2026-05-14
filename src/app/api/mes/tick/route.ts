@@ -17,7 +17,10 @@ import {
 import { getCurrentShiftContext, getShiftWindows } from "@/lib/shiftTime";
 import type { ShiftName } from "@/lib/types/core";
 import { PANEL_OPTIONS, pickDefectType } from "@/lib/types/quality";
-import type { DowntimeReason } from "@/lib/types/downtime";
+import {
+  ACTIVE_DOWNTIME_REASONS,
+  type DowntimeReason,
+} from "@/lib/types/downtime";
 import { requireRole } from "@/lib/apiAuth";
 import { isLineRunningForShift } from "@/lib/adminConfig";
 
@@ -32,13 +35,7 @@ const DEFECT_INJECTION_PROBABILITY = 0.08;
 const KICKED_LID_INJECTION_PROBABILITY = 0.03;
 const DOWNTIME_EVENT_PROBABILITY = 0.35;
 
-const DOWNTIME_REASONS: DowntimeReason[] = [
-  "machine-failure",
-  "material-shortage",
-  "quality-hold",
-  "operator-break",
-  "changeover",
-];
+const DOWNTIME_REASONS: DowntimeReason[] = ACTIVE_DOWNTIME_REASONS;
 
 function getShiftTimelineHour(simClock: Date, shift: ShiftName): number {
   const hours = simClock.getUTCHours() + simClock.getUTCMinutes() / 60;
