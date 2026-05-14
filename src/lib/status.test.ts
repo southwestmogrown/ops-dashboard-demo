@@ -8,6 +8,8 @@ import {
   calcLinePace,
   getRiskLevel,
   getStatusReasons,
+  HPU_GREEN_THRESHOLD,
+  HPU_AMBER_THRESHOLD,
   PILL_STYLE,
   type RiskLevel,
 } from "./status";
@@ -119,19 +121,19 @@ describe("getFpyColor", () => {
 // ─── getHpuColor ─────────────────────────────────────────────────────────────
 
 describe("getHpuColor", () => {
-  it("returns green when HPU <= 0.35", () => {
-    expect(getHpuColor(0.35)).toBe("text-status-green");
-    expect(getHpuColor(0.1)).toBe("text-status-green");
+  it("returns green when HPU <= 1.8", () => {
+    expect(getHpuColor(HPU_GREEN_THRESHOLD)).toBe("text-status-green");
+    expect(getHpuColor(1.2)).toBe("text-status-green");
   });
 
-  it("returns amber when HPU > 0.35 but <= 0.45", () => {
-    expect(getHpuColor(0.36)).toBe("text-status-amber");
-    expect(getHpuColor(0.45)).toBe("text-status-amber");
+  it("returns amber when HPU > 1.8 but <= 2.1", () => {
+    expect(getHpuColor(1.81)).toBe("text-status-amber");
+    expect(getHpuColor(HPU_AMBER_THRESHOLD)).toBe("text-status-amber");
   });
 
-  it("returns red when HPU > 0.45", () => {
-    expect(getHpuColor(0.46)).toBe("text-status-red");
-    expect(getHpuColor(1.0)).toBe("text-status-red");
+  it("returns red when HPU > 2.1", () => {
+    expect(getHpuColor(2.11)).toBe("text-status-red");
+    expect(getHpuColor(3)).toBe("text-status-red");
   });
 });
 

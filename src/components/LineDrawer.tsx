@@ -28,6 +28,8 @@ import {
   getOeeColor,
   getStatusReasons,
   calcLinePace,
+  HPU_GREEN_THRESHOLD,
+  HPU_AMBER_THRESHOLD,
 } from "@/lib/status";
 import type { ShiftName } from "@/lib/types/core";
 import { authFetch } from "@/lib/clientAuth";
@@ -876,12 +878,12 @@ export default function LineDrawer({
                                   }}
                                 />
                                 <ReferenceLine
-                                  y={0.35}
+                                  y={HPU_GREEN_THRESHOLD}
                                   stroke="#22c55e"
                                   strokeDasharray="4 3"
                                   strokeOpacity={0.45}
                                   label={{
-                                    value: "Green ≤ 0.35",
+                                    value: `Green ≤ ${HPU_GREEN_THRESHOLD}`,
                                     position: "insideTopLeft",
                                     fill: "#22c55e",
                                     fillOpacity: 0.7,
@@ -889,12 +891,12 @@ export default function LineDrawer({
                                   }}
                                 />
                                 <ReferenceLine
-                                  y={0.45}
+                                  y={HPU_AMBER_THRESHOLD}
                                   stroke="#f59e0b"
                                   strokeDasharray="4 3"
                                   strokeOpacity={0.45}
                                   label={{
-                                    value: "Amber ≤ 0.45",
+                                    value: `Amber ≤ ${HPU_AMBER_THRESHOLD}`,
                                     position: "insideBottomLeft",
                                     fill: "#f59e0b",
                                     fillOpacity: 0.7,
