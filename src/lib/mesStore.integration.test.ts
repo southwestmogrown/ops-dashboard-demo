@@ -246,6 +246,34 @@ describe("getLineState", () => {
     const state = await getLineState("vs1-l1");
     expect(state.completedOrders).toBe(2);
   });
+
+  it("keeps shift-wide changeovers after queue advancement resets active-schedule progress", async () => {
+    await setSimRunning(true, 3600);
+
+    await setSchedule(
+      "vs1-l1",
+      makeSchedule("vs1-l1", [
+        { model: "M1", qty: 1 },
+        { model: "M2", qty: 1 },
+      ]),
+    );
+    await enqueueSchedule(
+      "vs1-l1",
+      makeSchedule("vs1-l1", [{ model: "M3", qty: 5 }]),
+    );
+
+    await tickLine("vs1-l1", 1, new Date("2026-04-12T08:00:00Z"));
+    await tickLine("vs1-l1", 1, new Date("2026-04-12T08:30:00Z"));
+    await tickLine("vs1-l1", 1, new Date("2026-04-12T09:00:00Z"));
+    await tickLine("vs1-l1", 1, new Date("2026-04-12T10:00:00Z"));
+
+    const state = await getLineState("vs1-l1");
+
+    expect(state.currentOrder).toBe("M3");
+    expect(state.completedOrders).toBe(0);
+    expect(state.totalChangeovers).toBe(1);
+    expect(state.hourlyChangeovers).toEqual({ "08:00": 1 });
+  });
 });
 
 // ── Admin config ─────────────────────────────────────────────────────────────

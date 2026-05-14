@@ -73,7 +73,10 @@ export interface LineState {
   currentOrder: string | null;
   remainingOnOrder: number; // 0 when sheet is done
   remainingOnRunSheet: number; // 0 when sheet is done
-  /** Number of fully completed orders — used as changeover count in EOS */
+  /**
+   * Number of fully completed orders on the currently active schedule head.
+   * This is schedule-progress data, not the shift-wide changeover total.
+   */
   completedOrders: number;
   /** Number of schedules waiting behind the active one */
   queuedCount: number;
@@ -81,9 +84,9 @@ export interface LineState {
   queue: LineSchedule[];
   /** units per hour bucket, key = "HH:00", e.g. "07:00" → 12 */
   hourlyOutput: Record<string, number>;
-  /** changeovers per hour bucket, key = "HH:00", e.g. "09:00" → 1 */
+  /** Shift-wide changeover events per hour bucket, key = "HH:00", e.g. "09:00" → 1 */
   hourlyChangeovers: Record<string, number>;
-  /** context-filtered changeovers across the current shift */
+  /** Context-filtered shift-wide changeover event count across the current shift */
   totalChangeovers: number;
   /** Orders skipped due to material shortage — can be re-activated */
   skippedItems: RunSheetItem[];

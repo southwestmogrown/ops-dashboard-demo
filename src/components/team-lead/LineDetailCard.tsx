@@ -49,7 +49,7 @@ export default function LineDetailCard({
   const [resolveDowntime, setResolveDowntime] = useState<DowntimeEntry | null>(
     null,
   );
-  const changeoverCount = mesState?.completedOrders ?? line.changeovers;
+  const changeoverCount = mesState?.totalChangeovers ?? line.changeovers;
 
   // Team-lead progress tracks actual output vs configured line target.
   const orderPct =
