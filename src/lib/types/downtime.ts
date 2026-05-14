@@ -74,42 +74,33 @@ export const DOWNTIME_REASON_LABELS: Record<DowntimeReason, string> = {
   changeover: "Changeover",
 };
 
+const DOWNTIME_REASON_BY_LABEL = Object.fromEntries(
+  Object.entries(DOWNTIME_REASON_LABELS).map(([reason, label]) => [label, reason]),
+) as Record<string, DowntimeReason>;
+
 export function getDowntimeReasonBadgeClass(reason: DowntimeReason | string): string {
-  const map: Record<string, string> = {
+  const map: Record<DowntimeReason, string> = {
     "angle-saw-down": "bg-status-red/20 text-status-red border-status-red/20",
-    "Angle Saw Down": "bg-status-red/20 text-status-red border-status-red/20",
     "panel-saw-down": "bg-status-red/20 text-status-red border-status-red/20",
-    "Panel Saw Down": "bg-status-red/20 text-status-red border-status-red/20",
     "vacuum-table-down": "bg-status-red/20 text-status-red border-status-red/20",
-    "Vacuum Table Down": "bg-status-red/20 text-status-red border-status-red/20",
     "bander-down": "bg-status-red/20 text-status-red border-status-red/20",
-    "Bander Down": "bg-status-red/20 text-status-red border-status-red/20",
     "waiting-for-material":
-      "bg-status-amber/20 text-status-amber border-status-amber/20",
-    "Waiting for Material":
       "bg-status-amber/20 text-status-amber border-status-amber/20",
     "waiting-for-rails-sides-tophats-extrusion":
       "bg-status-amber/20 text-status-amber border-status-amber/20",
-    "Waiting for Rails/Sides/Tophats/Extrusion":
-      "bg-status-amber/20 text-status-amber border-status-amber/20",
     "quality-hold": "bg-status-amber/20 text-status-amber border-status-amber/20",
-    "Quality Hold": "bg-status-amber/20 text-status-amber border-status-amber/20",
     "planned-maintenance": "bg-blue-500/20 text-blue-400 border-blue-400/20",
-    "Planned Maintenance": "bg-blue-500/20 text-blue-400 border-blue-400/20",
     "machine-failure": "bg-status-red/20 text-status-red border-status-red/20",
-    "Machine Failure": "bg-status-red/20 text-status-red border-status-red/20",
     "material-shortage":
       "bg-status-amber/20 text-status-amber border-status-amber/20",
-    "Material Shortage":
-      "bg-status-amber/20 text-status-amber border-status-amber/20",
     "operator-break": "bg-slate-500/20 text-slate-400 border-slate-400/20",
-    "Operator Break": "bg-slate-500/20 text-slate-400 border-slate-400/20",
     "safety-stop": "bg-red-600/20 text-red-500 border-red-500/20",
-    "Safety Stop": "bg-red-600/20 text-red-500 border-red-500/20",
     changeover: "bg-purple-500/20 text-purple-400 border-purple-400/20",
-    Changeover: "bg-purple-500/20 text-purple-400 border-purple-400/20",
     other: "bg-slate-500/20 text-slate-400 border-slate-400/20",
-    Other: "bg-slate-500/20 text-slate-400 border-slate-400/20",
   };
-  return map[reason] ?? "bg-slate-500/20 text-slate-400 border-slate-400/20";
+  const normalizedReason =
+    reason in map
+      ? (reason as DowntimeReason)
+      : DOWNTIME_REASON_BY_LABEL[reason] ?? "other";
+  return map[normalizedReason];
 }

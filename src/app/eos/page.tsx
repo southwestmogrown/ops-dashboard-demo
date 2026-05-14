@@ -195,7 +195,12 @@ export default function EOSPage() {
         .map(([lineId]) => lineIdToLineKey(lineId));
       const currentTime = new Date(metrics.generatedAt);
       const downtimeByLine = downtimeEntries.reduce((grouped, entry) => {
-        grouped.set(entry.lineId, [...(grouped.get(entry.lineId) ?? []), entry]);
+        const existing = grouped.get(entry.lineId);
+        if (existing) {
+          existing.push(entry);
+        } else {
+          grouped.set(entry.lineId, [entry]);
+        }
         return grouped;
       }, new Map<string, DowntimeEntry[]>());
 
