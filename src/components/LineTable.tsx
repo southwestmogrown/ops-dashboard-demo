@@ -2,8 +2,10 @@
 
 import { useState } from "react";
 import type { Line } from "@/lib/types/core";
+import type { ShiftName } from "@/lib/types/core";
 import type { AdminLineConfig, LineState } from "@/lib/types/mes";
 import type { ShiftProgress } from "@/lib/shiftTime";
+import { isLineRunningForShift } from "@/lib/adminConfig";
 import {
   getFpyColor,
   getPaceColor,
@@ -22,6 +24,7 @@ interface LineTableProps {
   mesStateMap?: Map<string, LineState>;
   shiftProgress?: ShiftProgress;
   adminConfig?: Record<string, AdminLineConfig>;
+  shift: ShiftName;
   /** Tracks last-known totalOutput per lineId for zero-output detection */
   lastOutputRef?: React.MutableRefObject<Record<string, number>>;
   /** Set of line IDs with an open (ongoing) downtime entry */
@@ -107,6 +110,7 @@ export default function LineTable({
   mesStateMap,
   shiftProgress,
   adminConfig,
+  shift,
   lastOutputRef,
   openDowntimeByLine,
 }: LineTableProps) {
@@ -204,7 +208,7 @@ export default function LineTable({
 
     return sorted.map(({ line, paceProjection, pacePerHour }, idx) => {
       const mesState = mesStateMap?.get(line.id);
-      const isRunning = adminConfig?.[line.id]?.isRunning;
+      const isRunning = isLineRunningForShift(adminConfig?.[line.id], shift);
       const risk = getRiskLevel(line, mesState, shiftProgress, isRunning);
 
       const plannedHc = line.headcount;

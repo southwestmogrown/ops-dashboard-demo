@@ -22,6 +22,7 @@ import { useRedirectTeamLead } from "@/hooks/useRedirectTeamLead";
 import { queryKeys } from "@/lib/queryKeys";
 import { fetchAdminConfig, fetchMesState } from "@/lib/queryFetchers";
 import { authFetch } from "@/lib/clientAuth";
+import { isLineRunningForShift } from "@/lib/adminConfig";
 
 // ── Draft types ────────────────────────────────────────────────────────────────
 
@@ -177,8 +178,9 @@ export default function EOSPage() {
       ]);
 
       const toHide: string[] = [];
+      const shiftKey = shift.toLowerCase() as ShiftName;
       const toOmit = Object.entries(adminConfig)
-        .filter(([, config]) => config.isRunning === false)
+        .filter(([, config]) => !isLineRunningForShift(config, shiftKey))
         .map(([lineId]) => lineIdToLineKey(lineId));
 
       setOmittedLines(new Set(toOmit));

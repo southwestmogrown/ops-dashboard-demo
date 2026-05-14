@@ -2,8 +2,10 @@
 
 import { useState } from "react";
 import type { Line } from "@/lib/types/core";
+import type { ShiftName } from "@/lib/types/core";
 import type { LineState } from "@/lib/types/mes";
 import type { AdminLineConfig } from "@/lib/types/mes";
+import { isLineRunningForShift } from "@/lib/adminConfig";
 
 export interface FloorAlert {
   lineId: string;
@@ -16,12 +18,13 @@ function computeAlerts(
   lines: Line[],
   mesStates: LineState[],
   adminConfig: Record<string, AdminLineConfig>,
+  shift: ShiftName,
 ): FloorAlert[] {
   const alerts: FloorAlert[] = [];
   const stateMap = new Map(mesStates.map((s) => [s.lineId, s]));
 
   for (const line of lines) {
-    const isRunning = adminConfig?.[line.id]?.isRunning;
+    const isRunning = isLineRunningForShift(adminConfig?.[line.id], shift);
     const state = stateMap.get(line.id);
     if (isRunning === false) continue; // dormant line — skip
 
@@ -59,17 +62,19 @@ interface FloorAlertStripProps {
   lines: Line[];
   mesStates: LineState[];
   adminConfig: Record<string, AdminLineConfig>;
+  shift: ShiftName;
 }
 
 export default function FloorAlertStrip({
   lines,
   mesStates,
   adminConfig,
+  shift,
 }: FloorAlertStripProps) {
   const [expanded, setExpanded] = useState(false);
   const [dismissed, setDismissed] = useState<Set<string>>(new Set());
 
-  const allAlerts = computeAlerts(lines, mesStates, adminConfig);
+  const allAlerts = computeAlerts(lines, mesStates, adminConfig, shift);
   const visibleAlerts = allAlerts.filter(
     (a) => !dismissed.has(a.lineId + "|" + a.issue),
   );

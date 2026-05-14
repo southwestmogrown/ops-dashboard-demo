@@ -14,6 +14,7 @@ import { useRedirectTeamLead } from "@/hooks/useRedirectTeamLead";
 import { queryKeys } from "@/lib/queryKeys";
 import { fetchAdminConfig, fetchMesState, fetchSimClock } from "@/lib/queryFetchers";
 import { authFetch } from "@/lib/clientAuth";
+import { isLineRunningForShift } from "@/lib/adminConfig";
 
 const SIDE_NAV: { icon: string; label: string; href?: string }[] = [
   { icon: "dashboard", label: "Dashboard", href: "/" },
@@ -170,7 +171,7 @@ export default function SimPage() {
   const { totalOutput, totalTarget, scheduledLines, efficiency } =
     useMemo(() => {
       const runningLineIds = LINES.map((line) => line.id).filter(
-        (lineId) => adminConfig[lineId]?.isRunning !== false,
+        (lineId) => isLineRunningForShift(adminConfig[lineId], shift),
       );
 
       const totalOutput = states

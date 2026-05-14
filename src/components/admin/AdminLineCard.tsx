@@ -14,6 +14,7 @@ import type {
   RunSheetItem,
   ShiftConfig,
 } from "@/lib/types/mes";
+import { defaultShiftConfig } from "@/lib/adminConfig";
 import type { ShiftName } from "@/lib/types/core";
 
 interface AdminConfigUpdate {
@@ -23,6 +24,18 @@ interface AdminConfigUpdate {
 }
 
 const AUTOSAVE_DEBOUNCE_MS = 600;
+
+function scheduleSignature(schedule: LineSchedule): string {
+  return JSON.stringify({
+    lineId: schedule.lineId,
+    date: schedule.date,
+    totalTarget: schedule.totalTarget,
+    items: schedule.items.map((item) => ({
+      model: item.model,
+      qty: item.qty,
+    })),
+  });
+}
 
 interface AdminLineCardProps {
   lineId: string;
@@ -70,29 +83,32 @@ const AdminLineCardInner = forwardRef(function AdminLineCardInner(
   const [pendingSchedule, setPendingSchedule] = useState<LineSchedule | null>(
     null,
   );
+  const [pendingQueuedSchedules, setPendingQueuedSchedules] = useState<
+    LineSchedule[]
+  >([]);
 
   const [activeTab, setActiveTab] = useState<ShiftName>(currentShift);
   const [shiftConfig, setShiftConfig] = useState<Record<ShiftName, ShiftConfig>>(
     () => ({
-      day: config?.day ?? { supervisor: "", dailyTarget: 0, headcount: 0 },
-      night: config?.night ?? { supervisor: "", dailyTarget: 0, headcount: 0 },
+      day: config?.day ?? defaultShiftConfig(),
+      night: config?.night ?? defaultShiftConfig(),
     }),
   );
   const [dirtyTabs, setDirtyTabs] = useState<Record<ShiftName, boolean>>({
     day: false,
     night: false,
   });
-  const [isRunning, setIsRunning] = useState(config?.isRunning ?? true);
   const [saved, setSaved] = useState(false);
 
   useEffect(() => {
     setShiftConfig({
-      day: config?.day ?? { supervisor: "", dailyTarget: 0, headcount: 0 },
-      night: config?.night ?? { supervisor: "", dailyTarget: 0, headcount: 0 },
+      day: config?.day ?? defaultShiftConfig(),
+      night: config?.night ?? defaultShiftConfig(),
     });
     setDirtyTabs({ day: false, night: false });
-    setIsRunning(config?.isRunning ?? true);
   }, [config]);
+
+  const activeShiftIsRunning = shiftConfig[activeTab].isRunning;
 
   const flashSaved = useCallback(() => {
     setSaved(true);
@@ -116,27 +132,28 @@ const AdminLineCardInner = forwardRef(function AdminLineCardInner(
     ref,
     () => ({
       save: async () => {
-        await onConfigSaved(lineId, { isRunning });
         await persistShiftConfig("day");
         await persistShiftConfig("night");
       },
     }),
-    [isRunning, lineId, onConfigSaved, persistShiftConfig],
+    [persistShiftConfig],
   );
 
   useEffect(() => {
-    if (!isRunning) return;
+    if (!activeShiftIsRunning) return;
     if (!dirtyTabs[activeTab]) return;
     const savedShift = config?.[activeTab] ?? {
       supervisor: "",
       dailyTarget: 0,
       headcount: 0,
+      isRunning: true,
     };
     const currentShiftConfig = shiftConfig[activeTab];
     if (
       currentShiftConfig.supervisor === savedShift.supervisor &&
       currentShiftConfig.dailyTarget === savedShift.dailyTarget &&
-      currentShiftConfig.headcount === savedShift.headcount
+      currentShiftConfig.headcount === savedShift.headcount &&
+      currentShiftConfig.isRunning === savedShift.isRunning
     ) {
       return;
     }
@@ -144,7 +161,7 @@ const AdminLineCardInner = forwardRef(function AdminLineCardInner(
       void persistShiftConfig(activeTab);
     }, AUTOSAVE_DEBOUNCE_MS);
     return () => window.clearTimeout(timeout);
-  }, [activeTab, config, dirtyTabs, isRunning, persistShiftConfig, shiftConfig]);
+  }, [activeShiftIsRunning, activeTab, config, dirtyTabs, persistShiftConfig, shiftConfig]);
 
   async function handleFile(file: File) {
     if (!file.name.endsWith(".pdf")) {
@@ -160,8 +177,14 @@ const AdminLineCardInner = forwardRef(function AdminLineCardInner(
         setParseError("No orders found");
         return;
       }
-      // Show preview immediately — the API call is just persistence
-      setPendingSchedule(s);
+      const hasExistingSchedule =
+        pendingSchedule !== null || schedule !== null || queuedSchedules.length > 0;
+      if (hasExistingSchedule) {
+        setPendingQueuedSchedules((current) => [...current, s]);
+      } else {
+        // Show preview immediately when replacing an empty line — the API call is just persistence
+        setPendingSchedule(s);
+      }
       setLoadedFlash(true);
       setTimeout(() => setLoadedFlash(false), 1500);
       // POST to API in the background; refresh() will pick up the canonical state
@@ -170,6 +193,9 @@ const AdminLineCardInner = forwardRef(function AdminLineCardInner(
       } catch {
         setParseError("Failed to save schedule — please retry");
         setPendingSchedule(null);
+        setPendingQueuedSchedules((current) =>
+          current.filter((queued) => scheduleSignature(queued) !== scheduleSignature(s)),
+        );
       }
     } catch (e) {
       setParseError(e instanceof Error ? e.message : "Parse failed");
@@ -186,7 +212,6 @@ const AdminLineCardInner = forwardRef(function AdminLineCardInner(
   }
 
   async function handleSave() {
-    await onConfigSaved(lineId, { isRunning });
     await persistShiftConfig(activeTab);
   }
 
@@ -197,12 +222,21 @@ const AdminLineCardInner = forwardRef(function AdminLineCardInner(
   const serverConfirmed =
     schedule !== null &&
     pendingSchedule !== null &&
-    schedule.lineId === pendingSchedule.lineId &&
-    schedule.date === pendingSchedule.date;
+    scheduleSignature(schedule) === scheduleSignature(pendingSchedule);
 
   useEffect(() => {
     if (serverConfirmed) setPendingSchedule(null);
   }, [serverConfirmed]);
+
+  useEffect(() => {
+    if (queuedSchedules.length === 0 && pendingQueuedSchedules.length === 0) return;
+    const serverQueueSignatures = new Set(queuedSchedules.map(scheduleSignature));
+    setPendingQueuedSchedules((current) =>
+      current.filter(
+        (queued) => !serverQueueSignatures.has(scheduleSignature(queued)),
+      ),
+    );
+  }, [pendingQueuedSchedules.length, queuedSchedules]);
 
   const pct = activeSchedule
     ? Math.round(
@@ -212,7 +246,11 @@ const AdminLineCardInner = forwardRef(function AdminLineCardInner(
       )
     : 0;
 
-  const queuedCount = queuedSchedules.length;
+  const displayedQueuedSchedules = [
+    ...queuedSchedules.map((sched) => ({ schedule: sched, pending: false })),
+    ...pendingQueuedSchedules.map((sched) => ({ schedule: sched, pending: true })),
+  ];
+  const queuedCount = displayedQueuedSchedules.length;
   const hasSchedule = activeSchedule !== null;
   const statusLabel = hasSchedule
     ? queuedCount > 0
@@ -244,16 +282,27 @@ const AdminLineCardInner = forwardRef(function AdminLineCardInner(
         </div>
         <label className="flex items-center gap-2 cursor-pointer group">
           <span className="text-[10px] font-bold tracking-widest text-[#e1e2ec]/40 group-hover:text-[#e1e2ec] transition-colors uppercase">
-            Running
+            {activeTab === "day" ? "Day" : "Night"} Running
           </span>
           <div className="relative inline-flex items-center h-5 w-9">
             <input
               type="checkbox"
-              checked={isRunning}
+              aria-label={`${label} ${activeTab === "day" ? "day" : "night"} running`}
+              checked={activeShiftIsRunning}
               onChange={async () => {
-                const next = !isRunning;
-                setIsRunning(next);
-                await onConfigSaved(lineId, { isRunning: next });
+                const next = !activeShiftIsRunning;
+                setShiftConfig((current) => ({
+                  ...current,
+                  [activeTab]: {
+                    ...current[activeTab],
+                    isRunning: next,
+                  },
+                }));
+                await onConfigSaved(lineId, {
+                  shift: activeTab,
+                  shiftConfig: { isRunning: next },
+                });
+                flashSaved();
               }}
               className="sr-only peer"
             />
@@ -275,9 +324,9 @@ const AdminLineCardInner = forwardRef(function AdminLineCardInner(
                 : loadedFlash
                   ? "border-status-green bg-status-green/5"
                   : "border-border bg-background/50 hover:border-accent/40"
-            } ${!isRunning ? "pointer-events-none" : "cursor-pointer"}`}
+            } ${!activeShiftIsRunning ? "pointer-events-none" : "cursor-pointer"}`}
             onDragOver={(e) => {
-              if (isRunning) {
+              if (activeShiftIsRunning) {
                 e.preventDefault();
                 setIsDragOver(true);
               }
@@ -285,7 +334,7 @@ const AdminLineCardInner = forwardRef(function AdminLineCardInner(
             onDragLeave={() => setIsDragOver(false)}
             onDrop={onDrop}
             onClick={() => {
-              if (isRunning) inputRef.current?.click();
+              if (activeShiftIsRunning) inputRef.current?.click();
             }}
           >
             <span
@@ -316,7 +365,7 @@ const AdminLineCardInner = forwardRef(function AdminLineCardInner(
               ref={inputRef}
               type="file"
               accept=".pdf"
-              disabled={!isRunning}
+              disabled={!activeShiftIsRunning}
               className="absolute inset-0 opacity-0 cursor-pointer"
               onChange={(e) => {
                 const f = e.target.files?.[0];
@@ -354,7 +403,7 @@ const AdminLineCardInner = forwardRef(function AdminLineCardInner(
               </label>
               <input
                 type="text"
-                disabled={!isRunning}
+                disabled={!activeShiftIsRunning}
                 value={shiftConfig[activeTab].supervisor}
                 onChange={(e) => {
                   setDirtyTabs((current) => ({ ...current, [activeTab]: true }));
@@ -379,7 +428,7 @@ const AdminLineCardInner = forwardRef(function AdminLineCardInner(
                 <input
                   type="number"
                   min={0}
-                  disabled={!isRunning}
+                  disabled={!activeShiftIsRunning}
                   value={shiftConfig[activeTab].dailyTarget}
                   onChange={(e) => {
                     setDirtyTabs((current) => ({ ...current, [activeTab]: true }));
@@ -403,7 +452,7 @@ const AdminLineCardInner = forwardRef(function AdminLineCardInner(
                 <input
                   type="number"
                   min={0}
-                  disabled={!isRunning}
+                  disabled={!activeShiftIsRunning}
                   value={shiftConfig[activeTab].headcount}
                   onChange={(e) => {
                     setDirtyTabs((current) => ({ ...current, [activeTab]: true }));
@@ -426,7 +475,7 @@ const AdminLineCardInner = forwardRef(function AdminLineCardInner(
           {/* Save Button */}
           <button
             onClick={handleSave}
-            disabled={!isRunning}
+            disabled={!activeShiftIsRunning}
             className={`kc-btn-primary-wide ${
               saved
                 ? "bg-status-green text-black"
@@ -440,7 +489,7 @@ const AdminLineCardInner = forwardRef(function AdminLineCardInner(
         {/* Right: RunSheet Preview */}
         {hasSchedule ? (
           <div
-            className={`bg-background p-4 border border-border/40 rounded-sm flex flex-col ${!isRunning ? "opacity-40 grayscale" : ""}`}
+            className={`bg-background p-4 border border-border/40 rounded-sm flex flex-col ${!activeShiftIsRunning ? "opacity-40 grayscale" : ""}`}
           >
             <div className="flex items-center justify-between mb-4 pb-2 border-b border-border/40">
               <span className="text-[10px] uppercase font-black tracking-widest">
@@ -559,22 +608,29 @@ const AdminLineCardInner = forwardRef(function AdminLineCardInner(
                 </button>
                 {queueOpen && (
                   <div className="flex flex-col gap-1">
-                    {queuedSchedules.map((sched, i) => (
+                    {displayedQueuedSchedules.map(({ schedule: sched, pending }, i) => (
                       <div
-                        key={i}
+                        key={`${scheduleSignature(sched)}-${pending ? "pending" : "saved"}`}
                         className="flex items-center justify-between gap-2 text-[10px]"
                       >
                         <span className="text-[#e1e2ec]/60 font-mono">
                           {sched.date} &middot; {sched.items.length} orders
                           &middot; {sched.totalTarget} units
+                          {pending ? " · syncing…" : ""}
                         </span>
-                        <button
-                          onClick={() => onRemoveQueued(lineId, i + 1)}
-                          title="Remove from queue"
-                          className="text-[#e1e2ec]/30 hover:text-status-red bg-transparent border-none cursor-pointer transition-colors"
-                        >
-                          remove
-                        </button>
+                        {pending ? (
+                          <span className="text-[#e1e2ec]/25 uppercase tracking-widest">
+                            pending
+                          </span>
+                        ) : (
+                          <button
+                            onClick={() => onRemoveQueued(lineId, i + 1)}
+                            title="Remove from queue"
+                            className="text-[#e1e2ec]/30 hover:text-status-red bg-transparent border-none cursor-pointer transition-colors"
+                          >
+                            remove
+                          </button>
+                        )}
                       </div>
                     ))}
                   </div>
@@ -593,6 +649,7 @@ const AdminLineCardInner = forwardRef(function AdminLineCardInner(
               <button
                 onClick={() => {
                   setPendingSchedule(null);
+                  setPendingQueuedSchedules([]);
                   onClearSchedule(lineId);
                 }}
                 className="kc-btn-compact-danger"
@@ -603,7 +660,7 @@ const AdminLineCardInner = forwardRef(function AdminLineCardInner(
           </div>
         ) : (
           <div
-            className={`bg-background p-4 border border-border/40 rounded-sm flex flex-col items-center justify-center min-h-[200px] ${!isRunning ? "opacity-40 grayscale" : ""}`}
+            className={`bg-background p-4 border border-border/40 rounded-sm flex flex-col items-center justify-center min-h-[200px] ${!activeShiftIsRunning ? "opacity-40 grayscale" : ""}`}
           >
             <span className="material-symbols-outlined text-[#e1e2ec]/10 text-5xl">
               inventory

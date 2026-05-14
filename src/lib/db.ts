@@ -16,6 +16,11 @@ import type {
 import type { LineComments } from "./mesTypes";
 import type { ScrapEntry } from "./reworkTypes";
 import type { DowntimeEntry } from "./downtimeTypes";
+import {
+  defaultAdminLineConfig,
+  defaultShiftConfig as createDefaultShiftConfig,
+  withDerivedLineRunning,
+} from "./adminConfig";
 
 // ── Client singleton (globalThis survives HMR in dev mode) ───────────────────
 
@@ -66,22 +71,6 @@ async function addColumnIfMissing(
   }
 }
 
-function defaultShiftConfig(): ShiftConfig {
-  return {
-    supervisor: "",
-    dailyTarget: 0,
-    headcount: 0,
-  };
-}
-
-function defaultAdminConfig(): AdminLineConfig {
-  return {
-    isRunning: true,
-    day: defaultShiftConfig(),
-    night: defaultShiftConfig(),
-  };
-}
-
 type LegacyAdminConfig = Partial<AdminLineConfig> & {
   target?: number | null;
   headcount?: number | null;
@@ -89,11 +78,18 @@ type LegacyAdminConfig = Partial<AdminLineConfig> & {
   supervisorName?: string | null;
 };
 
-function resetAdminConfig(isRunning: boolean): AdminLineConfig {
-  return {
-    ...defaultAdminConfig(),
-    isRunning,
-  };
+function resetAdminConfig(config: AdminLineConfig): AdminLineConfig {
+  return withDerivedLineRunning({
+    ...defaultAdminLineConfig(),
+    day: {
+      ...createDefaultShiftConfig(),
+      isRunning: config.day?.isRunning ?? true,
+    },
+    night: {
+      ...createDefaultShiftConfig(),
+      isRunning: config.night?.isRunning ?? true,
+    },
+  });
 }
 
 function normalizeShiftConfig(
@@ -113,10 +109,16 @@ function normalizeShiftConfig(
       typeof shift?.headcount === "number" && Number.isFinite(shift.headcount)
         ? shift.headcount
         : fallback.headcount,
+    isRunning:
+      typeof shift?.isRunning === "boolean"
+        ? shift.isRunning
+        : fallback.isRunning,
   };
 }
 
 function normalizeAdminConfig(config?: LegacyAdminConfig | null): AdminLineConfig {
+  const sharedIsRunning =
+    typeof config?.isRunning === "boolean" ? config.isRunning : true;
   const sharedFallback: ShiftConfig = {
     supervisor:
       typeof config?.supervisorName === "string" ? config.supervisorName : "",
@@ -128,13 +130,14 @@ function normalizeAdminConfig(config?: LegacyAdminConfig | null): AdminLineConfi
       typeof config?.headcount === "number" && Number.isFinite(config.headcount)
         ? config.headcount
         : 0,
+    isRunning: sharedIsRunning,
   };
 
-  return {
-    isRunning: config?.isRunning ?? true,
+  return withDerivedLineRunning({
+    isRunning: sharedIsRunning,
     day: normalizeShiftConfig(config?.day, sharedFallback),
     night: normalizeShiftConfig(config?.night, sharedFallback),
-  };
+  });
 }
 
 async function getTableColumns(table: string): Promise<string[]> {
@@ -486,7 +489,7 @@ export async function dbGetAdminConfig(
   });
   const row = result.rows[0] as unknown as { config: string } | undefined;
   if (!row) {
-    const config = defaultAdminConfig();
+    const config = defaultAdminLineConfig();
     await dbSetAdminConfig(lineId, config);
     return config;
   }
@@ -946,7 +949,7 @@ export async function dbResetAll(): Promise<void> {
 
   const preservedConfigs = Object.entries(existingConfig).map(([lineId, config]) => ({
     lineId,
-    config: JSON.stringify(resetAdminConfig(config.isRunning)),
+    config: JSON.stringify(resetAdminConfig(config)),
   }));
 
   if (preservedConfigs.length > 0) {

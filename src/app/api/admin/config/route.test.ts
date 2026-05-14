@@ -4,20 +4,20 @@ import { NextRequest } from "next/server";
 vi.mock("@/lib/mesStore", () => ({
   getAdminConfig: vi.fn(async () => ({
     isRunning: true,
-    day: { supervisor: "", dailyTarget: 225, headcount: 45 },
-    night: { supervisor: "", dailyTarget: 200, headcount: 40 },
+    day: { supervisor: "", dailyTarget: 225, headcount: 45, isRunning: true },
+    night: { supervisor: "", dailyTarget: 200, headcount: 40, isRunning: true },
   })),
   setAdminConfig: vi.fn(async () => {}),
   getAllAdminConfig: vi.fn(async () => ({
     "vs1-l1": {
       isRunning: true,
-      day: { supervisor: "", dailyTarget: 225, headcount: 45 },
-      night: { supervisor: "", dailyTarget: 200, headcount: 40 },
+      day: { supervisor: "", dailyTarget: 225, headcount: 45, isRunning: true },
+      night: { supervisor: "", dailyTarget: 200, headcount: 40, isRunning: true },
     },
     "vs2-l1": {
       isRunning: true,
-      day: { supervisor: "", dailyTarget: 200, headcount: 40 },
-      night: { supervisor: "", dailyTarget: 180, headcount: 35 },
+      day: { supervisor: "", dailyTarget: 200, headcount: 40, isRunning: true },
+      night: { supervisor: "", dailyTarget: 180, headcount: 35, isRunning: true },
     },
   })),
   refreshCacheFromDb: vi.fn(async () => {}),
@@ -120,7 +120,31 @@ describe("POST /api/admin/config", () => {
         night: expect.objectContaining({
           dailyTarget: 300,
           supervisor: "Jane",
+          isRunning: true,
         }),
+      }),
+    );
+  });
+
+  it("updates only the targeted shift running flag", async () => {
+    const req = new NextRequest("http://localhost/api/admin/config", {
+      method: "POST",
+      body: JSON.stringify({
+        lineId: "vs1-l1",
+        shift: "night",
+        isRunning: false,
+      }),
+      headers: { "content-type": "application/json" },
+    });
+    const res = await POST(req);
+
+    expect(res.status).toBe(200);
+    expect(setAdminConfig).toHaveBeenCalledWith(
+      "vs1-l1",
+      expect.objectContaining({
+        isRunning: true,
+        day: expect.objectContaining({ isRunning: true }),
+        night: expect.objectContaining({ isRunning: false }),
       }),
     );
   });

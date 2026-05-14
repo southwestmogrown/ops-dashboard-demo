@@ -19,6 +19,7 @@ import {
   fetchMetrics,
   fetchSimClock,
 } from "@/lib/queryFetchers";
+import { isLineRunningForShift } from "@/lib/adminConfig";
 import KpiCard from "@/components/KpiCard";
 import LineTable from "@/components/LineTable";
 import { getOutputColor, getFpyColor, getHpuColor, getOeeColor } from "@/lib/status";
@@ -187,8 +188,8 @@ export default function Home() {
         activeLines: [],
       };
     const allLines = metrics.lines;
-    const active = allLines.filter(
-      (l) => adminConfig[l.id]?.isRunning !== false
+    const active = allLines.filter((l) =>
+      isLineRunningForShift(adminConfig[l.id], shift),
     );
     return {
       totalOutput: active.reduce((sum, l) => sum + l.output, 0),
@@ -201,7 +202,7 @@ export default function Home() {
       totalHeadcount: active.reduce((sum, l) => sum + l.headcount, 0),
       activeLines: active,
     };
-  }, [metrics, adminConfig]);
+  }, [adminConfig, metrics, shift]);
 
   const lineStateMap = useMemo(
     () => new Map(mesStates.map((s) => [s.lineId, s])),
@@ -369,6 +370,7 @@ export default function Home() {
               onSelectLine={setSelectedLineId}
               selectedLineId={selectedLineId}
               adminConfig={adminConfig}
+              shift={shift}
               lastOutputRef={lastOutputRef}
               openDowntimeByLine={openDowntimeByLine}
             />

@@ -17,6 +17,7 @@ import type { DowntimeEntry } from "@/lib/types/downtime";
 import { DOWNTIME_REASON_LABELS } from "@/lib/types/downtime";
 import type { ShiftProgress } from "@/lib/shiftTime";
 import { getHourlyTargets } from "@/lib/shiftBreaks";
+import { isLineRunningForShift } from "@/lib/adminConfig";
 import {
   getFpyColor,
   getHpuColor,
@@ -201,7 +202,7 @@ export default function LineDrawer({
   // ─── Dynamic status label ─────────────────────────────────────────────────────
   const statusLabel = (() => {
     if (!line) return null;
-    const isRunning = adminConfig?.[line.id]?.isRunning;
+    const isRunning = isLineRunningForShift(adminConfig?.[line.id], shift);
     const plannedHc = adminConfig?.[line.id]?.[shift]?.headcount;
 
     const reasons = getStatusReasons(

@@ -5,6 +5,7 @@ import {
   getAllAdminConfig,
   refreshCacheFromDb,
 } from "@/lib/mesStore";
+import { withDerivedLineRunning } from "@/lib/adminConfig";
 import type { ShiftName } from "@/lib/types/core";
 import type { ShiftConfig } from "@/lib/types/mes";
 import { requireRole } from "@/lib/apiAuth";
@@ -30,6 +31,9 @@ function mergeShiftConfigUpdate(
       : {}),
     ...(update.headcount !== undefined
       ? { headcount: Number(update.headcount) }
+      : {}),
+    ...(update.isRunning !== undefined
+      ? { isRunning: Boolean(update.isRunning) }
       : {}),
   };
 }
@@ -61,8 +65,13 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     night: { ...existing.night },
   };
 
-  if (body.isRunning !== undefined) {
-    current.isRunning = Boolean(body.isRunning);
+  if (body.shift === "day" && body.isRunning !== undefined) {
+    current.day.isRunning = Boolean(body.isRunning);
+  } else if (body.shift === "night" && body.isRunning !== undefined) {
+    current.night.isRunning = Boolean(body.isRunning);
+  } else if (body.isRunning !== undefined) {
+    current.day.isRunning = Boolean(body.isRunning);
+    current.night.isRunning = Boolean(body.isRunning);
   }
 
   if (body.shift === "day" && body.shiftConfig) {
@@ -73,6 +82,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     current.night = mergeShiftConfigUpdate(current.night, body.shiftConfig);
   }
 
-  await setAdminConfig(body.lineId, current);
-  return NextResponse.json(current);
+  const normalized = withDerivedLineRunning(current);
+  await setAdminConfig(body.lineId, normalized);
+  return NextResponse.json(normalized);
 }
