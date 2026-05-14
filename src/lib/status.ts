@@ -11,6 +11,8 @@ import type { LineState } from "./mesTypes";
 import type { ShiftProgress } from "./shiftTime";
 
 export type RiskLevel = "none" | "amber" | "red" | "unscheduled";
+export const HPU_GREEN_THRESHOLD = 1.8;
+export const HPU_AMBER_THRESHOLD = 2.1;
 
 export function getOutputColor(output: number, target: number): string {
   const pct = output / target;
@@ -26,8 +28,8 @@ export function getFpyColor(fpy: number): string {
 }
 
 export function getHpuColor(hpu: number): string {
-  if (hpu <= 0.35) return "text-status-green";
-  if (hpu <= 0.45) return "text-status-amber";
+  if (hpu <= HPU_GREEN_THRESHOLD) return "text-status-green";
+  if (hpu <= HPU_AMBER_THRESHOLD) return "text-status-amber";
   return "text-status-red";
 }
 
