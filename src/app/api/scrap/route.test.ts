@@ -120,7 +120,7 @@ describe("POST /api/scrap", () => {
         shift: "day",
         model: "M2",
         panel: "B",
-        reasonCode: "MC / MISSCUT / FABRICATED INCORRECTLY",
+        reasonCode: "MC / MIS-CUT / FABRICATED INCORRECTLY",
         damageType: "SC / SCRATCH",
         stationFound: "Station 3",
         howDamaged: "Dented",

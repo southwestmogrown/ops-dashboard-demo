@@ -9,6 +9,7 @@ import {
   updateScrapEntry,
 } from "@/lib/mesStore";
 import type { ScrapEntry, ScrappedPanel, KickedLid } from "@/lib/types/quality";
+import { isReasonCode } from "@/lib/types/quality";
 import type { ShiftName } from "@/lib/types/core";
 import { requireRole } from "@/lib/apiAuth";
 
@@ -65,6 +66,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   }
 
   const { kind, lineId, shift, model, panel, damageType } = body;
+  const reasonCode = body.reasonCode;
   const operatingTime = await getOperatingTime();
 
   if (!kind || !lineId || !shift || !model || !panel || !damageType) {
@@ -81,6 +83,12 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       { status: 400 },
     );
   }
+  if (reasonCode !== undefined && !isReasonCode(reasonCode)) {
+    return NextResponse.json(
+      { error: "reasonCode must be one of the supported scrap reason codes" },
+      { status: 400 },
+    );
+  }
 
   const entry =
     kind === "scrapped-panel"
@@ -91,7 +99,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
           productionDate: operatingTime.productionDate,
           model: model as string,
           panel: panel as ScrappedPanel["panel"],
-          reasonCode: body.reasonCode as ScrappedPanel["reasonCode"],
+          reasonCode,
           damageType: damageType as ScrappedPanel["damageType"],
           stationFound: (body.stationFound as string) ?? "",
           howDamaged: (body.howDamaged as string) ?? "",
@@ -104,7 +112,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
           productionDate: operatingTime.productionDate,
           model: model as string,
           panel: panel as KickedLid["panel"],
-          reasonCode: body.reasonCode as KickedLid["reasonCode"],
+          reasonCode,
           damageType: damageType as KickedLid["damageType"],
           affectedArea: (body.affectedArea as "panel" | "extrusion") ?? "panel",
           auditorInitials: ((body.auditorInitials as string) ?? "")

@@ -10,7 +10,7 @@ export const PANEL_OPTIONS = ["A", "B", "C", "D", "E", "F", "G"] as const;
 export type PanelPosition = (typeof PANEL_OPTIONS)[number];
 
 export const REASON_CODES = [
-  "MC / MISSCUT / FABRICATED INCORRECTLY",
+  "MC / MIS-CUT / FABRICATED INCORRECTLY",
   "WS / WORKSTATION SURFACE",
   "HT / HAND TOOL / IMPACT",
   "DP / DROPPED PANEL",
@@ -94,6 +94,7 @@ interface ScrapEntryBase {
   productionDate: string; // operational day key
   model: string; // part/model number
   panel: PanelPosition; // which panel position (A–G)
+  /** Optional for legacy/simulated entries; manual form submissions should provide it. */
   reasonCode?: ReasonCode;
   /** Manual-entry values (Damaged Panel, Bent Extrusion…) or sim-injected codes (kicked-lid, weld-defect…) */
   damageType: DamageType | DefectType;
@@ -140,4 +141,11 @@ export interface ScrapStats {
 
 export function isRevolverLine(lineId: string): boolean {
   return lineId.startsWith("vs2-");
+}
+
+export function isReasonCode(value: unknown): value is ReasonCode {
+  return (
+    typeof value === "string" &&
+    REASON_CODES.includes(value as (typeof REASON_CODES)[number])
+  );
 }
