@@ -65,10 +65,11 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     night: { ...existing.night },
   };
 
-  if (body.shift && body.isRunning !== undefined) {
-    current[body.shift].isRunning = Boolean(body.isRunning);
+  if (body.shift === "day" && body.isRunning !== undefined) {
+    current.day.isRunning = Boolean(body.isRunning);
+  } else if (body.shift === "night" && body.isRunning !== undefined) {
+    current.night.isRunning = Boolean(body.isRunning);
   } else if (body.isRunning !== undefined) {
-    current.isRunning = Boolean(body.isRunning);
     current.day.isRunning = Boolean(body.isRunning);
     current.night.isRunning = Boolean(body.isRunning);
   }
