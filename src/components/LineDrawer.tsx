@@ -20,7 +20,7 @@ import { DOWNTIME_REASON_LABELS } from "@/lib/types/downtime";
 import type { ShiftProgress } from "@/lib/shiftTime";
 import { getHourlyTargets } from "@/lib/shiftBreaks";
 import { isLineRunningForShift } from "@/lib/adminConfig";
-import { buildHpuTrend, roundHpu } from "@/lib/hpuTrend";
+import { buildHpuTrend, roundHpu, type HpuTrendPoint } from "@/lib/hpuTrend";
 import {
   getFpyColor,
   getHpuColor,
@@ -356,10 +356,13 @@ export default function LineDrawer({
     }),
     { bestHpuPoint: null, worstHpuPoint: null },
   );
-  const hpuDelta =
-    currentHpuPoint && previousHpuPoint && currentHpuPoint.hpu !== null && previousHpuPoint.hpu !== null
-      ? roundHpu(currentHpuPoint.hpu - previousHpuPoint.hpu)
-      : null;
+  const hpuDelta = (() => {
+    if (!currentHpuPoint || !previousHpuPoint) return null;
+    const currentHpu = currentHpuPoint.hpu;
+    const previousHpu = previousHpuPoint.hpu;
+    if (currentHpu === null || previousHpu === null) return null;
+    return roundHpu(currentHpu - previousHpu);
+  })();
 
   const linePace =
     shiftProgress.elapsedHours >= 0.25
@@ -857,12 +860,7 @@ export default function LineDrawer({
                                     "HPU",
                                   ]}
                                   labelFormatter={(label, payload) => {
-                                    const point = payload?.[0]?.payload as
-                                      | {
-                                          cumulativeOutput?: number;
-                                          elapsedHours?: number;
-                                        }
-                                      | undefined;
+                                    const point = payload?.[0]?.payload as HpuTrendPoint | undefined;
                                     if (!point) return label;
                                     return `${label} · ${point.cumulativeOutput ?? 0} units · ${(
                                       point.elapsedHours ?? 0
