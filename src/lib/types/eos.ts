@@ -24,6 +24,10 @@ export interface EOSLineEntry {
   remainingOnOrder: string;
   remainingOnRunSheet: string;
   changeovers: string;
+  downtimeMinutes: string;
+  downtimeCount: string;
+  openDowntimeCount: string;
+  latestDowntimeReason: string;
   lineNotes: string;
 }
 
