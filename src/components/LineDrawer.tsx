@@ -74,11 +74,19 @@ const tooltipStyle = {
 const HPU_AXIS_ROUNDING_FACTOR = 10;
 
 const DOWNTIME_BADGE_COLORS: Record<string, string> = {
+  "angle-saw-down": "bg-status-red/20 text-status-red border-status-red/30",
+  "panel-saw-down": "bg-status-red/20 text-status-red border-status-red/30",
+  "vacuum-table-down": "bg-status-red/20 text-status-red border-status-red/30",
+  "waiting-for-material":
+    "bg-status-amber/20 text-status-amber border-status-amber/30",
+  "waiting-for-rails-sides-tophats-extrusion":
+    "bg-status-amber/20 text-status-amber border-status-amber/30",
+  "bander-down": "bg-status-red/20 text-status-red border-status-red/30",
+  "quality-hold": "bg-purple-500/20 text-purple-400 border-purple-500/30",
+  "planned-maintenance": "bg-blue-500/20 text-blue-400 border-blue-500/30",
   "machine-failure": "bg-status-red/20 text-status-red border-status-red/30",
   "material-shortage":
     "bg-status-amber/20 text-status-amber border-status-amber/30",
-  "quality-hold": "bg-purple-500/20 text-purple-400 border-purple-500/30",
-  "planned-maintenance": "bg-blue-500/20 text-blue-400 border-blue-500/30",
   "operator-break": "bg-[#e1e2ec]/10 text-[#e1e2ec]/60 border-[#e1e2ec]/20",
   "safety-stop": "bg-status-red/20 text-status-red border-status-red/30",
   changeover: "bg-vs2/20 text-vs2 border-vs2/30",

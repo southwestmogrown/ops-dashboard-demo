@@ -9,22 +9,15 @@ import {
   getOperatingTime,
   refreshCacheFromDb,
 } from "@/lib/mesStore";
-import type { DowntimeReason, DowntimeEntry } from "@/lib/types/downtime";
+import {
+  ACTIVE_DOWNTIME_REASONS,
+  type DowntimeReason,
+  type DowntimeEntry,
+} from "@/lib/types/downtime";
 import type { ShiftName } from "@/lib/types/core";
 import { getShiftWindows } from "@/lib/shiftTime";
 import { getDefaultTarget } from "@/lib/generateMetrics";
 import { getRequestRole, requireRole } from "@/lib/apiAuth";
-
-const VALID_REASONS: DowntimeReason[] = [
-  "machine-failure",
-  "material-shortage",
-  "quality-hold",
-  "planned-maintenance",
-  "operator-break",
-  "safety-stop",
-  "changeover",
-  "other",
-];
 
 export async function GET(request: NextRequest): Promise<NextResponse> {
   const authError = requireRole(request, ["supervisor", "team-lead"]);
@@ -107,7 +100,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       { status: 400 },
     );
   }
-  if (!VALID_REASONS.includes(reason as DowntimeReason)) {
+  if (!ACTIVE_DOWNTIME_REASONS.includes(reason as DowntimeReason)) {
     return NextResponse.json(
       { error: "invalid reason value" },
       { status: 400 },

@@ -1,14 +1,38 @@
 import type { ShiftName } from "./core";
 
-export type DowntimeReason =
+export type ActiveDowntimeReason =
+  | "angle-saw-down"
+  | "panel-saw-down"
+  | "vacuum-table-down"
+  | "waiting-for-material"
+  | "waiting-for-rails-sides-tophats-extrusion"
+  | "bander-down"
+  | "planned-maintenance"
+  | "quality-hold"
+  | "other";
+
+export type LegacyDowntimeReason =
   | "machine-failure"
   | "material-shortage"
-  | "quality-hold"
-  | "planned-maintenance"
   | "operator-break"
   | "safety-stop"
-  | "changeover"
-  | "other";
+  | "changeover";
+
+export type DowntimeReason =
+  | ActiveDowntimeReason
+  | LegacyDowntimeReason;
+
+export const ACTIVE_DOWNTIME_REASONS: ActiveDowntimeReason[] = [
+  "angle-saw-down",
+  "panel-saw-down",
+  "vacuum-table-down",
+  "waiting-for-material",
+  "waiting-for-rails-sides-tophats-extrusion",
+  "bander-down",
+  "planned-maintenance",
+  "quality-hold",
+  "other",
+];
 
 export interface DowntimeEntry {
   id: string; // "DT-001"
@@ -24,12 +48,19 @@ export interface DowntimeEntry {
 }
 
 export const DOWNTIME_REASON_LABELS: Record<DowntimeReason, string> = {
-  "machine-failure": "Machine Failure",
-  "material-shortage": "Material Shortage",
+  "angle-saw-down": "Angle Saw Down",
+  "panel-saw-down": "Panel Saw Down",
+  "vacuum-table-down": "Vacuum Table Down",
+  "waiting-for-material": "Waiting for Material",
+  "waiting-for-rails-sides-tophats-extrusion":
+    "Waiting for Rails/Sides/Tophats/Extrusion",
+  "bander-down": "Bander Down",
   "quality-hold": "Quality Hold",
   "planned-maintenance": "Planned Maintenance",
+  other: "Other",
+  "machine-failure": "Machine Failure",
+  "material-shortage": "Material Shortage",
   "operator-break": "Operator Break",
   "safety-stop": "Safety Stop",
   changeover: "Changeover",
-  other: "Other",
 };

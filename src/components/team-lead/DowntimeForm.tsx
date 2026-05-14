@@ -3,7 +3,10 @@
 import { useState } from "react";
 import type { DowntimeReason } from "@/lib/types/downtime";
 import { useAuth } from "@/hooks/useAuth";
-import { DOWNTIME_REASON_LABELS } from "@/lib/types/downtime";
+import {
+  ACTIVE_DOWNTIME_REASONS,
+  DOWNTIME_REASON_LABELS,
+} from "@/lib/types/downtime";
 import type { ShiftName } from "@/lib/types/core";
 import { authFetch } from "@/lib/clientAuth";
 
@@ -16,14 +19,6 @@ interface DowntimeFormProps {
   onClose: () => void;
   onRefresh: () => void;
 }
-
-const REASONS: DowntimeReason[] = [
-  "machine-failure",
-  "material-shortage",
-  "planned-maintenance",
-  "safety-stop",
-  "other",
-];
 
 function toDateTimeLocal(iso: string): string {
   const d = new Date(iso);
@@ -46,7 +41,7 @@ export default function DowntimeForm({
   const isResolve = !!existingEntryId;
   const { role } = useAuth();
   const [reason, setReason] = useState<DowntimeReason>(
-    isResolve ? "other" : "machine-failure",
+    isResolve ? "other" : ACTIVE_DOWNTIME_REASONS[0],
   );
   const [startTime, setStartTime] = useState(
     isResolve && existingStartTime
@@ -200,7 +195,7 @@ export default function DowntimeForm({
                   onChange={(e) => setReason(e.target.value as DowntimeReason)}
                   className={selectClass}
                 >
-                  {REASONS.map((r) => (
+                  {ACTIVE_DOWNTIME_REASONS.map((r) => (
                     <option key={r} value={r}>
                       {DOWNTIME_REASON_LABELS[r]}
                     </option>

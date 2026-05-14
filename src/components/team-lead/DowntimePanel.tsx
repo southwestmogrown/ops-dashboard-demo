@@ -29,10 +29,17 @@ function formatDuration(startIso: string, endIso: string | null): string {
 
 function getReasonBadge(reason: DowntimeEntry["reason"]): string {
   const map: Record<string, string> = {
-    "machine-failure": "bg-status-red/20 text-status-red",
-    "material-shortage": "bg-status-amber/20 text-status-amber",
+    "angle-saw-down": "bg-status-red/20 text-status-red",
+    "panel-saw-down": "bg-status-red/20 text-status-red",
+    "vacuum-table-down": "bg-status-red/20 text-status-red",
+    "waiting-for-material": "bg-status-amber/20 text-status-amber",
+    "waiting-for-rails-sides-tophats-extrusion":
+      "bg-status-amber/20 text-status-amber",
+    "bander-down": "bg-status-red/20 text-status-red",
     "quality-hold": "bg-status-amber/20 text-status-amber",
     "planned-maintenance": "bg-blue-500/20 text-blue-400",
+    "machine-failure": "bg-status-red/20 text-status-red",
+    "material-shortage": "bg-status-amber/20 text-status-amber",
     "operator-break": "bg-slate-500/20 text-slate-400",
     "safety-stop": "bg-red-600/20 text-red-500",
     changeover: "bg-purple-500/20 text-purple-400",
