@@ -66,7 +66,6 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   }
 
   const { kind, lineId, shift, model, panel, damageType } = body;
-  const reasonCode = body.reasonCode;
   const operatingTime = await getOperatingTime();
 
   if (!kind || !lineId || !shift || !model || !panel || !damageType) {
@@ -83,6 +82,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       { status: 400 },
     );
   }
+  const reasonCode = body.reasonCode;
   if (!isReasonCode(reasonCode)) {
     return NextResponse.json(
       {
