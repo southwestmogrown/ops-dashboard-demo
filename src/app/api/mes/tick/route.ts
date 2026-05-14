@@ -77,10 +77,6 @@ function getElapsedWorkMinutes(
   let isOnBreak = false;
 
   for (const breakWindow of shiftWindow.breakWindows) {
-    if (timelineHour >= breakWindow.start && timelineHour < breakWindow.end) {
-      isOnBreak = true;
-    }
-
     const breakStartMinutes =
       (breakWindow.start - shiftWindow.startHour) * 60;
     const breakEndMinutes = (breakWindow.end - shiftWindow.startHour) * 60;
@@ -89,6 +85,11 @@ function getElapsedWorkMinutes(
       Math.min(elapsedClockMinutes, breakEndMinutes) - breakStartMinutes,
     );
     elapsedWorkMinutes -= elapsedBreakMinutes;
+
+    if (timelineHour >= breakWindow.start && timelineHour < breakWindow.end) {
+      isOnBreak = true;
+      break;
+    }
   }
 
   return {
@@ -258,12 +259,11 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       return NextResponse.json({ scansAdded: 0, stopped: true });
 
     const simState = await getSimState();
-    const shift = simState.currentShift;
     const productionDate = simState.productionDate ?? "unknown";
 
     const simClock = (await getSimClock()) ?? new Date();
     const { multiplier, shift: activeShift } = getRateMultiplier(simClock);
-    if (!shift || !activeShift || multiplier <= 0) {
+    if (!activeShift || multiplier <= 0) {
       return NextResponse.json({ scansAdded: 0 });
     }
 
@@ -296,7 +296,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       if (Math.random() < DOWNTIME_SKIP_PROBABILITY) {
         await maybeInjectDowntime(
           state.lineId,
-          shift,
+          activeShift,
           productionDate,
           simClock,
           state.schedule?.totalTarget ?? 0,

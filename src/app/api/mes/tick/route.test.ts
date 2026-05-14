@@ -65,6 +65,8 @@ function makeReq(body: unknown): NextRequest {
 beforeEach(() => {
   vi.clearAllMocks();
   mockRequireRole.mockReturnValue(null);
+  // Keep simulator-side randomness deterministic so skip/downtime/defect branches
+  // do not interfere with route assertions in these tests.
   vi.spyOn(Math, "random").mockReturnValue(0.99);
 });
 
