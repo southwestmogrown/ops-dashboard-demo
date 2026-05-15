@@ -92,7 +92,11 @@ describe("re-exports", () => {
 
 describe("compareLineOrder", () => {
   it("keeps VS1 lines in canonical top-to-bottom order", () => {
-    const unordered = [LINES[2]!, LINES[0]!, LINES[1]!];
+    const unordered = [
+      { id: "vs1-l3", name: "Folding Line_03" },
+      { id: "vs1-l1", name: "Folding Line_01" },
+      { id: "vs1-l2", name: "Folding Line_02" },
+    ];
     const ordered = unordered.sort(compareLineOrder);
 
     expect(ordered.map((line) => line.id)).toEqual([

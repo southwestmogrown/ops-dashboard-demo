@@ -6,12 +6,7 @@
  * Re-exported from generateMetrics to avoid a circular dep.
  */
 
-import {
-  LINE_DEFS,
-  generateMetrics,
-  getDefaultHeadcount,
-  getDefaultTarget,
-} from "./generateMetrics";
+import { LINE_DEFS } from "./generateMetrics";
 import { getShiftWindows } from "./shiftTime";
 import type { ShiftName } from "./types";
 
@@ -19,7 +14,7 @@ import type { ShiftName } from "./types";
 export const LINES = LINE_DEFS;
 
 /** Re-export helpers too so callers have one place to import from. */
-export { generateMetrics, getDefaultHeadcount, getDefaultTarget };
+export { generateMetrics, getDefaultHeadcount, getDefaultTarget } from "./generateMetrics";
 
 /** Pre-computed short labels for sim/team-lead displays. */
 export const LINE_LABELS: Record<string, string> = {
