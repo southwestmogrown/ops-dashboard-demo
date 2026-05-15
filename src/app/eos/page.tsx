@@ -35,7 +35,7 @@ interface EosDraftPayload {
   activeStream: string;
 }
 
-function inferEnabledFromText(text: string): boolean {
+function shouldEnableFromText(text: string): boolean {
   return text.trim() !== "";
 }
 
@@ -49,13 +49,13 @@ function normalizeStructuredNotes(
   return {
     topIssueToday: notes?.topIssueToday ?? "",
     resolvedDuringShiftEnabled:
-      notes?.resolvedDuringShiftEnabled ?? inferEnabledFromText(resolvedDuringShift),
+      notes?.resolvedDuringShiftEnabled ?? shouldEnableFromText(resolvedDuringShift),
     resolvedDuringShift,
     openItemsNextShiftEnabled:
-      notes?.openItemsNextShiftEnabled ?? inferEnabledFromText(openItemsNextShift),
+      notes?.openItemsNextShiftEnabled ?? shouldEnableFromText(openItemsNextShift),
     openItemsNextShift,
     equipmentConcernsEnabled:
-      notes?.equipmentConcernsEnabled ?? inferEnabledFromText(equipmentConcerns),
+      notes?.equipmentConcernsEnabled ?? shouldEnableFromText(equipmentConcerns),
     equipmentConcerns,
     generalNotes: notes?.generalNotes ?? "",
   };
@@ -70,14 +70,18 @@ function isEosDraftPayload(value: unknown): value is EosDraftPayload {
     hiddenLines?: unknown;
     activeStream?: unknown;
   };
+  const formData =
+    candidate.formData && typeof candidate.formData === "object"
+      ? (candidate.formData as { notes?: unknown })
+      : null;
 
   return (
     typeof candidate.savedAt === "string" &&
     typeof candidate.activeStream === "string" &&
     Array.isArray(candidate.hiddenLines) &&
     candidate.hiddenLines.every((line) => typeof line === "string") &&
-    !!candidate.formData &&
-    typeof candidate.formData === "object"
+    !!formData &&
+    (!formData.notes || typeof formData.notes === "object")
   );
 }
 
