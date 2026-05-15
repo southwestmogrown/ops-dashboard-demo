@@ -4,3 +4,4 @@ export * from "./eos";
 export * from "./quality";
 export * from "./downtime";
 export * from "./auth";
+export * from "./history";
