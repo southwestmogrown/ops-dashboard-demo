@@ -2,13 +2,19 @@
 
 interface Props {
   label: string;
+  checked: boolean;
+  onCheckedChange: (checked: boolean) => void;
   value: string;
   onChange: (value: string) => void;
 }
 
-export default function NoteCheckboxField({ label, value, onChange }: Props) {
-  const checked = value !== "";
-
+export default function NoteCheckboxField({
+  label,
+  checked,
+  onCheckedChange,
+  value,
+  onChange,
+}: Props) {
   return (
     <div>
       <label className="flex items-center gap-3 mb-2 cursor-pointer group select-none">
@@ -16,9 +22,7 @@ export default function NoteCheckboxField({ label, value, onChange }: Props) {
           <input
             type="checkbox"
             checked={checked}
-            onChange={(e) => {
-              if (!e.target.checked) onChange("");
-            }}
+            onChange={(e) => onCheckedChange(e.target.checked)}
             className="sr-only"
           />
           <div
@@ -46,7 +50,7 @@ export default function NoteCheckboxField({ label, value, onChange }: Props) {
               ? "border-accent/45 bg-accent/12 text-[#ffd6b8]"
               : "border-border bg-surface text-[#aeb8c8]",
           ].join(" ")}>
-            {checked ? "Checked" : "Off"}
+            {checked ? "On" : "Off"}
           </span>
         </div>
       </label>

@@ -42,8 +42,11 @@ describe("generateEmailBody", () => {
     shift: "Day",
     notes: {
       topIssueToday: "Conveyor belt jam on Line 2",
+      resolvedDuringShiftEnabled: true,
       resolvedDuringShift: "Cleared at 10:15",
+      openItemsNextShiftEnabled: true,
       openItemsNextShift: "Check belt tension",
+      equipmentConcernsEnabled: true,
       equipmentConcerns: "Motor running hot",
       generalNotes: "Good shift overall",
     },
@@ -127,13 +130,32 @@ describe("generateEmailBody", () => {
       ...formData,
       notes: {
         topIssueToday: "",
+        resolvedDuringShiftEnabled: false,
         resolvedDuringShift: "",
+        openItemsNextShiftEnabled: false,
         openItemsNextShift: "",
+        equipmentConcernsEnabled: false,
         equipmentConcerns: "",
         generalNotes: "",
       },
     };
     const body = generateEmailBody(emptyNotes, activeLines, "All Lines");
     expect(body).toContain("(no notes entered)");
+  });
+
+  it("omits disabled structured notes even when text exists", () => {
+    const disabledNotes: EOSFormData = {
+      ...formData,
+      notes: {
+        ...formData.notes,
+        resolvedDuringShiftEnabled: false,
+        openItemsNextShiftEnabled: false,
+        equipmentConcernsEnabled: false,
+      },
+    };
+    const body = generateEmailBody(disabledNotes, activeLines, "All Lines");
+    expect(body).not.toContain("Cleared at 10:15");
+    expect(body).not.toContain("Check belt tension");
+    expect(body).not.toContain("Motor running hot");
   });
 });

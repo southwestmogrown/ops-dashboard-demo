@@ -35,6 +35,28 @@ interface EosDraftPayload {
   activeStream: string;
 }
 
+function normalizeStructuredNotes(
+  notes?: Partial<EOSFormData["notes"]>,
+): EOSFormData["notes"] {
+  const resolvedDuringShift = notes?.resolvedDuringShift ?? "";
+  const openItemsNextShift = notes?.openItemsNextShift ?? "";
+  const equipmentConcerns = notes?.equipmentConcerns ?? "";
+
+  return {
+    topIssueToday: notes?.topIssueToday ?? "",
+    resolvedDuringShiftEnabled:
+      notes?.resolvedDuringShiftEnabled ?? resolvedDuringShift.trim() !== "",
+    resolvedDuringShift,
+    openItemsNextShiftEnabled:
+      notes?.openItemsNextShiftEnabled ?? openItemsNextShift.trim() !== "",
+    openItemsNextShift,
+    equipmentConcernsEnabled:
+      notes?.equipmentConcernsEnabled ?? equipmentConcerns.trim() !== "",
+    equipmentConcerns,
+    generalNotes: notes?.generalNotes ?? "",
+  };
+}
+
 // ── Draft helpers ─────────────────────────────────────────────────────────────
 
 const DRAFT_TTL_MS = 48 * 60 * 60 * 1000; // 48 hours
@@ -48,13 +70,19 @@ function loadDraft(shift: string, date: string): EosDraftPayload | null {
   try {
     const raw = localStorage.getItem(draftKey(shift, date));
     if (!raw) return null;
-    const payload: EosDraftPayload = JSON.parse(raw);
+    const payload = JSON.parse(raw) as EosDraftPayload;
     const age = Date.now() - new Date(payload.savedAt).getTime();
     if (age > DRAFT_TTL_MS) {
       localStorage.removeItem(draftKey(shift, date));
       return null;
     }
-    return payload;
+    return {
+      ...payload,
+      formData: {
+        ...payload.formData,
+        notes: normalizeStructuredNotes(payload.formData.notes),
+      },
+    };
   } catch {
     return null;
   }
@@ -118,8 +146,11 @@ function emptyFormData(): EOSFormData {
     shift: "Day",
     notes: {
       topIssueToday: "",
+      resolvedDuringShiftEnabled: false,
       resolvedDuringShift: "",
+      openItemsNextShiftEnabled: false,
       openItemsNextShift: "",
+      equipmentConcernsEnabled: false,
       equipmentConcerns: "",
       generalNotes: "",
     },
@@ -291,6 +322,14 @@ export default function EOSPage() {
 
   const handleNotes = (field: keyof EOSFormData["notes"], value: string) =>
     setFormData((p) => ({ ...p, notes: { ...p.notes, [field]: value } }));
+
+  const handleNoteToggle = (
+    field:
+      | "resolvedDuringShiftEnabled"
+      | "openItemsNextShiftEnabled"
+      | "equipmentConcernsEnabled",
+    value: boolean,
+  ) => setFormData((p) => ({ ...p, notes: { ...p.notes, [field]: value } }));
 
   const handleLine = (
     lineKey: string,
@@ -569,6 +608,10 @@ export default function EOSPage() {
                     {/* Resolved During Shift */}
                     <NoteCheckboxField
                       label="Resolved During Shift"
+                      checked={formData.notes.resolvedDuringShiftEnabled}
+                      onCheckedChange={(checked) =>
+                        handleNoteToggle("resolvedDuringShiftEnabled", checked)
+                      }
                       value={formData.notes.resolvedDuringShift}
                       onChange={(v) => handleNotes("resolvedDuringShift", v)}
                     />
@@ -576,6 +619,10 @@ export default function EOSPage() {
                     {/* Open Items Next Shift */}
                     <NoteCheckboxField
                       label="Open Items for Next Shift"
+                      checked={formData.notes.openItemsNextShiftEnabled}
+                      onCheckedChange={(checked) =>
+                        handleNoteToggle("openItemsNextShiftEnabled", checked)
+                      }
                       value={formData.notes.openItemsNextShift}
                       onChange={(v) => handleNotes("openItemsNextShift", v)}
                     />
@@ -583,6 +630,10 @@ export default function EOSPage() {
                     {/* Equipment Concerns */}
                     <NoteCheckboxField
                       label="Equipment Concerns"
+                      checked={formData.notes.equipmentConcernsEnabled}
+                      onCheckedChange={(checked) =>
+                        handleNoteToggle("equipmentConcernsEnabled", checked)
+                      }
                       value={formData.notes.equipmentConcerns}
                       onChange={(v) => handleNotes("equipmentConcerns", v)}
                     />

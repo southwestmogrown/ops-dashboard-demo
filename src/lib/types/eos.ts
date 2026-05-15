@@ -35,8 +35,11 @@ export interface EOSLineEntry {
 // Structured notes fields for the Operational Summary section
 export interface EOSStructuredNotes {
   topIssueToday: string; // required
+  resolvedDuringShiftEnabled: boolean;
   resolvedDuringShift: string; // visible only when checked (checkbox + text)
+  openItemsNextShiftEnabled: boolean;
   openItemsNextShift: string; // visible only when checked (checkbox + text)
+  equipmentConcernsEnabled: boolean;
   equipmentConcerns: string; // visible only when checked (checkbox + text)
   generalNotes: string; // optional multi-line
 }
