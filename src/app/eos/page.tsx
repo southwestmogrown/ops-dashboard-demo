@@ -35,6 +35,10 @@ interface EosDraftPayload {
   activeStream: string;
 }
 
+function inferEnabledFromText(text: string): boolean {
+  return text.trim() !== "";
+}
+
 function normalizeStructuredNotes(
   notes?: Partial<EOSFormData["notes"]>,
 ): EOSFormData["notes"] {
@@ -45,16 +49,36 @@ function normalizeStructuredNotes(
   return {
     topIssueToday: notes?.topIssueToday ?? "",
     resolvedDuringShiftEnabled:
-      notes?.resolvedDuringShiftEnabled ?? resolvedDuringShift.trim() !== "",
+      notes?.resolvedDuringShiftEnabled ?? inferEnabledFromText(resolvedDuringShift),
     resolvedDuringShift,
     openItemsNextShiftEnabled:
-      notes?.openItemsNextShiftEnabled ?? openItemsNextShift.trim() !== "",
+      notes?.openItemsNextShiftEnabled ?? inferEnabledFromText(openItemsNextShift),
     openItemsNextShift,
     equipmentConcernsEnabled:
-      notes?.equipmentConcernsEnabled ?? equipmentConcerns.trim() !== "",
+      notes?.equipmentConcernsEnabled ?? inferEnabledFromText(equipmentConcerns),
     equipmentConcerns,
     generalNotes: notes?.generalNotes ?? "",
   };
+}
+
+function isEosDraftPayload(value: unknown): value is EosDraftPayload {
+  if (!value || typeof value !== "object") return false;
+
+  const candidate = value as {
+    savedAt?: unknown;
+    formData?: unknown;
+    hiddenLines?: unknown;
+    activeStream?: unknown;
+  };
+
+  return (
+    typeof candidate.savedAt === "string" &&
+    typeof candidate.activeStream === "string" &&
+    Array.isArray(candidate.hiddenLines) &&
+    candidate.hiddenLines.every((line) => typeof line === "string") &&
+    !!candidate.formData &&
+    typeof candidate.formData === "object"
+  );
 }
 
 // ── Draft helpers ─────────────────────────────────────────────────────────────
@@ -70,7 +94,9 @@ function loadDraft(shift: string, date: string): EosDraftPayload | null {
   try {
     const raw = localStorage.getItem(draftKey(shift, date));
     if (!raw) return null;
-    const payload = JSON.parse(raw) as EosDraftPayload;
+    const parsed: unknown = JSON.parse(raw);
+    if (!isEosDraftPayload(parsed)) return null;
+    const payload = parsed;
     const age = Date.now() - new Date(payload.savedAt).getTime();
     if (age > DRAFT_TTL_MS) {
       localStorage.removeItem(draftKey(shift, date));

@@ -1,6 +1,6 @@
 import type { EOSFormData, EOSLineDescriptor } from "./eosTypes";
 
-function getOptionalNote(
+function getEnabledNoteValue(
   enabled: boolean,
   value: string,
 ): string {
@@ -40,9 +40,9 @@ function generateEOSCSV(
     `Date:,${data.date}`,
     `Shift:,${data.shift}`,
     `Top Issue Today:,${data.notes.topIssueToday}`,
-    `Resolved During Shift:,${getOptionalNote(data.notes.resolvedDuringShiftEnabled, data.notes.resolvedDuringShift)}`,
-    `Open Items Next Shift:,${getOptionalNote(data.notes.openItemsNextShiftEnabled, data.notes.openItemsNextShift)}`,
-    `Equipment Concerns:,${getOptionalNote(data.notes.equipmentConcernsEnabled, data.notes.equipmentConcerns)}`,
+    `Resolved During Shift:,${getEnabledNoteValue(data.notes.resolvedDuringShiftEnabled, data.notes.resolvedDuringShift)}`,
+    `Open Items Next Shift:,${getEnabledNoteValue(data.notes.openItemsNextShiftEnabled, data.notes.openItemsNextShift)}`,
+    `Equipment Concerns:,${getEnabledNoteValue(data.notes.equipmentConcernsEnabled, data.notes.equipmentConcerns)}`,
     `General Notes:,${data.notes.generalNotes}`,
     "",
   ];
