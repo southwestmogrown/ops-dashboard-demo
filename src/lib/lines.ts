@@ -6,18 +6,20 @@
  * Re-exported from generateMetrics to avoid a circular dep.
  */
 
-import { getShiftWindows } from "./shiftTime";
-import type { ShiftName } from "./types";
-
-// Re-export the canonical line roster
-export { LINE_DEFS as LINES } from "./generateMetrics";
-
-/** Re-export helpers too so callers have one place to import from. */
-export {
+import {
+  LINE_DEFS,
   generateMetrics,
   getDefaultHeadcount,
   getDefaultTarget,
 } from "./generateMetrics";
+import { getShiftWindows } from "./shiftTime";
+import type { ShiftName } from "./types";
+
+// Re-export the canonical line roster
+export const LINES = LINE_DEFS;
+
+/** Re-export helpers too so callers have one place to import from. */
+export { generateMetrics, getDefaultHeadcount, getDefaultTarget };
 
 /** Pre-computed short labels for sim/team-lead displays. */
 export const LINE_LABELS: Record<string, string> = {
@@ -47,4 +49,16 @@ export function getLineLabel(vs: string, name: string): string {
 /** Shift start hour (canonical — from shiftTime.ts). */
 export function getShiftStartHour(shift: ShiftName): number {
   return getShiftWindows(shift).startHour;
+}
+
+const LINE_ORDER = new Map(LINES.map((line, index) => [line.id, index]));
+
+/** Canonical dashboard line ordering (VS1 Line_01 → VS2 Line_02). */
+export function compareLineOrder(
+  a: Pick<(typeof LINES)[number], "id" | "name">,
+  b: Pick<(typeof LINES)[number], "id" | "name">
+): number {
+  const orderA = LINE_ORDER.get(a.id) ?? Number.MAX_SAFE_INTEGER;
+  const orderB = LINE_ORDER.get(b.id) ?? Number.MAX_SAFE_INTEGER;
+  return orderA - orderB || a.name.localeCompare(b.name);
 }

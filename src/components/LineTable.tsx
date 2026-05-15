@@ -4,6 +4,7 @@ import { useState } from "react";
 import type { Line } from "@/lib/types/core";
 import type { ShiftName } from "@/lib/types/core";
 import type { AdminLineConfig, LineState } from "@/lib/types/mes";
+import { compareLineOrder } from "@/lib/lines";
 import type { ShiftProgress } from "@/lib/shiftTime";
 import { isLineRunningForShift } from "@/lib/adminConfig";
 import {
@@ -30,6 +31,9 @@ interface LineTableProps {
   /** Set of line IDs with an open (ongoing) downtime entry */
   openDowntimeByLine?: Record<string, boolean>;
 }
+
+const SORT_STORAGE_KEY = "lt-sort-v2";
+const SORT_DIR_STORAGE_KEY = "lt-sort-dir-v2";
 
 function StatusPill({ risk, reasons }: { risk: RiskLevel; reasons: string[] }) {
   const { label, cls } = PILL_STYLE[risk];
@@ -119,15 +123,15 @@ export default function LineTable({
 
   const [sortKey, setSortKey] = useState<SortKey>(() => {
     if (typeof window !== "undefined") {
-      const saved = localStorage.getItem("lt-sort");
+      const saved = localStorage.getItem(SORT_STORAGE_KEY);
       if (saved === "fpy" || saved === "output" || saved === "pace" || saved === "line") return saved;
     }
-    return "fpy";
+    return "line";
   });
 
   const [sortDir, setSortDir] = useState<"asc" | "desc">(() => {
     if (typeof window !== "undefined") {
-      const saved = localStorage.getItem("lt-sort-dir");
+      const saved = localStorage.getItem(SORT_DIR_STORAGE_KEY);
       if (saved === "asc" || saved === "desc") return saved;
     }
     return "asc";
@@ -137,12 +141,12 @@ export default function LineTable({
     if (key === sortKey) {
       const next = sortDir === "asc" ? "desc" : "asc";
       setSortDir(next);
-      localStorage.setItem("lt-sort-dir", next);
+      localStorage.setItem(SORT_DIR_STORAGE_KEY, next);
     } else {
       setSortKey(key);
       setSortDir("asc");
-      localStorage.setItem("lt-sort", key);
-      localStorage.setItem("lt-sort-dir", "asc");
+      localStorage.setItem(SORT_STORAGE_KEY, key);
+      localStorage.setItem(SORT_DIR_STORAGE_KEY, "asc");
     }
   }
 
@@ -188,19 +192,26 @@ export default function LineTable({
 
     // Sort if performance sort is active
     const sorted = [...linesWithPace].sort((a, b) => {
-      if (sortKey === "line") return 0;
-      if (sortKey === "fpy") return a.line.fpy - b.line.fpy;
-      if (sortKey === "output") {
+      let comparison = 0;
+      if (sortKey === "line") {
+        comparison = compareLineOrder(a.line, b.line);
+      } else if (sortKey === "fpy") {
+        comparison = a.line.fpy - b.line.fpy;
+      } else if (sortKey === "output") {
         const ap = a.line.target > 0 ? a.line.output / a.line.target : 0;
         const bp = b.line.target > 0 ? b.line.output / b.line.target : 0;
-        return ap - bp;
-      }
-      if (sortKey === "pace") {
+        comparison = ap - bp;
+      } else if (sortKey === "pace") {
         const ap = a.pacePerHour ?? 0;
         const bp = b.pacePerHour ?? 0;
-        return ap - bp;
+        comparison = ap - bp;
       }
-      return 0;
+
+      if (comparison === 0) {
+        comparison = compareLineOrder(a.line, b.line);
+      }
+
+      return sortDir === "desc" ? comparison * -1 : comparison;
     });
 
     // When sort is "asc" (worst first), top 1-2 get a highlight ring
@@ -335,8 +346,12 @@ export default function LineTable({
         <table className="w-full border-collapse">
           <thead>
             <tr className="bg-surface-high text-left">
-              <th className="kc-table-th px-6">
+              <th
+                className="kc-table-th px-6 cursor-pointer select-none hover:text-[#e1e2ec]/80"
+                onClick={() => handleSort("line")}
+              >
                 Line Identification
+                <SortIcon active={sortKey === "line"} dir={sortDir} />
               </th>
               <th className="kc-table-th">
                 Output / Target
