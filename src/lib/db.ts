@@ -734,7 +734,7 @@ export async function dbGetKickedLids(
         sql: "SELECT extra FROM scrap_log WHERE line_id = ? AND shift = ? AND kind = 'kicked-lid' AND void_reason IS NULL",
         args: [lineId, shift],
       });
-  return (result.rows as Array<{ extra: string }>).reduce((sum, row) => {
+  return (result.rows as unknown as Array<{ extra: string }>).reduce((sum, row) => {
     try {
       const extra = JSON.parse(row.extra) as { quantity?: unknown };
       const quantity =
