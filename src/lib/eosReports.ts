@@ -1,5 +1,12 @@
 import type { EOSFormData, EOSLineDescriptor } from "./eosTypes";
 
+function noteIfEnabled(
+  enabled: boolean,
+  value: string,
+): string {
+  return enabled ? value : "";
+}
+
 export function calculateHPU(output: string, headcount: string, hoursWorked: string): string {
   const o = parseFloat(output);
   const h = parseFloat(headcount);
@@ -33,9 +40,9 @@ function generateEOSCSV(
     `Date:,${data.date}`,
     `Shift:,${data.shift}`,
     `Top Issue Today:,${data.notes.topIssueToday}`,
-    `Resolved During Shift:,${data.notes.resolvedDuringShift}`,
-    `Open Items Next Shift:,${data.notes.openItemsNextShift}`,
-    `Equipment Concerns:,${data.notes.equipmentConcerns}`,
+    `Resolved During Shift:,${noteIfEnabled(data.notes.resolvedDuringShiftEnabled, data.notes.resolvedDuringShift)}`,
+    `Open Items Next Shift:,${noteIfEnabled(data.notes.openItemsNextShiftEnabled, data.notes.openItemsNextShift)}`,
+    `Equipment Concerns:,${noteIfEnabled(data.notes.equipmentConcernsEnabled, data.notes.equipmentConcerns)}`,
     `General Notes:,${data.notes.generalNotes}`,
     "",
   ];
@@ -166,13 +173,28 @@ export function generateEmailBody(
     })
     .join("\n\n");
 
-  const { topIssueToday, resolvedDuringShift, openItemsNextShift, equipmentConcerns, generalNotes } = data.notes;
+  const {
+    topIssueToday,
+    resolvedDuringShiftEnabled,
+    resolvedDuringShift,
+    openItemsNextShiftEnabled,
+    openItemsNextShift,
+    equipmentConcernsEnabled,
+    equipmentConcerns,
+    generalNotes,
+  } = data.notes;
 
   const notesSections = [
     topIssueToday ? `• Top Issue Today: ${topIssueToday}` : null,
-    resolvedDuringShift ? `• Resolved During Shift: ${resolvedDuringShift}` : null,
-    openItemsNextShift ? `• Open Items for Next Shift: ${openItemsNextShift}` : null,
-    equipmentConcerns ? `• Equipment Concerns: ${equipmentConcerns}` : null,
+    resolvedDuringShiftEnabled && resolvedDuringShift
+      ? `• Resolved During Shift: ${resolvedDuringShift}`
+      : null,
+    openItemsNextShiftEnabled && openItemsNextShift
+      ? `• Open Items for Next Shift: ${openItemsNextShift}`
+      : null,
+    equipmentConcernsEnabled && equipmentConcerns
+      ? `• Equipment Concerns: ${equipmentConcerns}`
+      : null,
     generalNotes ? `• General Notes: ${generalNotes}` : null,
   ].filter(Boolean);
 

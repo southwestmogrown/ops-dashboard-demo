@@ -35,6 +35,56 @@ interface EosDraftPayload {
   activeStream: string;
 }
 
+function isTextPresent(text: string): boolean {
+  return text.trim() !== "";
+}
+
+function normalizeStructuredNotes(
+  notes?: Partial<EOSFormData["notes"]>,
+): EOSFormData["notes"] {
+  const resolvedDuringShift = notes?.resolvedDuringShift ?? "";
+  const openItemsNextShift = notes?.openItemsNextShift ?? "";
+  const equipmentConcerns = notes?.equipmentConcerns ?? "";
+
+  return {
+    topIssueToday: notes?.topIssueToday ?? "",
+    resolvedDuringShiftEnabled:
+      notes?.resolvedDuringShiftEnabled ?? isTextPresent(resolvedDuringShift),
+    resolvedDuringShift,
+    openItemsNextShiftEnabled:
+      notes?.openItemsNextShiftEnabled ?? isTextPresent(openItemsNextShift),
+    openItemsNextShift,
+    equipmentConcernsEnabled:
+      notes?.equipmentConcernsEnabled ?? isTextPresent(equipmentConcerns),
+    equipmentConcerns,
+    generalNotes: notes?.generalNotes ?? "",
+  };
+}
+
+function isEOSDraftPayload(value: unknown): value is EosDraftPayload {
+  if (!value || typeof value !== "object") return false;
+
+  const candidate = value as {
+    savedAt?: unknown;
+    formData?: unknown;
+    hiddenLines?: unknown;
+    activeStream?: unknown;
+  };
+  const formData =
+    candidate.formData && typeof candidate.formData === "object"
+      ? (candidate.formData as { notes?: unknown })
+      : null;
+
+  return (
+    typeof candidate.savedAt === "string" &&
+    typeof candidate.activeStream === "string" &&
+    Array.isArray(candidate.hiddenLines) &&
+    candidate.hiddenLines.every((line) => typeof line === "string") &&
+    !!formData &&
+    (!formData.notes || typeof formData.notes === "object")
+  );
+}
+
 // ── Draft helpers ─────────────────────────────────────────────────────────────
 
 const DRAFT_TTL_MS = 48 * 60 * 60 * 1000; // 48 hours
@@ -48,13 +98,21 @@ function loadDraft(shift: string, date: string): EosDraftPayload | null {
   try {
     const raw = localStorage.getItem(draftKey(shift, date));
     if (!raw) return null;
-    const payload: EosDraftPayload = JSON.parse(raw);
+    const parsed: unknown = JSON.parse(raw);
+    if (!isEOSDraftPayload(parsed)) return null;
+    const payload = parsed;
     const age = Date.now() - new Date(payload.savedAt).getTime();
     if (age > DRAFT_TTL_MS) {
       localStorage.removeItem(draftKey(shift, date));
       return null;
     }
-    return payload;
+    return {
+      ...payload,
+      formData: {
+        ...payload.formData,
+        notes: normalizeStructuredNotes(payload.formData.notes),
+      },
+    };
   } catch {
     return null;
   }
@@ -118,8 +176,11 @@ function emptyFormData(): EOSFormData {
     shift: "Day",
     notes: {
       topIssueToday: "",
+      resolvedDuringShiftEnabled: false,
       resolvedDuringShift: "",
+      openItemsNextShiftEnabled: false,
       openItemsNextShift: "",
+      equipmentConcernsEnabled: false,
       equipmentConcerns: "",
       generalNotes: "",
     },
@@ -291,6 +352,14 @@ export default function EOSPage() {
 
   const handleNotes = (field: keyof EOSFormData["notes"], value: string) =>
     setFormData((p) => ({ ...p, notes: { ...p.notes, [field]: value } }));
+
+  const handleNoteToggle = (
+    field:
+      | "resolvedDuringShiftEnabled"
+      | "openItemsNextShiftEnabled"
+      | "equipmentConcernsEnabled",
+    value: boolean,
+  ) => setFormData((p) => ({ ...p, notes: { ...p.notes, [field]: value } }));
 
   const handleLine = (
     lineKey: string,
@@ -569,6 +638,10 @@ export default function EOSPage() {
                     {/* Resolved During Shift */}
                     <NoteCheckboxField
                       label="Resolved During Shift"
+                      checked={formData.notes.resolvedDuringShiftEnabled}
+                      onCheckedChange={(checked) =>
+                        handleNoteToggle("resolvedDuringShiftEnabled", checked)
+                      }
                       value={formData.notes.resolvedDuringShift}
                       onChange={(v) => handleNotes("resolvedDuringShift", v)}
                     />
@@ -576,6 +649,10 @@ export default function EOSPage() {
                     {/* Open Items Next Shift */}
                     <NoteCheckboxField
                       label="Open Items for Next Shift"
+                      checked={formData.notes.openItemsNextShiftEnabled}
+                      onCheckedChange={(checked) =>
+                        handleNoteToggle("openItemsNextShiftEnabled", checked)
+                      }
                       value={formData.notes.openItemsNextShift}
                       onChange={(v) => handleNotes("openItemsNextShift", v)}
                     />
@@ -583,6 +660,10 @@ export default function EOSPage() {
                     {/* Equipment Concerns */}
                     <NoteCheckboxField
                       label="Equipment Concerns"
+                      checked={formData.notes.equipmentConcernsEnabled}
+                      onCheckedChange={(checked) =>
+                        handleNoteToggle("equipmentConcernsEnabled", checked)
+                      }
                       value={formData.notes.equipmentConcerns}
                       onChange={(v) => handleNotes("equipmentConcerns", v)}
                     />
