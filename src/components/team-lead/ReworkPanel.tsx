@@ -76,9 +76,9 @@ function EditEntryForm({
           />
         </div>
         <div>
-            <label className="text-[9px] text-[#e1e2ec]/40 uppercase tracking-widest font-bold block mb-0.5">
-             {positionLabel}
-            </label>
+          <label className="text-[9px] text-[#e1e2ec]/40 uppercase tracking-widest font-bold block mb-0.5">
+            {positionLabel}
+          </label>
             <select
               value={panel}
               onChange={(e) => setPanel(e.target.value as ScrapEntry["panel"])}

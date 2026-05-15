@@ -14,9 +14,9 @@ function generateEOSCSV(
 ): string {
   const headers = [
     "Line", "Output", "HPU", "Hours Worked",
-     "Headcount", "Order at Packout", "Remaining on Order",
-     "Remaining on Run Sheet", "Changeovers", "Downtime (min)",
-     "Lids Lost", "Stops", "Open Stops", "Latest Downtime", "Line Notes",
+    "Headcount", "Order at Packout", "Remaining on Order",
+    "Remaining on Run Sheet", "Changeovers", "Downtime (min)",
+    "Lids Lost", "Stops", "Open Stops", "Latest Downtime", "Line Notes",
   ];
   const rows = activeLines.map(({ lineKey, line }) => {
     const l = data.lines[lineKey];
