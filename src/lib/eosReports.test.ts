@@ -58,6 +58,7 @@ describe("generateEmailBody", () => {
         remainingOnRunSheet: "30",
         changeovers: "2",
         downtimeMinutes: "45",
+        downtimeUnitsLost: "6",
         downtimeCount: "2",
         openDowntimeCount: "1",
         latestDowntimeReason: "Waiting for Material",
@@ -101,6 +102,7 @@ describe("generateEmailBody", () => {
   it("includes downtime summary data", () => {
     const body = generateEmailBody(formData, activeLines, "All Lines");
     expect(body).toContain("Downtime: 45 min");
+    expect(body).toContain("Lids Lost: 6");
     expect(body).toContain("Stops: 2");
     expect(body).toContain("Open Stops: 1");
     expect(body).toContain("Latest Stop: Waiting for Material");

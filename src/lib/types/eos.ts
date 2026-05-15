@@ -25,6 +25,7 @@ export interface EOSLineEntry {
   remainingOnRunSheet: string;
   changeovers: string;
   downtimeMinutes: string;
+  downtimeUnitsLost: string;
   downtimeCount: string;
   openDowntimeCount: string;
   latestDowntimeReason: string;

@@ -16,7 +16,7 @@ import {
 import type { ShiftName } from "@/lib/types/core";
 import { getShiftWindows } from "@/lib/shiftTime";
 import { getDefaultTarget } from "@/lib/generateMetrics";
-import { getRequestRole, requireRole } from "@/lib/apiAuth";
+import { requireRole } from "@/lib/apiAuth";
 
 export async function GET(request: NextRequest): Promise<NextResponse> {
   const authError = requireRole(request, ["supervisor", "team-lead"]);
@@ -75,8 +75,6 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   const authError = requireRole(request, ["supervisor", "team-lead"]);
   if (authError) return authError;
 
-  const role = getRequestRole(request);
-
   let body: Record<string, unknown>;
   try {
     body = await request.json();
@@ -84,12 +82,22 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
   }
 
-  const { lineId, shift, reason, startTime, unitsLost, notes } = body;
+  const { lineId, shift, reason, startTime, unitsLost, notes, createdBy } = body;
   const operatingTime = await getOperatingTime();
 
-  if (!lineId || !shift || !reason || !startTime) {
+  if (!lineId || !shift || !reason || !startTime || !createdBy) {
     return NextResponse.json(
-      { error: "lineId, shift, reason, and startTime are all required" },
+      {
+        error:
+          "lineId, shift, reason, startTime, and createdBy are all required",
+      },
+      { status: 400 },
+    );
+  }
+  const normalizedCreatedBy = String(createdBy).trim().toUpperCase();
+  if (!normalizedCreatedBy) {
+    return NextResponse.json(
+      { error: "createdBy is required" },
       { status: 400 },
     );
   }
@@ -116,7 +124,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     endTime: null,
     unitsLost: typeof unitsLost === "number" ? unitsLost : 0,
     notes: typeof notes === "string" ? notes : "",
-    createdBy: role ?? undefined,
+    createdBy: normalizedCreatedBy,
   };
 
   const saved = await addDowntimeEntry(entry);

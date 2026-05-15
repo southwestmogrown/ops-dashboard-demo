@@ -6,6 +6,7 @@ describe("summarizeDowntimeEntries", () => {
   it("returns zeroed summary for empty lists", () => {
     expect(summarizeDowntimeEntries([], new Date("2026-05-14T10:00:00.000Z"))).toEqual({
       downtimeMinutes: "0",
+      downtimeUnitsLost: "0",
       downtimeCount: "0",
       openDowntimeCount: "0",
       latestDowntimeReason: "",
@@ -42,6 +43,7 @@ describe("summarizeDowntimeEntries", () => {
       summarizeDowntimeEntries(entries, new Date("2026-05-14T09:20:00.000Z")),
     ).toEqual({
       downtimeMinutes: "35",
+      downtimeUnitsLost: "4",
       downtimeCount: "2",
       openDowntimeCount: "1",
       latestDowntimeReason: "Waiting for Material",

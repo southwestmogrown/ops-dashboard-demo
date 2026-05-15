@@ -81,6 +81,14 @@ const DOWNTIME_BADGE_COLORS: Record<string, string> = {
   "vacuum-table-down": "bg-status-red/20 text-status-red border-status-red/30",
   "waiting-for-material":
     "bg-status-amber/20 text-status-amber border-status-amber/30",
+  "waiting-for-rails":
+    "bg-status-amber/20 text-status-amber border-status-amber/30",
+  "waiting-for-sides":
+    "bg-status-amber/20 text-status-amber border-status-amber/30",
+  "waiting-for-tophats":
+    "bg-status-amber/20 text-status-amber border-status-amber/30",
+  "waiting-for-extrusion":
+    "bg-status-amber/20 text-status-amber border-status-amber/30",
   "waiting-for-rails-sides-tophats-extrusion":
     "bg-status-amber/20 text-status-amber border-status-amber/30",
   "bander-down": "bg-status-red/20 text-status-red border-status-red/30",
@@ -200,7 +208,7 @@ function DowntimeTimeline({ entries }: { entries: DowntimeEntry[] }) {
 
             {entry.unitsLost > 0 && (
               <p className="text-[9px] text-status-amber/70 mt-0.5">
-                {entry.unitsLost} units lost
+                {entry.unitsLost} lids lost
               </p>
             )}
           </div>

@@ -144,8 +144,8 @@ export default function TeamLeadPage() {
       scrappedPanels = 0,
       totalBoughtIn = 0;
     for (const e of selectedScrapEntries) {
-      if (e.kind === "kicked-lid") kickedLids++;
-      else if (e.kind === "scrapped-panel") scrappedPanels++;
+      if (e.kind === "kicked-lid") kickedLids += e.quantity;
+      else if (e.kind === "scrapped-panel") scrappedPanels += e.quantity;
       if (e.boughtIn) totalBoughtIn++;
     }
     return { kickedLids, scrappedPanels, totalBoughtIn };

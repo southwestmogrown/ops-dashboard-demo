@@ -16,7 +16,7 @@ import {
 } from "@/lib/mesStore";
 import { getCurrentShiftContext, getShiftWindows } from "@/lib/shiftTime";
 import type { ShiftName } from "@/lib/types/core";
-import { PANEL_OPTIONS, pickDefectType } from "@/lib/types/quality";
+import { getScrapPositionOptions, pickDefectType } from "@/lib/types/quality";
 import {
   ACTIVE_DOWNTIME_REASONS,
   type DowntimeReason,
@@ -161,6 +161,7 @@ async function maybeInjectDefect(
   const shift: ShiftName = context?.shift ?? "day";
   const productionDate = context?.productionDate ?? "unknown";
   const isVS2 = line.lineId.toLowerCase().includes("vs2");
+  const positionOptions = getScrapPositionOptions(line.lineId);
 
   if (Math.random() < KICKED_LID_INJECTION_PROBABILITY) {
     await addScrapEntry({
@@ -169,7 +170,9 @@ async function maybeInjectDefect(
       shift,
       productionDate,
       model: line.currentOrder ?? "UNKNOWN",
-      panel: randomChoice(PANEL_OPTIONS),
+      panel: randomChoice(positionOptions),
+      quantity: 1,
+      createdBy: "SYS",
       damageType: "kicked-lid",
       affectedArea: randomChoice(AFFECTED_AREAS),
       auditorInitials: "SYS",
@@ -191,7 +194,9 @@ async function maybeInjectDefect(
     shift,
     productionDate,
     model: line.currentOrder ?? "UNKNOWN",
-    panel: randomChoice(PANEL_OPTIONS),
+    panel: randomChoice(positionOptions),
+    quantity: 1,
+    createdBy: "SYS",
     damageType: defectType,
     stationFound: "Final Inspection",
     howDamaged: `Simulated defect: ${defectType}`,

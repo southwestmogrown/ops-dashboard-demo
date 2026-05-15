@@ -2,6 +2,7 @@ import { DOWNTIME_REASON_LABELS, type DowntimeEntry } from "@/lib/types/downtime
 
 export interface EOSDowntimeSummary {
   downtimeMinutes: string;
+  downtimeUnitsLost: string;
   downtimeCount: string;
   openDowntimeCount: string;
   latestDowntimeReason: string;
@@ -9,6 +10,7 @@ export interface EOSDowntimeSummary {
 
 export const EMPTY_EOS_DOWNTIME_SUMMARY: EOSDowntimeSummary = {
   downtimeMinutes: "0",
+  downtimeUnitsLost: "0",
   downtimeCount: "0",
   openDowntimeCount: "0",
   latestDowntimeReason: "",
@@ -28,6 +30,10 @@ export function summarizeDowntimeEntries(
     const end = entry.endTime ? new Date(entry.endTime).getTime() : nowMs;
     return sum + Math.max(0, Math.floor((end - start) / 60000));
   }, 0);
+  const downtimeUnitsLost = entries.reduce(
+    (sum, entry) => sum + Math.max(0, entry.unitsLost),
+    0,
+  );
 
   const latestEntry = entries.reduce<DowntimeEntry | null>((latest, entry) => {
     if (!latest) return entry;
@@ -38,6 +44,7 @@ export function summarizeDowntimeEntries(
 
   return {
     downtimeMinutes: String(downtimeMinutes),
+    downtimeUnitsLost: String(downtimeUnitsLost),
     downtimeCount: String(entries.length),
     openDowntimeCount: String(entries.filter((entry) => entry.endTime === null).length),
     latestDowntimeReason: latestEntry

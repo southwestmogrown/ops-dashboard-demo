@@ -65,14 +65,40 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
   }
 
-  const { kind, lineId, shift, model, panel, damageType } = body;
+  const { kind, lineId, shift, model, panel, damageType, quantity, createdBy } =
+    body;
   const operatingTime = await getOperatingTime();
 
-  if (!kind || !lineId || !shift || !model || !panel || !damageType) {
+  if (
+    !kind ||
+    !lineId ||
+    !shift ||
+    !model ||
+    !panel ||
+    !damageType ||
+    quantity === undefined ||
+    !createdBy
+  ) {
     return NextResponse.json(
       {
-        error: "kind, lineId, shift, model, panel, damageType are all required",
+        error:
+          "kind, lineId, shift, model, panel, quantity, damageType, and createdBy are all required",
       },
+      { status: 400 },
+    );
+  }
+  const normalizedQuantity =
+    typeof quantity === "number" ? quantity : Number(quantity);
+  if (!Number.isInteger(normalizedQuantity) || normalizedQuantity < 1) {
+    return NextResponse.json(
+      { error: "quantity must be a positive integer" },
+      { status: 400 },
+    );
+  }
+  const normalizedCreatedBy = String(createdBy).trim().toUpperCase();
+  if (!normalizedCreatedBy) {
+    return NextResponse.json(
+      { error: "createdBy is required" },
       { status: 400 },
     );
   }
@@ -104,6 +130,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
           productionDate: operatingTime.productionDate,
           model: model as string,
           panel: panel as ScrappedPanel["panel"],
+          quantity: normalizedQuantity,
+          createdBy: normalizedCreatedBy,
           reasonCode,
           damageType: damageType as ScrappedPanel["damageType"],
           stationFound: (body.stationFound as string) ?? "",
@@ -117,6 +145,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
           productionDate: operatingTime.productionDate,
           model: model as string,
           panel: panel as KickedLid["panel"],
+          quantity: normalizedQuantity,
+          createdBy: normalizedCreatedBy,
           reasonCode,
           damageType: damageType as KickedLid["damageType"],
           affectedArea: (body.affectedArea as "panel" | "extrusion") ?? "panel",

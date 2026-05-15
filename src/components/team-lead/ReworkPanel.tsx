@@ -2,7 +2,11 @@
 
 import { useEffect, useState } from "react";
 import type { ScrapEntry } from "@/lib/types/quality";
-import { PANEL_OPTIONS, DAMAGE_TYPES } from "@/lib/types/quality";
+import {
+  DAMAGE_TYPES,
+  getScrapPositionLabel,
+  getScrapPositionOptions,
+} from "@/lib/types/quality";
 import { authFetch } from "@/lib/clientAuth";
 
 interface ReworkPanelProps {
@@ -37,6 +41,8 @@ function EditEntryForm({
   const [panel, setPanel] = useState(entry.panel);
   const [damageType, setDamageType] = useState(entry.damageType);
   const [saving, setSaving] = useState(false);
+  const positionLabel = getScrapPositionLabel(entry.lineId);
+  const positionOptions = getScrapPositionOptions(entry.lineId);
 
   async function handleSave() {
     setSaving(true);
@@ -70,20 +76,18 @@ function EditEntryForm({
           />
         </div>
         <div>
-          <label className="text-[9px] text-[#e1e2ec]/40 uppercase tracking-widest font-bold block mb-0.5">
-            Panel
-          </label>
-          <select
-            value={panel}
-            onChange={(e) =>
-              setPanel(e.target.value as (typeof PANEL_OPTIONS)[number])
-            }
-            className="kc-input-compact"
-          >
-            {PANEL_OPTIONS.map((p) => (
-              <option key={p} value={p}>
-                {p}
-              </option>
+            <label className="text-[9px] text-[#e1e2ec]/40 uppercase tracking-widest font-bold block mb-0.5">
+             {positionLabel}
+            </label>
+            <select
+              value={panel}
+              onChange={(e) => setPanel(e.target.value as ScrapEntry["panel"])}
+              className="kc-input-compact"
+            >
+              {positionOptions.map((p) => (
+                <option key={p} value={p}>
+                  {p}
+                </option>
             ))}
           </select>
         </div>
@@ -267,7 +271,10 @@ export default function ReworkPanel({
                             {entry.model}
                           </span>
                           <span className="text-[#e1e2ec]/30 text-[10px]">
-                            Panel {entry.panel}
+                            {getScrapPositionLabel(entry.lineId)} {entry.panel}
+                          </span>
+                          <span className="text-[#e1e2ec]/30 text-[10px]">
+                            &middot; Qty {entry.quantity}
                           </span>
                           <span className="text-[#e1e2ec]/30 text-[10px]">
                             &middot;
@@ -286,7 +293,10 @@ export default function ReworkPanel({
                         <div className="text-[#e1e2ec]/30 text-[9px] mt-0.5">
                           {entry.kind === "scrapped-panel"
                             ? entry.stationFound || "\u2014"
-                            : `Auditor: ${entry.auditorInitials || "\u2014"}`}
+                            : `Initials: ${entry.createdBy || entry.auditorInitials || "\u2014"}`}
+                          {entry.kind === "scrapped-panel" && entry.createdBy
+                            ? ` · Initials: ${entry.createdBy}`
+                            : ""}
                           {" \u00B7 "}
                           {formatTime(entry.timestamp)}
                           {" \u00B7 "}
