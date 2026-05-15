@@ -7,7 +7,17 @@ import type { ShiftName } from "./core";
 // ── Constants ─────────────────────────────────────────────────────────────────
 
 export const PANEL_OPTIONS = ["A", "B", "C", "D", "E", "F", "G"] as const;
-export type PanelPosition = (typeof PANEL_OPTIONS)[number];
+export const VS2_EXTRUSION_OPTIONS = [
+  "98",
+  "99",
+  "165",
+  "166",
+  "167",
+  "168",
+] as const;
+export type PanelPosition =
+  | (typeof PANEL_OPTIONS)[number]
+  | (typeof VS2_EXTRUSION_OPTIONS)[number];
 
 export const REASON_CODES = [
   "MC / MIS-CUT / FABRICATED INCORRECTLY",
@@ -93,7 +103,9 @@ interface ScrapEntryBase {
   shift: ShiftName; // auto-populated from team-lead context
   productionDate: string; // operational day key
   model: string; // part/model number
-  panel: PanelPosition; // which panel position (A–G)
+  panel: PanelPosition; // VS1 panel position (A–G) or VS2 extrusion number
+  quantity: number;
+  createdBy: string;
   /** Stored as optional in the shared type; the API enforces it for manual form submissions. */
   reasonCode?: ReasonCode;
   /** Manual-entry values (Damaged Panel, Bent Extrusion…) or sim-injected codes (kicked-lid, weld-defect…) */
@@ -134,13 +146,25 @@ export type NewScrapEntry =
 // ── Derived stats ─────────────────────────────────────────────────────────────
 
 export interface ScrapStats {
-  kickedLids: number; // count of KickedLid entries
-  scrappedPanels: number; // count of ScrappedPanel entries
+  kickedLids: number; // summed quantity of KickedLid entries
+  scrappedPanels: number; // summed quantity of ScrappedPanel entries
   totalBoughtIn: number; // count where boughtIn === true
 }
 
 export function isRevolverLine(lineId: string): boolean {
   return lineId.startsWith("vs2-");
+}
+
+export function getScrapPositionOptions(lineId: string): readonly PanelPosition[] {
+  return isRevolverLine(lineId) ? VS2_EXTRUSION_OPTIONS : PANEL_OPTIONS;
+}
+
+export function getScrapPositionLabel(lineId: string): string {
+  return isRevolverLine(lineId) ? "Extrusion" : "Panel";
+}
+
+export function getDefaultScrapPosition(lineId: string): PanelPosition {
+  return isRevolverLine(lineId) ? "98" : "A";
 }
 
 export function isReasonCode(value: unknown): value is ReasonCode {

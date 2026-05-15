@@ -3,10 +3,11 @@
 import { useState } from "react";
 import type { ScrapEntry } from "@/lib/types/quality";
 import {
-  PANEL_OPTIONS,
   DAMAGE_TYPES,
   REASON_CODES,
-  isRevolverLine,
+  getDefaultScrapPosition,
+  getScrapPositionLabel,
+  getScrapPositionOptions,
 } from "@/lib/types/quality";
 import type { ShiftName } from "@/lib/types/core";
 import { authFetch } from "@/lib/clientAuth";
@@ -26,12 +27,15 @@ export default function ScrapForm({
   onClose,
   onCreated,
 }: ScrapFormProps) {
-  const revolverLine = isRevolverLine(lineId);
+  const revolverLine = lineId.startsWith("vs2-");
   const primaryKindLabel = revolverLine ? "Extrusion" : "Scrapped Panel";
-  const panelLabel = revolverLine ? "Extrusion" : "Panel";
+  const panelLabel = getScrapPositionLabel(lineId);
+  const panelOptions = getScrapPositionOptions(lineId);
   const [kind, setKind] = useState<FormKind>("scrapped-panel");
   const [model, setModel] = useState("");
-  const [panel, setPanel] = useState<(typeof PANEL_OPTIONS)[number]>("A");
+  const [panel, setPanel] = useState(getDefaultScrapPosition(lineId));
+  const [quantity, setQuantity] = useState("1");
+  const [initials, setInitials] = useState("");
   const [reasonCode, setReasonCode] = useState<(typeof REASON_CODES)[number]>(
     REASON_CODES[0],
   );
@@ -43,7 +47,6 @@ export default function ScrapForm({
   const [affectedArea, setAffectedArea] = useState<"panel" | "extrusion">(
     "panel",
   );
-  const [auditorInitials, setAuditorInitials] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -58,6 +61,8 @@ export default function ScrapForm({
         shift,
         model,
         panel,
+        quantity: Number(quantity),
+        createdBy: initials.toUpperCase().trim(),
         reasonCode,
         damageType,
       };
@@ -72,7 +77,7 @@ export default function ScrapForm({
           : {
               ...base,
               affectedArea,
-              auditorInitials: auditorInitials.toUpperCase().trim(),
+              auditorInitials: initials.toUpperCase().trim(),
             };
 
       const res = await authFetch("/api/scrap", {
@@ -146,16 +151,42 @@ export default function ScrapForm({
             />
           </div>
 
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className={labelClass}>Quantity</label>
+              <input
+                type="number"
+                min={1}
+                step={1}
+                value={quantity}
+                onChange={(e) => setQuantity(e.target.value)}
+                required
+                className={inputClass}
+              />
+            </div>
+            <div>
+              <label className={labelClass}>Initials</label>
+              <input
+                value={initials}
+                onChange={(e) => setInitials(e.target.value.toUpperCase())}
+                required
+                maxLength={4}
+                placeholder="e.g. JDF"
+                className={`${inputClass} uppercase`}
+              />
+            </div>
+          </div>
+
           {/* Panel */}
           <div>
             <label className={labelClass}>{panelLabel}</label>
-            <div className="flex gap-2">
-              {PANEL_OPTIONS.map((p) => (
+            <div className="grid grid-cols-3 gap-2">
+              {panelOptions.map((p) => (
                 <button
                   key={p}
                   type="button"
                   onClick={() => setPanel(p)}
-                  className={`w-9 h-9 rounded-sm text-sm font-bold border transition-colors cursor-pointer ${
+                  className={`min-h-9 rounded-sm px-2 text-sm font-bold border transition-colors cursor-pointer ${
                     panel === p
                       ? "bg-accent text-black border-accent"
                       : "bg-transparent text-[#e1e2ec]/40 border-border hover:border-[#e1e2ec]/30"
@@ -249,17 +280,6 @@ export default function ScrapForm({
                     </button>
                   ))}
                 </div>
-              </div>
-              <div>
-                <label className={labelClass}>Auditor Initials</label>
-                <input
-                  value={auditorInitials}
-                  onChange={(e) => setAuditorInitials(e.target.value)}
-                  required
-                  maxLength={3}
-                  placeholder="e.g. JDF"
-                  className={`${inputClass} uppercase`}
-                />
               </div>
             </>
           )}

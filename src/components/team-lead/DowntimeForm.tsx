@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import type { DowntimeReason } from "@/lib/types/downtime";
-import { useAuth } from "@/hooks/useAuth";
 import {
   ACTIVE_DOWNTIME_REASONS,
   DOWNTIME_REASON_LABELS,
@@ -39,7 +38,6 @@ export default function DowntimeForm({
   onRefresh,
 }: DowntimeFormProps) {
   const isResolve = !!existingEntryId;
-  const { role } = useAuth();
   const [reason, setReason] = useState<DowntimeReason>(
     isResolve ? "other" : ACTIVE_DOWNTIME_REASONS[0],
   );
@@ -49,6 +47,7 @@ export default function DowntimeForm({
       : nowLocal(),
   );
   const [endTime, setEndTime] = useState("");
+  const [initials, setInitials] = useState("");
   const [notes, setNotes] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -67,7 +66,7 @@ export default function DowntimeForm({
           reason,
           startTime: new Date(startTime).toISOString(),
           notes,
-          createdBy: role ?? "unknown",
+          createdBy: initials.trim().toUpperCase(),
         }),
       });
       if (!res.ok) {
@@ -219,12 +218,24 @@ export default function DowntimeForm({
               />
             </div>
 
-            {/* Units Lost */}
+            {/* Lids Lost */}
             <div>
-              <label className={labelClass}>Units Lost</label>
+              <label className={labelClass}>Lids Lost</label>
               <div className={`${inputClass} tabular-nums text-[#e1e2ec]/65`}>
                 Auto-calculated when downtime is resolved
               </div>
+            </div>
+
+            <div>
+              <label className={labelClass}>Initials</label>
+              <input
+                value={initials}
+                onChange={(e) => setInitials(e.target.value.toUpperCase())}
+                required
+                maxLength={4}
+                placeholder="e.g. JDF"
+                className={`${inputClass} uppercase`}
+              />
             </div>
 
             {/* Notes */}

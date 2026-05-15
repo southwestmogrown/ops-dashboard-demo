@@ -50,6 +50,10 @@ export default function DowntimePanel({
     const end = e.endTime ? new Date(e.endTime).getTime() : now;
     return sum + Math.max(0, Math.floor((end - start) / 60000));
   }, 0);
+  const totalUnitsLost = entries.reduce(
+    (sum, entry) => sum + Math.max(0, entry.unitsLost),
+    0,
+  );
 
   const totalLabel =
     totalMinutes < 60
@@ -66,7 +70,9 @@ export default function DowntimePanel({
           <span className="material-symbols-outlined text-[14px] text-status-red">
             flag
           </span>
-          {entries.length === 0 ? "No downtime" : `${totalLabel} downtime`}
+          {entries.length === 0
+            ? "No downtime"
+            : `${totalLabel} downtime · ${totalUnitsLost} lids lost`}
         </span>
         <span className="text-[#e1e2ec]/45 text-sm">
           {open ? "\u25B2" : "\u25BC"}
@@ -119,10 +125,15 @@ export default function DowntimePanel({
                         {entry.notes}
                       </p>
                     )}
+                    {entry.createdBy && (
+                      <p className="text-[10px] text-[#e1e2ec]/35 mt-0.5 uppercase tracking-widest">
+                        Initials: {entry.createdBy}
+                      </p>
+                    )}
                   </div>
                   {entry.unitsLost > 0 && (
                     <span className="shrink-0 text-[10px] font-mono bg-status-red/10 text-status-red border border-status-red/20 px-1.5 py-0.5 rounded-sm">
-                      {entry.unitsLost} lost
+                      {entry.unitsLost} lids lost
                     </span>
                   )}
                   {entry.endTime === null && (

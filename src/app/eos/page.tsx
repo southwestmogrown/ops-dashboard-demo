@@ -100,6 +100,7 @@ const EMPTY_LINE: EOSLineEntry = {
   remainingOnRunSheet: "",
   changeovers: "",
   downtimeMinutes: "0",
+  downtimeUnitsLost: "0",
   downtimeCount: "0",
   openDowntimeCount: "0",
   latestDowntimeReason: "",

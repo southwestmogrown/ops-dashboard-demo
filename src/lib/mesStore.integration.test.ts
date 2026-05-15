@@ -391,6 +391,8 @@ describe("Scrap entries", () => {
       productionDate: PROD_DATE,
       model: "M1",
       panel: "A",
+      quantity: 2,
+      createdBy: "AB",
       damageType: "kicked-lid",
       affectedArea: "panel",
       auditorInitials: "AB",
@@ -410,6 +412,8 @@ describe("Scrap entries", () => {
       productionDate: PROD_DATE,
       model: "M1",
       panel: "A",
+      quantity: 2,
+      createdBy: "AB",
       damageType: "kicked-lid",
       affectedArea: "panel",
       auditorInitials: "AB",
@@ -422,14 +426,16 @@ describe("Scrap entries", () => {
       productionDate: PROD_DATE,
       model: "M2",
       panel: "B",
+      quantity: 3,
+      createdBy: "CD",
       damageType: "Damaged Panel",
       stationFound: "Station 3",
       howDamaged: "Dented",
       boughtIn: true,
     });
     const stats = await getScrapStats("vs1-l1", "day", PROD_DATE);
-    expect(stats.kickedLids).toBe(1);
-    expect(stats.scrappedPanels).toBe(1);
+    expect(stats.kickedLids).toBe(2);
+    expect(stats.scrappedPanels).toBe(3);
     expect(stats.totalBoughtIn).toBe(1);
   });
 
@@ -441,6 +447,8 @@ describe("Scrap entries", () => {
       productionDate: PROD_DATE,
       model: "M1",
       panel: "A",
+      quantity: 1,
+      createdBy: "AB",
       damageType: "kicked-lid",
       affectedArea: "panel",
       auditorInitials: "AB",
@@ -452,7 +460,9 @@ describe("Scrap entries", () => {
       shift: "night",
       productionDate: PROD_DATE,
       model: "M1",
-      panel: "A",
+      panel: "98",
+      quantity: 1,
+      createdBy: "AB",
       damageType: "kicked-lid",
       affectedArea: "panel",
       auditorInitials: "AB",

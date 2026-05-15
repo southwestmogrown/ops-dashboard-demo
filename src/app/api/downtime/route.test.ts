@@ -45,6 +45,7 @@ describe("POST /api/downtime", () => {
         shift: "day",
         reason: "angle-saw-down",
         startTime: "2026-04-12T08:00:00Z",
+        createdBy: "AB",
         notes: "Saw offline",
       }),
       headers: { "content-type": "application/json" },
@@ -63,6 +64,7 @@ describe("POST /api/downtime", () => {
         shift: "day",
         reason: "operator-break",
         startTime: "2026-04-12T08:00:00Z",
+        createdBy: "AB",
       }),
       headers: { "content-type": "application/json" },
     });

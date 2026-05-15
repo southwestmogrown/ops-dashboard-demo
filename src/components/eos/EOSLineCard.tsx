@@ -27,6 +27,7 @@ const FIELDS: { key: keyof EOSLineEntry; label: string; type: string; readOnly?:
 export default function EOSLineCard({ lineKey, vsId, line, vsName, data, onChange, onHide }: Props) {
   const hasOutput = Boolean(data.output);
   const downtimeMinutes = Number(data.downtimeMinutes) || 0;
+  const downtimeUnitsLost = Number(data.downtimeUnitsLost) || 0;
   const downtimeCount = Number(data.downtimeCount) || 0;
   const openDowntimeCount = Number(data.openDowntimeCount) || 0;
 
@@ -106,6 +107,9 @@ export default function EOSLineCard({ lineKey, vsId, line, vsName, data, onChang
             <span className="text-[10px] text-[#e1e2ec]/45 font-mono">
               {downtimeCount} stop{downtimeCount === 1 ? "" : "s"}
             </span>
+            <span className="text-[10px] text-status-red/75 font-mono">
+              {downtimeUnitsLost} lids lost
+            </span>
             {openDowntimeCount > 0 && (
               <span className="inline-flex items-center px-1.5 py-0.5 rounded-sm text-[9px] font-bold border uppercase bg-status-red/20 text-status-red border-status-red/20">
                 {openDowntimeCount} open
@@ -114,7 +118,7 @@ export default function EOSLineCard({ lineKey, vsId, line, vsName, data, onChang
           </div>
           {data.latestDowntimeReason && (
             <span
-              className={`mt-2 inline-flex w-fit items-center px-2 py-0.5 rounded-sm text-[9px] font-bold border uppercase ${getDowntimeReasonBadgeClass(data.latestDowntimeReason)}`}
+              className={`mt-2 inline-flex max-w-full items-center whitespace-normal break-words px-2 py-1 rounded-sm text-[9px] leading-tight font-bold border uppercase ${getDowntimeReasonBadgeClass(data.latestDowntimeReason)}`}
             >
               {data.latestDowntimeReason}
             </span>

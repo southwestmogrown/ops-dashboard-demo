@@ -16,7 +16,7 @@ function generateEOSCSV(
     "Line", "Output", "HPU", "Hours Worked",
     "Headcount", "Order at Packout", "Remaining on Order",
     "Remaining on Run Sheet", "Changeovers", "Downtime (min)",
-    "Stops", "Open Stops", "Latest Downtime", "Line Notes",
+    "Lids Lost", "Stops", "Open Stops", "Latest Downtime", "Line Notes",
   ];
   const rows = activeLines.map(({ lineKey, line }) => {
     const l = data.lines[lineKey];
@@ -24,7 +24,7 @@ function generateEOSCSV(
       line, l.output, l.hpu, l.hoursWorked,
       l.headcount, l.orderAtPackout, l.remainingOnOrder,
       l.remainingOnRunSheet, l.changeovers, l.downtimeMinutes,
-      l.downtimeCount, l.openDowntimeCount, l.latestDowntimeReason, l.lineNotes,
+      l.downtimeUnitsLost, l.downtimeCount, l.openDowntimeCount, l.latestDowntimeReason, l.lineNotes,
     ].join(",");
   });
   const meta = [
@@ -56,6 +56,7 @@ function generateLineStatusCSV(
     "Hours Worked",
     "Changeovers",
     "Downtime (min)",
+    "Lids Lost",
     "Stops",
     "Open Stops",
     "Latest Downtime",
@@ -69,7 +70,7 @@ function generateLineStatusCSV(
     return [
       line, vsName, l.output || "—", target, l.hpu || "0",
       l.headcount || "—", l.hoursWorked || "8", l.changeovers || "0",
-      l.downtimeMinutes || "0", l.downtimeCount || "0", l.openDowntimeCount || "0",
+      l.downtimeMinutes || "0", l.downtimeUnitsLost || "0", l.downtimeCount || "0", l.openDowntimeCount || "0",
       l.latestDowntimeReason || "—",
       `${pct}%`,
     ].join(",");
@@ -103,6 +104,7 @@ function generatePrePostCSV(
     "Headcount",
     "Changeovers",
     "Downtime (min)",
+    "Lids Lost",
     "Stops",
     "Open Stops",
     "Latest Downtime",
@@ -115,7 +117,7 @@ function generatePrePostCSV(
     return [
       line, l.output || "—", l.hpu || "0", l.hoursWorked || "8",
       l.headcount || "—", l.changeovers || "0",
-      l.downtimeMinutes || "0", l.downtimeCount || "0", l.openDowntimeCount || "0",
+      l.downtimeMinutes || "0", l.downtimeUnitsLost || "0", l.downtimeCount || "0", l.openDowntimeCount || "0",
       l.latestDowntimeReason || "—",
       l.remainingOnOrder || "—", l.remainingOnRunSheet || "—", l.lineNotes || "",
     ].join(",");
@@ -158,7 +160,7 @@ export function generateEmailBody(
       return `  ${line} (${vsName})
     Output: ${l.output || "—"}  |  HPU: ${l.hpu || "0"}
     Headcount: ${l.headcount || "—"}  |  Hours Worked: ${l.hoursWorked || "8"}  |  Changeovers: ${l.changeovers || "—"}
-    Downtime: ${l.downtimeMinutes || "0"} min  |  Stops: ${l.downtimeCount || "0"}  |  Open Stops: ${l.openDowntimeCount || "0"}  |  Latest Stop: ${l.latestDowntimeReason || "—"}
+    Downtime: ${l.downtimeMinutes || "0"} min  |  Lids Lost: ${l.downtimeUnitsLost || "0"}  |  Stops: ${l.downtimeCount || "0"}  |  Open Stops: ${l.openDowntimeCount || "0"}  |  Latest Stop: ${l.latestDowntimeReason || "—"}
     Order @ Packout: ${l.orderAtPackout || "—"}  |  Remaining on Order: ${l.remainingOnOrder || "—"}  |  Remaining on Run Sheet: ${l.remainingOnRunSheet || "—"}
     Line Notes: ${l.lineNotes || "—"}`;
     })

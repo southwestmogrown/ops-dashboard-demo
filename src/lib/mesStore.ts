@@ -784,8 +784,12 @@ export async function getScrapStats(
     (e) => !e.voidReason,
   );
   return {
-    kickedLids: entries.filter((e) => e.kind === "kicked-lid").length,
-    scrappedPanels: entries.filter((e) => e.kind === "scrapped-panel").length,
+    kickedLids: entries
+      .filter((e) => e.kind === "kicked-lid")
+      .reduce((sum, entry) => sum + entry.quantity, 0),
+    scrappedPanels: entries
+      .filter((e) => e.kind === "scrapped-panel")
+      .reduce((sum, entry) => sum + entry.quantity, 0),
     totalBoughtIn: entries.filter((e) => e.boughtIn).length,
   };
 }

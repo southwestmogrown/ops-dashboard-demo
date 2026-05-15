@@ -5,13 +5,17 @@ export type ActiveDowntimeReason =
   | "panel-saw-down"
   | "vacuum-table-down"
   | "waiting-for-material"
-  | "waiting-for-rails-sides-tophats-extrusion"
+  | "waiting-for-rails"
+  | "waiting-for-sides"
+  | "waiting-for-tophats"
+  | "waiting-for-extrusion"
   | "bander-down"
   | "planned-maintenance"
   | "quality-hold"
   | "other";
 
 export type LegacyDowntimeReason =
+  | "waiting-for-rails-sides-tophats-extrusion"
   | "machine-failure"
   | "material-shortage"
   | "operator-break"
@@ -27,7 +31,10 @@ export const ACTIVE_DOWNTIME_REASONS: ActiveDowntimeReason[] = [
   "panel-saw-down",
   "vacuum-table-down",
   "waiting-for-material",
-  "waiting-for-rails-sides-tophats-extrusion",
+  "waiting-for-rails",
+  "waiting-for-sides",
+  "waiting-for-tophats",
+  "waiting-for-extrusion",
   "bander-down",
   "planned-maintenance",
   "quality-hold",
@@ -61,6 +68,10 @@ export const DOWNTIME_REASON_LABELS: Record<DowntimeReason, string> = {
   "panel-saw-down": "Panel Saw Down",
   "vacuum-table-down": "Vacuum Table Down",
   "waiting-for-material": "Waiting for Material",
+  "waiting-for-rails": "Waiting for Rails",
+  "waiting-for-sides": "Waiting for Sides",
+  "waiting-for-tophats": "Waiting for Tophats",
+  "waiting-for-extrusion": "Waiting for Extrusion",
   "waiting-for-rails-sides-tophats-extrusion":
     "Waiting for Rails/Sides/Tophats/Extrusion",
   "bander-down": "Bander Down",
@@ -85,6 +96,14 @@ export function getDowntimeReasonBadgeClass(reason: DowntimeReason | string): st
     "vacuum-table-down": "bg-status-red/20 text-status-red border-status-red/20",
     "bander-down": "bg-status-red/20 text-status-red border-status-red/20",
     "waiting-for-material":
+      "bg-status-amber/20 text-status-amber border-status-amber/20",
+    "waiting-for-rails":
+      "bg-status-amber/20 text-status-amber border-status-amber/20",
+    "waiting-for-sides":
+      "bg-status-amber/20 text-status-amber border-status-amber/20",
+    "waiting-for-tophats":
+      "bg-status-amber/20 text-status-amber border-status-amber/20",
+    "waiting-for-extrusion":
       "bg-status-amber/20 text-status-amber border-status-amber/20",
     "waiting-for-rails-sides-tophats-extrusion":
       "bg-status-amber/20 text-status-amber border-status-amber/20",

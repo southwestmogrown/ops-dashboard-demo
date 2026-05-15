@@ -594,6 +594,8 @@ export async function dbClearComments(): Promise<void> {
 
 export async function dbInsertScrap(entry: ScrapEntry): Promise<void> {
   const extra: Record<string, unknown> = {};
+  extra.quantity = entry.quantity;
+  extra.createdBy = entry.createdBy;
   if (entry.reasonCode) extra.reasonCode = entry.reasonCode;
   if (entry.kind === "scrapped-panel") {
     extra.stationFound = entry.stationFound;
@@ -641,6 +643,12 @@ function _parseScrapRow(r: ScrapRow): ScrapEntry {
   const extra = JSON.parse(r.extra) as Record<string, unknown>;
   const panel = r.panel as ScrapEntry["panel"];
   const damageType = r.damage_type as ScrapEntry["damageType"];
+  const quantity =
+    typeof extra.quantity === "number" && extra.quantity > 0
+      ? extra.quantity
+      : 1;
+  const createdBy =
+    typeof extra.createdBy === "string" ? String(extra.createdBy) : "";
   const reasonCode =
     typeof extra.reasonCode === "string"
       ? (extra.reasonCode as ScrapEntry["reasonCode"])
@@ -653,6 +661,8 @@ function _parseScrapRow(r: ScrapRow): ScrapEntry {
         productionDate: r.production_date,
         model: r.model,
       panel,
+      quantity,
+      createdBy,
       reasonCode,
       damageType,
       boughtIn: !!r.bought_in,
@@ -670,6 +680,8 @@ function _parseScrapRow(r: ScrapRow): ScrapEntry {
         productionDate: r.production_date,
         model: r.model,
       panel,
+      quantity,
+      createdBy,
       reasonCode,
       damageType,
       boughtIn: !!r.bought_in,
@@ -715,15 +727,25 @@ export async function dbGetKickedLids(
 ): Promise<number> {
   const result = productionDate
     ? await getClient().execute({
-        sql: "SELECT COUNT(*) AS cnt FROM scrap_log WHERE line_id = ? AND shift = ? AND production_date = ? AND kind = 'kicked-lid' AND void_reason IS NULL",
+        sql: "SELECT extra FROM scrap_log WHERE line_id = ? AND shift = ? AND production_date = ? AND kind = 'kicked-lid' AND void_reason IS NULL",
         args: [lineId, shift, productionDate],
       })
     : await getClient().execute({
-        sql: "SELECT COUNT(*) AS cnt FROM scrap_log WHERE line_id = ? AND shift = ? AND kind = 'kicked-lid' AND void_reason IS NULL",
+        sql: "SELECT extra FROM scrap_log WHERE line_id = ? AND shift = ? AND kind = 'kicked-lid' AND void_reason IS NULL",
         args: [lineId, shift],
       });
-  const row = result.rows[0] as unknown as { cnt: number } | undefined;
-  return row?.cnt ?? 0;
+  return (result.rows as unknown as Array<{ extra: string }>).reduce((sum, row) => {
+    try {
+      const extra = JSON.parse(row.extra) as { quantity?: unknown };
+      const quantity =
+        typeof extra.quantity === "number" && extra.quantity > 0
+          ? extra.quantity
+          : 1;
+      return sum + quantity;
+    } catch {
+      return sum + 1;
+    }
+  }, 0);
 }
 
 export async function dbUpdateScrapEntry(
