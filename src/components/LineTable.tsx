@@ -207,7 +207,7 @@ export default function LineTable({
         comparison = ap - bp;
       }
 
-      if (comparison === 0) {
+      if (comparison === 0 && sortKey !== "line") {
         comparison = compareLineOrder(a.line, b.line);
       }
 
