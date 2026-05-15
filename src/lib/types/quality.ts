@@ -164,7 +164,7 @@ export function getScrapPositionLabel(lineId: string): string {
 }
 
 export function getDefaultScrapPosition(lineId: string): PanelPosition {
-  return getScrapPositionOptions(lineId)[0]!;
+  return getScrapPositionOptions(lineId)[0] ?? "A";
 }
 
 export function isReasonCode(value: unknown): value is ReasonCode {

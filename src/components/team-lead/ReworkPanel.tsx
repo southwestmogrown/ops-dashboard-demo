@@ -292,11 +292,8 @@ export default function ReworkPanel({
                         </div>
                         <div className="text-[#e1e2ec]/30 text-[9px] mt-0.5">
                           {entry.kind === "scrapped-panel"
-                            ? entry.stationFound || "\u2014"
+                            ? `${entry.stationFound || "\u2014"} · Initials: ${entry.createdBy || "\u2014"}`
                             : `Initials: ${entry.createdBy || entry.auditorInitials || "\u2014"}`}
-                          {entry.kind === "scrapped-panel" && entry.createdBy
-                            ? ` · Initials: ${entry.createdBy}`
-                            : ""}
                           {" \u00B7 "}
                           {formatTime(entry.timestamp)}
                           {" \u00B7 "}
