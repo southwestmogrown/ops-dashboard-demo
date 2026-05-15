@@ -3,6 +3,7 @@ import {
   LINES,
   LINE_LABELS,
   LINE_ADMIN_LABELS,
+  compareLineOrder,
   getLineLabel,
   getShiftStartHour,
   getDefaultHeadcount,
@@ -86,5 +87,33 @@ describe("re-exports", () => {
   it("re-exports getDefaultTarget", () => {
     expect(typeof getDefaultTarget).toBe("function");
     expect(getDefaultTarget("vs2-l1")).toBe(200);
+  });
+});
+
+describe("compareLineOrder", () => {
+  it("keeps VS1 lines in canonical top-to-bottom order", () => {
+    const unordered = [
+      { id: "vs1-l3", name: "Folding Line_03" },
+      { id: "vs1-l1", name: "Folding Line_01" },
+      { id: "vs1-l2", name: "Folding Line_02" },
+    ];
+    const ordered = unordered.sort(compareLineOrder);
+
+    expect(ordered.map((line) => line.id)).toEqual([
+      "vs1-l1",
+      "vs1-l2",
+      "vs1-l3",
+    ]);
+  });
+
+  it("falls back to the line name for unknown ids", () => {
+    const unordered = [
+      { id: "custom-b", name: "Line B" },
+      { id: "custom-a", name: "Line A" },
+    ];
+
+    const ordered = unordered.sort(compareLineOrder);
+
+    expect(ordered.map((line) => line.name)).toEqual(["Line A", "Line B"]);
   });
 });
