@@ -35,7 +35,7 @@ interface EosDraftPayload {
   activeStream: string;
 }
 
-function shouldEnableFromText(text: string): boolean {
+function isTextPresent(text: string): boolean {
   return text.trim() !== "";
 }
 
@@ -49,19 +49,19 @@ function normalizeStructuredNotes(
   return {
     topIssueToday: notes?.topIssueToday ?? "",
     resolvedDuringShiftEnabled:
-      notes?.resolvedDuringShiftEnabled ?? shouldEnableFromText(resolvedDuringShift),
+      notes?.resolvedDuringShiftEnabled ?? isTextPresent(resolvedDuringShift),
     resolvedDuringShift,
     openItemsNextShiftEnabled:
-      notes?.openItemsNextShiftEnabled ?? shouldEnableFromText(openItemsNextShift),
+      notes?.openItemsNextShiftEnabled ?? isTextPresent(openItemsNextShift),
     openItemsNextShift,
     equipmentConcernsEnabled:
-      notes?.equipmentConcernsEnabled ?? shouldEnableFromText(equipmentConcerns),
+      notes?.equipmentConcernsEnabled ?? isTextPresent(equipmentConcerns),
     equipmentConcerns,
     generalNotes: notes?.generalNotes ?? "",
   };
 }
 
-function isEosDraftPayload(value: unknown): value is EosDraftPayload {
+function isEOSDraftPayload(value: unknown): value is EosDraftPayload {
   if (!value || typeof value !== "object") return false;
 
   const candidate = value as {
@@ -99,7 +99,7 @@ function loadDraft(shift: string, date: string): EosDraftPayload | null {
     const raw = localStorage.getItem(draftKey(shift, date));
     if (!raw) return null;
     const parsed: unknown = JSON.parse(raw);
-    if (!isEosDraftPayload(parsed)) return null;
+    if (!isEOSDraftPayload(parsed)) return null;
     const payload = parsed;
     const age = Date.now() - new Date(payload.savedAt).getTime();
     if (age > DRAFT_TTL_MS) {
