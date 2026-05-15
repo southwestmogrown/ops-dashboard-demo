@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { usePathname } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
 import type { ShiftMetrics, ShiftName } from "@/lib/types/core";
@@ -13,6 +13,7 @@ import type {
   EOSValueStream,
 } from "@/lib/types/eos";
 import { calculateHPU, downloadAllReports } from "@/lib/eosReports";
+import { summarizeDowntimeEntries } from "@/lib/eosDowntime";
 import EOSLineCard from "@/components/eos/EOSLineCard";
 import EOSMetaForm from "@/components/eos/EOSMetaForm";
 import EOSEmailPreview from "@/components/eos/EOSEmailPreview";
@@ -20,9 +21,10 @@ import NoteCheckboxField from "@/components/eos/NoteCheckboxField";
 import SidebarNav, { SidebarNavItem } from "@/components/SidebarNav";
 import { useRedirectTeamLead } from "@/hooks/useRedirectTeamLead";
 import { queryKeys } from "@/lib/queryKeys";
-import { fetchAdminConfig, fetchMesState } from "@/lib/queryFetchers";
+import { fetchAdminConfig, fetchDowntime, fetchMesState } from "@/lib/queryFetchers";
 import { authFetch } from "@/lib/clientAuth";
 import { isLineRunningForShift } from "@/lib/adminConfig";
+import type { DowntimeEntry } from "@/lib/types/downtime";
 
 // ── Draft types ────────────────────────────────────────────────────────────────
 
@@ -97,6 +99,10 @@ const EMPTY_LINE: EOSLineEntry = {
   remainingOnOrder: "",
   remainingOnRunSheet: "",
   changeovers: "",
+  downtimeMinutes: "0",
+  downtimeCount: "0",
+  openDowntimeCount: "0",
+  latestDowntimeReason: "",
   lineNotes: "",
 };
 
@@ -153,19 +159,20 @@ export default function EOSPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // run once on mount
 
-  async function refreshFromMes(
+  const refreshFromMes = useCallback(async (
     shift: string,
     autoHide: (keys: string[]) => void,
-  ) {
+  ) => {
     setMesRefreshing(true);
     try {
-      const [metrics, mesStates, adminConfig] = await Promise.all([
+      const shiftKey = shift.toLowerCase() as ShiftName;
+      const [metrics, mesStates, adminConfig, downtimeEntries] = await Promise.all([
         authFetch(`/api/metrics?shift=${shift.toLowerCase()}`).then(
           (r) => r.json() as Promise<ShiftMetrics>,
         ),
         queryClient.fetchQuery({
-          queryKey: queryKeys.mesState(shift.toLowerCase() as ShiftName),
-          queryFn: () => fetchMesState(shift.toLowerCase() as ShiftName),
+          queryKey: queryKeys.mesState(shiftKey),
+          queryFn: () => fetchMesState(shiftKey),
           staleTime: 2000,
         }).catch(
           () => [] as LineState[],
@@ -175,13 +182,27 @@ export default function EOSPage() {
           queryFn: fetchAdminConfig,
           staleTime: 2000,
         }).catch(() => ({} as Record<string, AdminLineConfig>)),
+        queryClient.fetchQuery({
+          queryKey: queryKeys.downtime(shiftKey),
+          queryFn: () => fetchDowntime(shiftKey),
+          staleTime: 2000,
+        }).catch(() => [] as DowntimeEntry[]),
       ]);
 
       const toHide: string[] = [];
-      const shiftKey = shift.toLowerCase() as ShiftName;
       const toOmit = Object.entries(adminConfig)
         .filter(([, config]) => !isLineRunningForShift(config, shiftKey))
         .map(([lineId]) => lineIdToLineKey(lineId));
+      const currentTime = new Date(metrics.generatedAt);
+      const downtimeByLine = downtimeEntries.reduce((grouped, entry) => {
+        const existing = grouped.get(entry.lineId);
+        if (existing) {
+          existing.push(entry);
+        } else {
+          grouped.set(entry.lineId, [entry]);
+        }
+        return grouped;
+      }, new Map<string, DowntimeEntry[]>());
 
       setOmittedLines(new Set(toOmit));
 
@@ -195,6 +216,7 @@ export default function EOSPage() {
             ...updatedLines[lineKey],
             output: String(line.output),
             headcount: String(line.headcount),
+            ...summarizeDowntimeEntries(downtimeByLine.get(line.id) ?? [], currentTime),
           };
           merged.hpu = calculateHPU(
             merged.output,
@@ -229,13 +251,13 @@ export default function EOSPage() {
     } finally {
       setMesRefreshing(false);
     }
-  }
+  }, [queryClient]);
 
   useEffect(() => {
     refreshFromMes(formData.shift, (keys) =>
       setHiddenLines((prev) => new Set([...prev, ...keys])),
     );
-  }, [formData.shift]);
+  }, [formData.shift, refreshFromMes]);
 
   // ── Draft: persist on every form change ───────────────────────────────────
   const saveDraft = useCallback(() => {
@@ -345,14 +367,6 @@ export default function EOSPage() {
   const omittedVsLines = currentStream.lines.filter((line) =>
     omittedLines.has(`${currentStream.id}:${line}`),
   );
-
-  const filledLines = activeLines.filter(
-    ({ lineKey }) => formData.lines[lineKey].output,
-  ).length;
-  const progress =
-    activeLines.length > 0
-      ? Math.round((filledLines / activeLines.length) * 100)
-      : 0;
 
   const shiftWindow =
     formData.shift === "Day" ? "06:00 – 14:00" : "14:00 – 22:00";

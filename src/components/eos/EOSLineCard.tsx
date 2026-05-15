@@ -1,6 +1,7 @@
 "use client";
 
 import type { EOSLineEntry } from "@/lib/types/eos";
+import { getDowntimeReasonBadgeClass } from "@/lib/types/downtime";
 
 interface Props {
   lineKey: string;
@@ -25,7 +26,9 @@ const FIELDS: { key: keyof EOSLineEntry; label: string; type: string; readOnly?:
 
 export default function EOSLineCard({ lineKey, vsId, line, vsName, data, onChange, onHide }: Props) {
   const hasOutput = Boolean(data.output);
-  const outputNum = Number(data.output) || 0;
+  const downtimeMinutes = Number(data.downtimeMinutes) || 0;
+  const downtimeCount = Number(data.downtimeCount) || 0;
+  const openDowntimeCount = Number(data.openDowntimeCount) || 0;
 
   // Status bar color — "LIVE" when line produced output, "STOPPED" otherwise
   const statusBarColor = hasOutput ? "bg-vs2" : "bg-border";
@@ -39,7 +42,7 @@ export default function EOSLineCard({ lineKey, vsId, line, vsName, data, onChang
       {/* Top status bar */}
       <div className={`absolute top-0 left-0 w-full h-[2px] ${statusBarColor}`} />
 
-      <div className="p-5 grid grid-cols-2 md:grid-cols-5 gap-6">
+      <div className="p-5 grid grid-cols-2 md:grid-cols-6 gap-6">
         {/* Station identifier */}
         <div className="col-span-2 md:col-span-1">
           <p className="text-[10px] text-accent uppercase font-black tracking-widest mb-1">
@@ -90,6 +93,32 @@ export default function EOSLineCard({ lineKey, vsId, line, vsName, data, onChang
           <p className="font-['Space_Grotesk',sans-serif] text-2xl font-bold tabular-nums">
             {data.changeovers || "0"}
           </p>
+        </div>
+        <div className="flex flex-col justify-start">
+          <p className="kc-micro-label mb-1">Downtime</p>
+          <p className="font-['Space_Grotesk',sans-serif] text-2xl font-bold tabular-nums">
+            {downtimeMinutes}
+            <span className="text-sm font-normal text-[#e1e2ec]/30 ml-1">
+              min
+            </span>
+          </p>
+          <div className="mt-1 flex flex-wrap items-center gap-1.5">
+            <span className="text-[10px] text-[#e1e2ec]/45 font-mono">
+              {downtimeCount} stop{downtimeCount === 1 ? "" : "s"}
+            </span>
+            {openDowntimeCount > 0 && (
+              <span className="inline-flex items-center px-1.5 py-0.5 rounded-sm text-[9px] font-bold border uppercase bg-status-red/20 text-status-red border-status-red/20">
+                {openDowntimeCount} open
+              </span>
+            )}
+          </div>
+          {data.latestDowntimeReason && (
+            <span
+              className={`mt-2 inline-flex w-fit items-center px-2 py-0.5 rounded-sm text-[9px] font-bold border uppercase ${getDowntimeReasonBadgeClass(data.latestDowntimeReason)}`}
+            >
+              {data.latestDowntimeReason}
+            </span>
+          )}
         </div>
       </div>
 

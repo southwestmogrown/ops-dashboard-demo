@@ -2,7 +2,10 @@
 
 import { useState, useEffect } from "react";
 import type { DowntimeEntry } from "@/lib/types/downtime";
-import { DOWNTIME_REASON_LABELS } from "@/lib/types/downtime";
+import {
+  DOWNTIME_REASON_LABELS,
+  getDowntimeReasonBadgeClass,
+} from "@/lib/types/downtime";
 
 interface DowntimePanelProps {
   entries: DowntimeEntry[];
@@ -25,27 +28,6 @@ function formatDuration(startIso: string, endIso: string | null): string {
   const h = Math.floor(mins / 60);
   const m = mins % 60;
   return m > 0 ? `${h}h ${m}m` : `${h}h`;
-}
-
-function getReasonBadge(reason: DowntimeEntry["reason"]): string {
-  const map: Record<string, string> = {
-    "angle-saw-down": "bg-status-red/20 text-status-red",
-    "panel-saw-down": "bg-status-red/20 text-status-red",
-    "vacuum-table-down": "bg-status-red/20 text-status-red",
-    "waiting-for-material": "bg-status-amber/20 text-status-amber",
-    "waiting-for-rails-sides-tophats-extrusion":
-      "bg-status-amber/20 text-status-amber",
-    "bander-down": "bg-status-red/20 text-status-red",
-    "quality-hold": "bg-status-amber/20 text-status-amber",
-    "planned-maintenance": "bg-blue-500/20 text-blue-400",
-    "machine-failure": "bg-status-red/20 text-status-red",
-    "material-shortage": "bg-status-amber/20 text-status-amber",
-    "operator-break": "bg-slate-500/20 text-slate-400",
-    "safety-stop": "bg-red-600/20 text-red-500",
-    changeover: "bg-purple-500/20 text-purple-400",
-    other: "bg-slate-500/20 text-slate-400",
-  };
-  return map[reason] ?? "bg-slate-500/20 text-slate-400";
 }
 
 export default function DowntimePanel({
@@ -106,11 +88,11 @@ export default function DowntimePanel({
                 <div className="flex items-start justify-between gap-2">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-1.5 flex-wrap">
-                      <span
-                        className={`text-[9px] font-bold uppercase tracking-widest px-1.5 py-0.5 rounded-sm ${getReasonBadge(entry.reason)}`}
-                      >
-                        {DOWNTIME_REASON_LABELS[entry.reason]}
-                      </span>
+                        <span
+                          className={`text-[9px] font-bold uppercase tracking-widest px-1.5 py-0.5 rounded-sm border ${getDowntimeReasonBadgeClass(entry.reason)}`}
+                        >
+                          {DOWNTIME_REASON_LABELS[entry.reason]}
+                        </span>
                       {entry.endTime === null && (
                         <span className="text-[9px] font-bold uppercase tracking-widest px-1.5 py-0.5 rounded-sm bg-status-red/20 text-status-red animate-pulse">
                           ONGOING
